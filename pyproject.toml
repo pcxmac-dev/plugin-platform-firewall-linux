@@ -9,7 +9,7 @@ description = "Linux firewall for Liminal: ufw, firewalld or nftables on a Linux
 readme = "README.md"
 requires-python = ">=3.10"
 # the library it plugs into (the machine kind: liminal_libs.machines, plugin API 2.1)
-dependencies = ["liminal-libs>=1.20.1"]
+dependencies = ["liminal-libs>=1.20.2"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

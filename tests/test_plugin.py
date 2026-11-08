@@ -42,7 +42,7 @@ class FakeLinux:
 
     def __call__(self, args, timeout):
         self.calls.append(list(args))
-        cmd = args[args.index("--") + 1:] if "--" in args else args
+        cmd = args[args.index("--exec") + 1:] if "--exec" in args else args
         if cmd == ["sh", "-c", DETECT]:
             return 0, {"ufw": "ufw", "firewalld": "firewalld", "nft": "nft"}.get(self.backend, "none") + "\n", ""
         if cmd == ["sh", "-c", SSH_LISTENING]:
@@ -180,7 +180,7 @@ def test_ufw_turned_on_with_ssh_kept_open_exposure_found_and_the_services_rules_
     assert fw.status()["summary"] == "ufw on WSL's Ubuntu: off (ufw off); 0 Liminal rule(s)"
     done = fw.setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in done] == [("enable", True), ("exposure", False), ("rules", True)]
-    cmds = [c[c.index("--") + 1:] for c in fake.calls]
+    cmds = [c[c.index("--exec") + 1:] for c in fake.calls]
     ssh_rule = cmds.index(["ufw", "allow", "proto", "tcp", "from", "any", "to", "any", "port", "22", "comment", "liminal:ssh"])
     assert ssh_rule < cmds.index(["ufw", "--force", "enable"])  # SSH kept open before the firewall goes up
     assert ["ufw", "allow", "proto", "tcp", "from", "any", "to", "any", "port", "25,587", "comment", "liminal:mail-example-test"] in cmds
@@ -221,7 +221,7 @@ def test_firewalld_services_rich_rules_reload_and_exposure():
     off = FakeLinux("firewalld", active=False)
     fw_off = plugin(off)
     assert fw_off.status()["enabled"] is False and fw_off.list_rules() == []  # read through firewall-offline-cmd
-    assert any(c[c.index("--") + 1] == "firewall-offline-cmd" for c in off.calls)
+    assert any(c[c.index("--exec") + 1] == "firewall-offline-cmd" for c in off.calls)
     assert fw_off.setup(log=lambda m: None, steps=("enable",))[0]["ok"] is True and off.running
 
 
@@ -244,7 +244,7 @@ def test_nftables_rules_by_comment_no_switch_and_what_filters():
     done = fw.setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in done] == [("enable", None), ("exposure", False), ("rules", True)]
     assert done[0]["detail"] == "on: inet filter input" and "charts (8765)" in done[1]["detail"] and "platform (8775)" in done[1]["detail"] and "8785" not in done[1]["detail"]
-    insert = next(c[c.index("--") + 1:] for c in fake.calls if "insert" in c)
+    insert = next(c[c.index("--exec") + 1:] for c in fake.calls if "insert" in c)
     assert insert == ["nft", "insert", "rule", "inet", "filter", "input", "tcp", "dport", "{", "25,", "587", "}", "accept", "comment",
                       '"liminal:mail-example-test:tcp:25,587:any"']
     (mine,) = fw.list_rules()

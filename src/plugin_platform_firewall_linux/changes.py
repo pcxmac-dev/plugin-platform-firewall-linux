@@ -45,10 +45,23 @@ class Step:
     args: list
     stdin: str | None = None
     check: bool = True
+    label: str = ""  # a script's words for what it does (its text is long)
 
     @property
     def words(self) -> str:
-        return " ".join(shlex.quote(a) for a in self.args) if self.args[:2] != ["sh", "-c"] else "a script: " + self.args[2].splitlines()[0]
+        return self.label or " ".join(shlex.quote(a) for a in self.args)
+
+
+def file_script(path: str, fill: str) -> str:
+    """A shell script writing `path` from `fill` (commands printing its contents): written beside it first (the old file's
+    mode and owner kept), `check` run on it when given, the file before kept as path.liminal-<when>, then moved in place;
+    the half-written one removed when anything fails."""
+    return ("set -e; f=" + shlex.quote(path) + '; new="$f.liminal-new"; trap \'rm -f "$new"\' EXIT; mkdir -p "$(dirname "$f")"; '
+            'if [ -e "$f" ]; then cp -p "$f" "$new"; fi; { ' + fill + '; } > "$new"; ')
+
+
+def file_finish() -> str:
+    return 'if [ -e "$f" ]; then cp -p "$f" "$f.liminal-$(date +%Y%m%d-%H%M%S)"; fi; mv "$new" "$f"'
 
 
 @dataclass
@@ -522,12 +535,11 @@ def plan_save(cfg: Config, kind: str) -> Plan:
             if t.family not in nft_mod.IPTABLES_FAMILIES and t.family not in ("inet", "netdev") or not SAFE_NAME.match(t.name):
                 raise ValueError(f"the table {t.key} is not saved by name here")
         listing = "; ".join(f"nft -s list table {t.family} {t.name}" for t in tables)
-        script = ("set -e; f=" + shlex.quote(keep.path) + '; new="$f.liminal-new"; '
-                  "{ printf '#!/usr/sbin/nft -f\\n# saved by the Liminal platform: the tables of this machine\\n\\nflush ruleset\\n\\n'; "
-                  + listing + '; } > "$new"; nft -c -f "$new"; '
-                  'if [ -e "$f" ]; then cp -p "$f" "$f.liminal-$(date +%Y%m%d-%H%M%S)"; fi; mv "$new" "$f"')
+        script = (file_script(keep.path, "printf '#!/usr/sbin/nft -f\\n# saved by the Liminal platform: the tables of this "
+                              "machine\\n\\nflush ruleset\\n\\n'; " + listing) + 'nft -c -f "$new"; ' + file_finish())
         names = ", ".join(t.key for t in tables)
-        return Plan([Step(["sh", "-c", script])], f"saved to {keep.path} ({names}): {keep.note}; the file before is kept beside it",
+        return Plan([Step(["sh", "-c", script], label=f"wrote {keep.path} from {names} (nft -s list table), checked with nft -c")],
+                    f"saved to {keep.path} ({names}): {keep.note}; the file before is kept beside it",
                     "", [f"checked with nft -c before it replaced {keep.path}", *later])
     # iptables to a file: iptables-save and ip6tables-save, each to its own
     pairs = {"/etc/sysconfig/iptables": "/etc/sysconfig/ip6tables", "/etc/iptables/iptables.rules": "/etc/iptables/ip6tables.rules",
@@ -536,8 +548,7 @@ def plan_save(cfg: Config, kind: str) -> Plan:
     for tool, path in (("iptables", keep.path), ("ip6tables", pairs.get(keep.path, ""))):
         if tool not in cfg.saved or not path:
             continue
-        script = ("set -e; f=" + shlex.quote(path) + '; new="$f.liminal-new"; ' + f'{tool}-save > "$new"; '
-                  'if [ -e "$f" ]; then cp -p "$f" "$f.liminal-$(date +%Y%m%d-%H%M%S)"; fi; mv "$new" "$f"')
-        steps.append(Step(["sh", "-c", script]))
+        script = file_script(path, f"{tool}-save") + file_finish()
+        steps.append(Step(["sh", "-c", script], label=f"wrote {path} from {tool}-save"))
     return Plan(steps, f"saved to {keep.path}{' and its ip6tables file' if len(steps) > 1 else ''}: {keep.note}; the file before is kept beside it",
                 "", later)

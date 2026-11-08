@@ -1,0 +1,32 @@
+cockpit
+  ports: 9090/tcp
+  protocols: 
+  source-ports: 
+  modules: 
+  destination: 
+  includes: 
+  helpers: 
+dhcpv6-client
+  ports: 546/udp
+  protocols: 
+  source-ports: 
+  modules: 
+  destination: ipv6:fe80::/64
+  includes: 
+  helpers: 
+mdns
+  ports: 5353/udp
+  protocols: 
+  source-ports: 
+  modules: 
+  destination: ipv4:224.0.0.251 ipv6:ff02::fb
+  includes: 
+  helpers: 
+ssh
+  ports: 22/tcp
+  protocols: 
+  source-ports: 
+  modules: 
+  destination: 
+  includes: 
+  helpers: 

@@ -1,0 +1,69 @@
+FedoraServer (default, active)
+  target: default
+  ingress-priority: 0
+  egress-priority: 0
+  icmp-block-inversion: no
+  interfaces: enp1s0
+  sources: 
+  services: cockpit dhcpv6-client ssh
+  ports: 8443/tcp
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+	port=80:proto=tcp:toport=8080:toaddr=
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+	rule family="ipv4" source address="10.0.0.0/8" port port="9100" protocol="tcp" accept
+
+block
+  target: %%REJECT%%
+  ingress-priority: 0
+  egress-priority: 0
+  icmp-block-inversion: no
+  interfaces: 
+  sources: 
+  services: 
+  ports: 
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+
+docker (active)
+  target: ACCEPT
+  ingress-priority: 0
+  egress-priority: 0
+  icmp-block-inversion: no
+  interfaces: docker0
+  sources: 
+  services: 
+  ports: 
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 
+
+public
+  target: default
+  ingress-priority: 0
+  egress-priority: 0
+  icmp-block-inversion: no
+  interfaces: 
+  sources: 
+  services: dhcpv6-client mdns ssh
+  ports: 
+  protocols: 
+  forward: yes
+  masquerade: no
+  forward-ports: 
+  source-ports: 
+  icmp-blocks: 
+  rich rules: 

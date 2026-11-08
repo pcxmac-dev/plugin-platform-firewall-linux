@@ -1,0 +1,5 @@
+NAME=Gentoo
+ID=gentoo
+PRETTY_NAME="Gentoo Linux"
+VERSION_ID="2.18"
+HOME_URL="https://www.gentoo.org/"

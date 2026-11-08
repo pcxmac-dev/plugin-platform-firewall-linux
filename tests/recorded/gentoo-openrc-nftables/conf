@@ -1,0 +1,2 @@
+NFTABLES_SAVE="/var/lib/nftables/rules-save"
+SAVE_ON_STOP="yes"

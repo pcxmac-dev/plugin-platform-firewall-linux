@@ -1,0 +1,11 @@
+nftables no
+iptables yes started default
+ip6tables yes started default
+ipset no
+firewalld no
+ufw no
+netfilter-persistent no
+ebtables no
+nftables-restore no
+iptables-restore no
+ip6tables-restore no

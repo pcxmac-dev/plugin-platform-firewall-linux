@@ -1,0 +1,2 @@
+LISTEN 0      4096         0.0.0.0:22             0.0.0.0:*  users:(("sshd",pid=1001,fd=3))
+LISTEN 0      4096         [::]:9090              [::]:*     users:(("systemd",pid=1,fd=3))

@@ -1,0 +1,11 @@
+nftables yes inactive disabled
+iptables no
+ip6tables no
+ipset no
+firewalld yes active enabled
+ufw no
+netfilter-persistent no
+ebtables no
+nftables-restore no
+iptables-restore no
+ip6tables-restore no

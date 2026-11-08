@@ -1,0 +1,9 @@
+NAME="Fedora Linux"
+VERSION="43 (Server Edition)"
+RELEASE_TYPE=stable
+ID=fedora
+VERSION_ID=43
+PLATFORM_ID="platform:f43"
+PRETTY_NAME="Fedora Linux 43 (Server Edition)"
+VARIANT="Server Edition"
+VARIANT_ID=server

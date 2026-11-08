@@ -1,0 +1,4 @@
+LISTEN 0      4096         0.0.0.0:22             0.0.0.0:*  users:(("sshd",pid=812,fd=3))
+LISTEN 0      4096         [::]:22                [::]:*     users:(("sshd",pid=812,fd=3))
+LISTEN 0      4096         0.0.0.0:5432           0.0.0.0:*  users:(("docker-proxy",pid=2210,fd=3))
+LISTEN 0      4096         127.0.0.1:8775         0.0.0.0:*  users:(("python3",pid=3301,fd=3))

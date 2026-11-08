@@ -1,0 +1,10 @@
+Status: active
+
+     To                         Action      From
+     --                         ------      ----
+[ 1] 22/tcp                     ALLOW IN    Anywhere                  
+[ 2] 80,443/tcp                 ALLOW IN    Anywhere                   # web
+[ 3] 25,587/tcp                 ALLOW IN    Anywhere                   # liminal:mail-example-test
+[ 4] Anywhere                   ALLOW IN    10.0.0.0/8                
+[ 5] 53/udp                     ALLOW OUT   Anywhere                   (out)
+[ 6] 22/tcp (v6)                ALLOW IN    Anywhere (v6)             

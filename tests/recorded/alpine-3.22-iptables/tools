@@ -1,0 +1,4 @@
+iptables /sbin/iptables
+ip6tables /sbin/ip6tables
+ip /sbin/ip
+netstat /bin/netstat

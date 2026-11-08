@@ -1,5 +1,6 @@
-"""`python -m plugin_platform_firewall_linux status | setup [STEP ...] | rules | exposure | allow NAME PORT[,PORT ...] [tcp|udp]
-| remove NAME | run -- COMMAND`: the plugin from the command line (the platform app drives the same hooks)."""
+"""`python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS ...] | setup [STEP ...] | exposure |
+allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND`: the plugin from the command line (the platform app
+drives the same hooks from its page, every change there confirmed first)."""
 from __future__ import annotations
 
 import json
@@ -9,8 +10,10 @@ from liminal_libs.machines.firewall import app_ports
 from liminal_libs.machines.plugin import CommandError
 
 from . import MACHINE
+from .model import PRESET_NAMES
 
-USAGE = "python -m plugin_platform_firewall_linux status | setup [STEP ...] | rules | exposure | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND"
+USAGE = ("python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS ...] | setup [STEP ...] | exposure "
+         "| allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -18,14 +21,22 @@ def main(argv: list[str] | None = None) -> int:
     what, rest = (argv[0], argv[1:]) if argv else ("status", [])
     try:
         if what == "status":
-            print(json.dumps(MACHINE.status(), indent=1))
-            return 0 if MACHINE.present() else 1
+            st = MACHINE.status()
+            print(json.dumps({k: v for k, v in st.items() if k not in ("tables", "forms", "actions")}, indent=1))
+            return 0 if st.get("valid") else 1
+        if what == "tables":
+            print(json.dumps(MACHINE.status().get("tables", []), indent=1))
+            return 0
+        if what == "rules":
+            preset = rest[0] if rest and rest[0] in PRESET_NAMES else "all"
+            words = " ".join(rest[1:] if rest and rest[0] in PRESET_NAMES else rest)
+            for e in MACHINE.config().entries():
+                if e.shown(preset) and e.found(words):
+                    print(f"{e.kind:9} {e.where:32} {e.direction:5} {e.action:8} {e.owner:10} {e.text}")
+            return 0
         if what == "setup":
             done = MACHINE.setup(log=print, steps=rest or None)
             return 0 if all(d["ok"] is not False for d in done) else 1
-        if what == "rules":
-            print(json.dumps([r.describe() for r in MACHINE.list_rules()], indent=1))
-            return 0
         if what == "exposure":
             ports = app_ports()
             hits = MACHINE.exposing(sorted(set(ports.values())))
@@ -44,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
             if command:
                 print(MACHINE.run(*command), end="")
                 return 0
-    except (CommandError, ValueError) as e:
+    except (CommandError, ValueError, LookupError) as e:
         print(str(e), file=sys.stderr)
         return 1
     print(USAGE, file=sys.stderr)

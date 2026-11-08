@@ -1,0 +1,6 @@
+Added user rules (see 'ufw status' for running firewall):
+ufw allow 22/tcp
+ufw allow 80,443/tcp comment 'web'
+ufw allow proto tcp from any to any port 25,587 comment 'liminal:mail-example-test'
+ufw allow from 10.0.0.0/8
+ufw allow out 53/udp

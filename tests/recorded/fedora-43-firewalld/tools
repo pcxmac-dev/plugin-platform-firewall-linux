@@ -1,0 +1,7 @@
+nft /usr/sbin/nft
+iptables /usr/sbin/iptables
+ip6tables /usr/sbin/ip6tables
+firewall-cmd /usr/bin/firewall-cmd
+firewall-offline-cmd /usr/bin/firewall-offline-cmd
+ip /usr/sbin/ip
+ss /usr/sbin/ss

@@ -1,0 +1,3 @@
+IPTABLES_SAVE="/etc/iptables/rules-save"
+SAVE_ON_STOP="yes"
+IPFORWARD="no"

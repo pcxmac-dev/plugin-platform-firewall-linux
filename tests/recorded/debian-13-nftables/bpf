@@ -1,0 +1,1 @@
+[{"xdp": [{"devname": "enp3s0", "ifindex": 2, "mode": "generic", "id": 42}], "tc": [{"devname": "enp3s0", "ifindex": 2, "kind": "clsact/ingress", "name": "tc_ingress", "id": 57}], "flow_dissector": [], "netfilter": []}]

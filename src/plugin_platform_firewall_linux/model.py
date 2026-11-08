@@ -22,6 +22,7 @@ OWNER_WORDS = {
     "calico": "Calico", "cilium": "Cilium", "flannel": "flannel", "weave": "Weave", "fail2ban": "Fail2ban",
     "crowdsec": "CrowdSec", "sshguard": "SSHGuard", "tailscale": "Tailscale", "networkmanager": "NetworkManager",
     "systemd": "systemd", "nixos": "NixOS", "waydroid": "Waydroid", "wireguard": "WireGuard",
+    "owned": "its owning program",  # a table with the kernel's owner flag: only that program may change it
 }
 # Programs making their own rules, by a table's or a chain's name (its start; the first match wins)
 NAMED_OWNERS = (
@@ -192,8 +193,8 @@ class Entry:
         s = self.source.split()[0] if self.source else ""
         if s.startswith("127.") or s in ("::1", "::1/128"):
             return True
-        st = self.state.replace(",", " ").split()
-        return bool(st) and "new" not in st and all(w in ("established", "related", "untracked") for w in st)
+        st = re.findall(r"[a-z]+", self.state.lower())  # established,related; { established, related }
+        return bool(st) and "not" not in st and all(w in ("established", "related", "untracked") for w in st)
 
     def covers(self, port: int, protocol: str = "tcp") -> bool:
         """Whether it is for this local port of `protocol`: every port when it names none and no other protocol (ICMP has

@@ -40,13 +40,18 @@ printf '\n@@ tools 0\n'
 for x in nft iptables ip6tables iptables-legacy-save ip6tables-legacy-save ebtables arptables ipset firewall-cmd \
   firewall-offline-cmd ufw conntrack bpftool ip ss netstat netfilter-persistent; do have "$x" && echo "$x $(command -v "$x")"; done
 if have nft; then sec nft.version nft --version; sec nft nft -j list ruleset; fi
-if have iptables; then sec iptables.version iptables -V; sec iptables.save iptables-save; fi
-if have ip6tables; then sec ip6tables.save ip6tables-save; fi
+# a legacy iptables lists only tables its modules hold already (listing them otherwise would load ip_tables)
+if have iptables; then sec iptables.version iptables -V
+  case "$(iptables -V 2>/dev/null)" in *nf_tables*) sec iptables.save iptables-save ;;
+  *) if [ -s /proc/net/ip_tables_names ]; then sec iptables.save iptables-save; fi ;; esac; fi
+if have ip6tables; then
+  case "$(ip6tables -V 2>/dev/null)" in *nf_tables*) sec ip6tables.save ip6tables-save ;;
+  *) if [ -s /proc/net/ip6_tables_names ]; then sec ip6tables.save ip6tables-save; fi ;; esac; fi
 if [ -s /proc/net/ip_tables_names ] && have iptables-legacy-save; then sec iptables.legacy iptables-legacy-save; fi
 if [ -s /proc/net/ip6_tables_names ] && have ip6tables-legacy-save; then sec ip6tables.legacy ip6tables-legacy-save; fi
 if have ebtables; then sec ebtables.version ebtables -V; fi
 if have arptables; then sec arptables.version arptables -V; fi
-if have ipset; then sec ipset.version ipset -v; sec ipset ipset list -t; fi
+if have ipset; then sec ipset.version ipset -v; if [ -d /sys/module/ip_set ]; then sec ipset ipset list -t; fi; fi
 if have firewall-cmd || have firewall-offline-cmd; then
   case $init in  # firewall-cmd waits 10 s for D-Bus when the daemon is stopped (firewalld 2.4.3+): its service asked first
   systemd) systemctl is-active --quiet firewalld.service 2>/dev/null; up=$? ;;

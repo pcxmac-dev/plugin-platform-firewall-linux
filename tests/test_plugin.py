@@ -125,7 +125,7 @@ def test_a_rule_made_through_each_front_end():
     fake = FakeLinux("gentoo-openrc-nftables")
     fw = plugin(fake)
     out = fw.make_rule("web", "in", "allow", "tcp", "8443, 8444", "10.0.0.0/8")
-    assert fake.changes == [["nft", "insert", "rule", "inet", "filter", "input", "position", "9", "ip", "saddr", "10.0.0.0/8", "tcp", "dport",
+    assert fake.changes == [["nft", "insert", "rule", "inet", "filter", "input", "handle", "9", "ip", "saddr", "10.0.0.0/8", "tcp", "dport",
                              "{", "8443, 8444", "}", "accept", "comment", '"liminal:web:tcp:8443,8444:10.0.0.0/8"']]
     assert out["said"].startswith("made in nftables' inet filter input: let tcp port 8443,8444 coming in from 10.0.0.0/8, as Liminal's web")
     fw.make_rule("spam", "in", "block", "tcp", "25", "203.0.113.0/24")
@@ -207,8 +207,9 @@ def test_a_change_that_can_cut_ssh_or_open_everything_needs_a_second_confirmatio
     # a default letting everything in; dropping by default with nothing letting SSH in
     with pytest.raises(Risky, match="lets in by default"):
         fw.set_policy("inet filter input", "accept")
-    gentoo = plugin(FakeLinux("gentoo-openrc-nftables"))
-    gentoo.set_policy("inet filter output", "drop")  # not inbound, SSH's replies are its own state: no second confirmation
+    gentoo_fake = FakeLinux("gentoo-openrc-nftables")
+    plugin(gentoo_fake).set_policy("inet filter output", "drop")  # not inbound: no second confirmation
+    assert gentoo_fake.changes == [["nft", "add", "chain", "inet", "filter", "output", "{", "policy", "drop;", "}"]]
     alpine = FakeLinux("alpine-3.22-iptables")
     alpine.set("iptables.save", "*filter\n:INPUT ACCEPT [0:0]\n:FORWARD DROP [0:0]\n:OUTPUT ACCEPT [0:0]\n-A INPUT -s 10.0.0.0/8 -m comment --comment own -j ACCEPT\nCOMMIT\n")
     alpine.set("ip6tables.save", "")

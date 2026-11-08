@@ -107,11 +107,12 @@ def parse_addresses(text: str) -> list[Interface]:
         xdp = ""
         x = i.get("xdp")
         if isinstance(x, dict):
-            mode = {0: "none", 1: "native", 2: "generic", 3: "offloaded", 4: "multiple"}.get(x.get("mode"), str(x.get("mode", "")))
+            mode = {0: "none", 1: "driver", 2: "generic", 3: "offload", 4: "multiple"}.get(x.get("mode"), str(x.get("mode", "")))
             prog = x.get("prog") or {}
             pid = prog.get("id") if isinstance(prog, dict) else None
-            if pid is None and isinstance(x.get("attached"), list):
-                ids = [str((a.get("prog") or {}).get("id")) for a in x["attached"] if isinstance(a, dict)]
+            if pid is None and isinstance(x.get("attached"), list):  # several modes at once: no program at the top
+                names = {1: "driver", 2: "generic", 3: "offload"}
+                ids = [f"{(a.get('prog') or {}).get('id')} ({names.get(a.get('mode'), a.get('mode'))})" for a in x["attached"] if isinstance(a, dict)]
                 xdp = f"XDP {mode}: programs {', '.join(ids)}"
             else:
                 xdp = f"XDP {mode}" + (f": program {pid}" if pid is not None else "")
@@ -119,26 +120,43 @@ def parse_addresses(text: str) -> list[Interface]:
     return out
 
 
+PF = {1: "inet", 2: "ip", 3: "arp", 5: "netdev", 7: "bridge", 10: "ip6"}
+HOOKS = {0: "prerouting", 1: "input", 2: "forward", 3: "output", 4: "postrouting"}
+
+
 def parse_bpf_net(text: str) -> list[str]:
-    """`bpftool -j net show`: the eBPF programs on the network's hooks (XDP, tc, flow dissector, netfilter), in words."""
+    """`bpftool -j net show`: the eBPF programs on the network's hooks, in words: XDP (driver, generic, offload; several
+    at once), tc (classic cls_bpf by `id`, tcx and netkit links by `prog_id`), the flow dissector, and netfilter links (BPF
+    programs on netfilter's hooks since Linux 6.4, never in nft's ruleset). bpftool writes a flow dissector's id as
+    `["id":N]`, which is not JSON: mended before it is read."""
+    raw = re.sub(r'"flow_dissector":\[\s*("id"\s*:\s*\d+)\s*\]', r'"flow_dissector":[{\1}]', text or "[]")
     try:
-        data = json.loads(text or "[]")
+        data = json.loads(raw)
     except ValueError:
         return []
     out = []
     for block in data if isinstance(data, list) else [data]:
         if not isinstance(block, dict):
             continue
-        for kind in ("xdp", "tc", "flow_dissector", "netfilter", "tcx"):
-            for p in block.get(kind) or []:
-                if not isinstance(p, dict):
-                    continue
-                where = p.get("devname") or p.get("ifname") or ""
-                hook = p.get("kind") or p.get("mode") or p.get("hook") or ""
-                name = p.get("name") or p.get("prog_name") or ""
-                pid = p.get("id") or p.get("prog_id") or ""
-                words = " ".join(str(w) for w in (kind, where, hook, name, f"id {pid}" if pid else "") if w)
-                out.append(words)
+        for p in block.get("xdp") or []:
+            if not isinstance(p, dict):
+                continue
+            multi = p.get("multi_attachments")
+            if isinstance(multi, list):
+                out += [f"xdp {p.get('devname', '')} {m.get('mode', '')} id {m.get('id', '')}" for m in multi if isinstance(m, dict)]
+            else:
+                out.append(f"xdp {p.get('devname', '')} {p.get('mode', '')} id {p.get('id', '')}")
+        for p in block.get("tc") or []:
+            if isinstance(p, dict):
+                pid = p.get("prog_id", p.get("id", ""))
+                out.append(" ".join(str(w) for w in ("tc", p.get("devname", ""), p.get("kind", ""), p.get("name", ""), f"id {pid}") if w != ""))
+        for p in block.get("flow_dissector") or []:
+            if isinstance(p, dict) and p.get("id") is not None:
+                out.append(f"flow dissector id {p['id']}")
+        for p in block.get("netfilter") or []:
+            if isinstance(p, dict):
+                out.append(f"netfilter {PF.get(p.get('pf'), p.get('pf'))} {HOOKS.get(p.get('hook'), p.get('hook'))} "
+                           f"prio {p.get('prio')} id {p.get('id')}")
     return out
 
 

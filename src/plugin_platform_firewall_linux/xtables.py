@@ -17,7 +17,7 @@ TARGETS = {"ACCEPT": "accept", "DROP": "drop", "REJECT": "reject", "RETURN": "re
            "ULOG": "log", "MASQUERADE": "nat", "SNAT": "nat", "DNAT": "nat", "REDIRECT": "nat", "NETMAP": "nat",
            "QUEUE": "queue", "NFQUEUE": "queue"}
 VERSION = re.compile(r"v?(\d+(?:\.\d+)+)")
-INCOMPATIBLE = re.compile(r"[Tt]able [`'\"]?(\w+)[`'\"]? is incompatible")
+INCOMPATIBLE = re.compile(r"[Tt]able [`'\"]?(\w+)[`'\"]? (?:is incompatible|contains incompatible)")
 COMMENT_OWNERS = (("cali:", "calico"), ("kubernetes", "kubernetes"), ("KUBE", "kubernetes"), ("docker", "docker"),
                   ("cilium", "cilium"), ("flannel", "flannel"), ("tailscale", "tailscale"), ("netavark", "podman"))
 
@@ -243,6 +243,8 @@ def entries(saved: Saved, binary: str = "") -> list[Entry]:
         if c.policy == "-":
             own_chains.setdefault(c.table, set()).add(c.name)
     for r in saved.rules:
+        if r.table in saved.incompatible:  # iptables-nft could not read it all: nftables' JSON stands for it
+            continue
         v = view(r.args, own_chains.get(r.table, frozenset()))
         direction = direction_of(r.table, hooks.get((r.table, r.chain), ())) if (r.table, r.chain) in hooks else "other"
         text = " ".join(_word(a) for a in r.args)

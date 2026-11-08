@@ -47,6 +47,23 @@ A change that can cut SSH or open everything needs a second confirmation (`accep
 
 **Tests.** They run over recorded machines.
 
+**What the research found** (the kernel's and the tools' sources, 2026-11-08; the README's "The kernel and its
+firewall today"):
+
+- Reading loads no kernel module: the legacy x_tables only when loaded, ipset only when `ip_set` is, conntrack from
+  /proc.
+- firewalld is asked only when its service runs.
+- Owned tables (flags owner, persist) are read only.
+- `nft insert ... handle N`.
+- nft's flags as a word or a list.
+- firewalld's TAB lines and disabled policies.
+- Alpine's rules file (its own save keeps counters only).
+- Gentoo's nftables-store and iptables-store.
+- openSUSE's /etc/nftables/rules/main.nft.
+- ufw kept at boot under OpenRC.
+- bpftool's JSON, mended where it is not JSON.
+- IPv6's neighbour discovery kept behind a second confirmation.
+
 **Its icon.** Tux as a wall of bricks (`ICON = "tuxbricks"`, liminal-libs 1.33.0; the user: "for the firewalls, lets use
 an icon of TUX penguin or Windows and then convert it to a patchwork of bricks"). It now needs liminal-libs>=1.33.0.
 

@@ -109,6 +109,57 @@ that as a second, explicit confirmation (`accept_risk`), in the plugin's own wor
 - stopping a firewall;
 - starting a service that flushes other programs' rules.
 
+## The kernel and its firewall today
+
+Researched on 2026-11-08 for this release (the user: "research the current linux kernel").
+
+**Kernel lines.**
+
+- Mainline is 7.4-rc1, and stable is 7.3.3.
+- The long-term lines are 6.18, 6.12, 6.6, 6.1, 5.15 and 5.10.
+- The plugin works the same on all of them.
+
+**nftables.**
+
+- nf_tables is the kernel's packet filter, and nftables 1.1.7 is its current tool.
+- Its JSON listing (`nft -j list ruleset`) is what the plugin reads.
+- A `flags` value is a word on nft 1.1.3 and older (a list when several flags are set), and a list on 1.1.7. The plugin
+  takes both.
+
+**iptables.**
+
+- iptables 1.8.13 is current. Its nf_tables variant (`iptables-nft`, the default on Debian and Ubuntu, Fedora and RHEL,
+  Arch since April 2026, and Alpine) writes its rules into nftables' tables.
+- It marks those tables with nothing, so the plugin knows them by what `iptables-save` lists. It reads them in iptables'
+  own syntax, because their `-m comment` and other extensions are opaque `xt` objects in nftables' JSON.
+
+**The legacy x_tables.**
+
+- They are optional since Linux 6.17 (`CONFIG_NETFILTER_XTABLES_LEGACY`, off by default), and gone from some kernels
+  (Raspberry Pi OS's 6.18).
+- Debian plans to drop them after forky.
+- The plugin reads them only when the kernel has them loaded (`/proc/net/ip_tables_names`), because listing them
+  otherwise would load `ip_tables`.
+
+**Reading loads nothing.** As root, a listing can load kernel modules. So:
+
+- conntrack is read from `/proc/sys/net/netfilter`, never through netlink;
+- ipset is asked only when `ip_set` is loaded;
+- the legacy tables are asked only when they are loaded.
+
+**Owned tables.**
+
+- firewalld's `inet firewalld` table carries the kernel's `owner` and `persist` flags (Linux 5.12 and 6.9), so only
+  firewalld may change it.
+- Any table with those flags is read only here.
+
+**eBPF.**
+
+- XDP programs (driver, generic, offload, several at once), tc programs (classic `cls_bpf`, and tcx or netkit links since
+  6.6) and netfilter BPF links (since 6.4) filter without being in nftables' ruleset.
+- The plugin lists them from `ip -j addr` and `bpftool -j net show`, read only.
+- bpftool writes an attached flow dissector as `["id":N]`, which is not JSON, so the plugin mends it before reading.
+
 ## Distributions and init systems
 
 The distribution is read from `/etc/os-release` (`ID`, `ID_LIKE`); its init system from what runs.

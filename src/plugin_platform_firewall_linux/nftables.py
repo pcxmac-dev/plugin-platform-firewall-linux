@@ -125,9 +125,10 @@ def parse(text: str) -> Ruleset:
             rs.tables.append(Table(o.get("family", ""), o.get("name", ""), int(o.get("handle") or 0),
                                    tuple([flags] if isinstance(flags, str) else flags), str(o.get("comment") or "")))
         elif kind == "chain":
+            dev = o.get("dev") or ""  # one device's name, or a list of them
             rs.chains.append(Chain(o.get("family", ""), o.get("table", ""), o.get("name", ""), int(o.get("handle") or 0),
                                    str(o.get("type") or ""), str(o.get("hook") or ""), o.get("prio"), str(o.get("policy") or ""),
-                                   str(o.get("dev") or ""), str(o.get("comment") or "")))
+                                   ", ".join(map(str, dev)) if isinstance(dev, list) else str(dev), str(o.get("comment") or "")))
         elif kind == "rule":
             rs.rules.append(Rule(o.get("family", ""), o.get("table", ""), o.get("chain", ""), int(o.get("handle") or 0),
                                  tuple(o.get("expr") or ()), str(o.get("comment") or "")))
@@ -135,8 +136,10 @@ def parse(text: str) -> Ruleset:
             elem = o.get("elem")
             flags = o.get("flags") or ()
             typ = o.get("type")
+            if isinstance(typ, dict) and "typeof" in typ:  # declared by an expression: typeof ip saddr
+                typ = "typeof " + left_text(typ["typeof"])
             rs.sets.append(NSet(o.get("family", ""), o.get("table", ""), o.get("name", ""), kind,
-                                " . ".join(typ) if isinstance(typ, list) else str(typ or ""),
+                                " . ".join(map(str, typ)) if isinstance(typ, list) else str(typ or ""),
                                 tuple([flags] if isinstance(flags, str) else flags), len(elem) if isinstance(elem, list) else 0,
                                 str(o.get("comment") or "")))
         else:
@@ -399,10 +402,13 @@ def iptables_tables(rs: Ruleset, saved: dict) -> set:
 
 
 def table_owner(t: Table, chains: list) -> str:
-    """The program that made a table ("own" when nothing says): its name, or the interfaces its chains are bound to."""
+    """The program that made a table ("own" when nothing says): its name, the interfaces its chains are bound to, or the
+    kernel's owner flag (a table only its owning program may change: firewalld's is owner and persist)."""
     owner = owner_by_name(t.name)
     if owner:
         return owner
+    if "owner" in t.flags or "persist" in t.flags:
+        return "owned"
     if t.comment.lower().startswith(PREFIX):
         return "liminal"
     for c in chains:
@@ -530,8 +536,9 @@ def comment_of(name: str, protocol: str, spans, source: str) -> str:
 
 
 def insert_rule(chain: Chain, words: list[str], verdict: str, comment: str, before: int | None = None) -> list[str]:
-    """`nft insert rule` at the head of the chain, or before the rule with the handle `before`."""
-    where = ["position", str(before)] if before else []
+    """`nft insert rule` at the head of the chain, or before the rule with the handle `before` (`handle N`: the older
+    `position N` is no longer documented)."""
+    where = ["handle", str(before)] if before else []
     return ["nft", "insert", "rule", chain.family, chain.table, chain.name, *where, *words, verdict, "comment", _quote(comment)]
 
 
@@ -544,7 +551,8 @@ def delete_rule(family: str, table: str, chain: str, handle: int) -> list[str]:
 
 
 def set_policy(chain: Chain, policy: str) -> list[str]:
-    return ["nft", "chain", chain.family, chain.table, chain.name, "{", "policy", f"{policy};", "}"]
+    """`nft add chain FAMILY TABLE NAME { policy X; }`: an existing base chain's policy changed alone."""
+    return ["nft", "add", "chain", chain.family, chain.table, chain.name, "{", "policy", f"{policy};", "}"]
 
 
 def catch_all(rule: Rule) -> bool:

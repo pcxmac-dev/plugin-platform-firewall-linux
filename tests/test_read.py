@@ -201,7 +201,7 @@ def test_each_tool_parsed_as_it_prints():
     assert system.service_command("systemd", "nftables", "stop") == [["systemctl", "disable", "--now", "nftables"]]
     multi = system.parse_addresses(json.dumps([{"ifname": "eth1", "operstate": "UP", "addr_info": [],
                                                 "xdp": {"mode": 4, "attached": [{"mode": 1, "prog": {"id": 7}}, {"mode": 2, "prog": {"id": 8}}]}}]))
-    assert multi[0].xdp == "XDP multiple: programs 7, 8"
+    assert multi[0].xdp == "XDP multiple: programs 7 (driver), 8 (generic)"
 
 
 def test_nftables_written_out_again():
@@ -271,3 +271,42 @@ def test_ufw_rows_as_its_format_prints_them():
     assert (to_host.destination, to_host.ports, to_host.protocol) == ("10.0.0.5", "22", "tcp")
     assert (telnet.action, telnet.ports, telnet.protocol, telnet.comment, telnet.family) == ("drop", "23", "", "telnet", "ipv6")
     assert telnet.covers(23, "udp") and telnet.covers(23)  # any protocol: ufw shows the port alone
+
+
+def test_what_the_netfilter_research_found():
+    # bpftool's net JSON: XDP single and multi, classic tc by "id" and tcx by "prog_id", netfilter links, and a flow
+    # dissector written as ["id":N] (not JSON) mended before it is read
+    bpf = ('[{"xdp":[{"devname":"eth0","ifindex":2,"mode":"driver","id":42},{"devname":"eth1","ifindex":3,"multi_attachments":'
+           '[{"mode":"generic","id":43},{"mode":"driver","id":44}]}],"tc":[{"devname":"eth0","ifindex":2,"kind":"clsact/ingress",'
+           '"name":"tc_ingress.o:[tc]","id":51},{"devname":"eth1","ifindex":3,"kind":"tcx/ingress","name":"tcx_ingress","prog_id":60,'
+           '"prog_flags":[],"link_id":7,"link_flags":[]}],"flow_dissector":["id":9],"netfilter":[{"pf":2,"hook":1,"prio":-128,"flags":0,"id":15}]}]')
+    assert system.parse_bpf_net(bpf) == ["xdp eth0 driver id 42", "xdp eth1 generic id 43", "xdp eth1 driver id 44",
+                                         "tc eth0 clsact/ingress tc_ingress.o:[tc] id 51", "tc eth1 tcx/ingress tcx_ingress id 60",
+                                         "flow dissector id 9", "netfilter ip input prio -128 id 15"]
+    assert system.parse_bpf_net('[{"xdp":[],"tc":[],"flow_dissector":[],"netfilter":[]}]') == []
+    # nft's JSON as its versions write it: flags a word or a list, a chain's devices a list, a set's typeof, an owned table
+    rs = nft.parse(json.dumps({"nftables": [
+        {"metainfo": {"version": "1.1.7", "release_name": "Commodore Bullmoose #8", "json_schema_version": 1}},
+        {"table": {"family": "inet", "name": "daemon", "handle": 4, "flags": ["owner", "persist"]}},
+        {"table": {"family": "netdev", "name": "edge", "handle": 5, "flags": "dormant"}},
+        {"chain": {"family": "netdev", "table": "edge", "name": "in", "handle": 1, "dev": ["eth0", "eth1"], "type": "filter",
+                   "hook": "ingress", "prio": -500, "policy": "accept"}},
+        {"set": {"family": "inet", "name": "seen", "table": "daemon", "type": {"typeof": {"payload": {"protocol": "ip", "field": "saddr"}}},
+                 "handle": 2, "flags": "timeout"}},
+        {"rule": {"family": "inet", "table": "daemon", "chain": "c", "handle": 3, "expr": [
+            {"match": {"op": "==", "left": {"ct": {"key": "state"}}, "right": {"set": ["established", "related"]}}},
+            {"counter": None}, {"log": None}, {"accept": None}]}}]}))
+    assert [t.flags for t in rs.tables] == [("owner", "persist"), ("dormant",)]
+    assert rs.chains[0].dev == "eth0, eth1" and rs.sets[0].type == "typeof ip saddr" and rs.sets[0].flags == ("timeout",)
+    assert nft.table_owner(rs.tables[0], rs.chains) == "owned"
+    e = nft.entries(rs)[0]
+    assert e.owner == "owned" and not e.removable and e.local  # a state in braces is the replies' still
+    assert e.text == "ct state { established, related } counter log accept"
+    # iptables-nft could not read every base chain of a table: nftables' JSON stands for it, not half of it twice
+    saved = xtables.parse_save("# Table `filter' contains incompatible base-chains, use 'nft' tool to list them.\n*filter\n"
+                               ":INPUT ACCEPT [0:0]\n-A INPUT -j ACCEPT\nCOMMIT\n", "iptables")
+    assert saved.incompatible == ["filter"] and xtables.entries(saved) == []
+    # the read never loads a module: legacy iptables only when its tables are loaded, ipset only when ip_set is
+    assert "*) if [ -s /proc/net/ip_tables_names ]; then sec iptables.save iptables-save; fi" in read.SCRIPT
+    assert "if [ -d /sys/module/ip_set ]; then sec ipset ipset list -t; fi" in read.SCRIPT
+    assert "conntrack -" not in read.SCRIPT  # its counts from /proc, never through netlink (which would load it)

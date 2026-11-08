@@ -22,7 +22,7 @@ from liminal_libs.machines.firewall import NAME, PREFIX, Firewall, FirewallError
 from liminal_libs.machines.linux import Shell
 from liminal_libs.machines.plugin import CommandError
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 TARGET_VAR = "FIREWALL_LINUX_TARGET"
 DETECT = ("if command -v ufw >/dev/null 2>&1; then echo ufw; "
           "elif command -v firewall-cmd >/dev/null 2>&1; then echo firewalld; "

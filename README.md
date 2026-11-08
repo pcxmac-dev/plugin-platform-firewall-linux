@@ -24,7 +24,9 @@ password asked; `wsl -u root` in a WSL distribution):
 The setup's steps: `enable`, `exposure` (a finding, never a change), `rules` (the ports the framework's services
 need, a domain login's mail server container). `allow(name, ports)`, `remove(name)`: Liminal's own rules only.
 
-Variables: `FIREWALL_LINUX_TARGET`: `local`, `wsl` or `wsl:<distribution>` (local on Linux, the default WSL distribution on Windows).
+Variables: `FIREWALL_LINUX_TARGET`: `local`, `wsl` or `wsl:<distribution>` (unset: this machine on Linux, Liminal's own
+WSL distribution on Windows, Liminal-Ubuntu first). On a target that is not Liminal's (the user's own distribution)
+the plugin runs no command at all.
 
 ## From the command line
 

@@ -151,15 +151,15 @@ class FakeLinux:
 
 
 def plugin(fake) -> LinuxFirewallPlugin:
-    p = LinuxFirewallPlugin(shell=Shell("wsl:Ubuntu", runner=fake))
+    p = LinuxFirewallPlugin(shell=Shell("wsl:Liminal-Ubuntu", runner=fake))
     p.wanted = lambda: list(WANTED)
     return p
 
 
 def test_the_plugin_its_target_and_the_firewall_it_finds(monkeypatch):
     assert MACHINE.name == "firewall-linux" and MACHINE.KIND == "machine" and MACHINE.options == ("FIREWALL_LINUX_TARGET",)
-    monkeypatch.setenv("FIREWALL_LINUX_TARGET", "wsl:Ubuntu")
-    assert LinuxFirewallPlugin().shell.target == "wsl:Ubuntu" and LinuxFirewallPlugin().shell.where == "WSL's Ubuntu"
+    monkeypatch.setenv("FIREWALL_LINUX_TARGET", "wsl:Liminal-Ubuntu")
+    assert LinuxFirewallPlugin().shell.target == "wsl:Liminal-Ubuntu" and LinuxFirewallPlugin().shell.where == "WSL's Liminal-Ubuntu"
     for backend, kind in (("ufw", Ufw), ("firewalld", Firewalld), ("nft", Nft), ("none", NoFirewall)):
         assert isinstance(plugin(FakeLinux(backend)).driver(), kind)
     none = plugin(FakeLinux("none"))
@@ -177,14 +177,14 @@ def test_ufw_turned_on_with_ssh_kept_open_exposure_found_and_the_services_rules_
                      "[ 4] 8775/tcp                   ALLOW IN    127.0.0.1\n"
                      "[ 5] 8780:8790/tcp              ALLOW IN    Anywhere\n")
     fw = plugin(fake)
-    assert fw.status()["summary"] == "ufw on WSL's Ubuntu: off (ufw off); 0 Liminal rule(s)"
+    assert fw.status()["summary"] == "ufw on WSL's Liminal-Ubuntu: off (ufw off); 0 Liminal rule(s)"
     done = fw.setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in done] == [("enable", True), ("exposure", False), ("rules", True)]
     cmds = [c[c.index("--exec") + 1:] for c in fake.calls]
     ssh_rule = cmds.index(["ufw", "allow", "proto", "tcp", "from", "any", "to", "any", "port", "22", "comment", "liminal:ssh"])
     assert ssh_rule < cmds.index(["ufw", "--force", "enable"])  # SSH kept open before the firewall goes up
     assert ["ufw", "allow", "proto", "tcp", "from", "any", "to", "any", "port", "25,587", "comment", "liminal:mail-example-test"] in cmds
-    assert all(c[:5] == ["wsl", "-d", "Ubuntu", "-u", "root"] for c in fake.calls)
+    assert all(c[:5] == ["wsl", "-d", "Liminal-Ubuntu", "-u", "root"] for c in fake.calls)
     hits = fw.exposing(APP)
     assert {p for p, _ in hits} == set(APP) and any("[3] Anywhere from 10.0.0.0/8" in label for _, label in hits)
     assert not any("[4]" in label for _, label in hits) and (8785, "ufw rule [5] 8780:8790/tcp from Anywhere") in hits
@@ -240,7 +240,7 @@ def test_nftables_rules_by_comment_no_switch_and_what_filters():
                            dport(8785), {"accept": None}])]
     fw = plugin(fake)
     st = fw.status()
-    assert st["enabled"] and st["profiles"] == {"inet filter input": True} and st["summary"].startswith("nftables on WSL's Ubuntu: on")
+    assert st["enabled"] and st["profiles"] == {"inet filter input": True} and st["summary"].startswith("nftables on WSL's Liminal-Ubuntu: on")
     done = fw.setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in done] == [("enable", None), ("exposure", False), ("rules", True)]
     assert done[0]["detail"] == "on: inet filter input" and "charts (8765)" in done[1]["detail"] and "platform (8775)" in done[1]["detail"] and "8785" not in done[1]["detail"]
@@ -257,3 +257,15 @@ def test_nftables_rules_by_comment_no_switch_and_what_filters():
     out = plugin(bare).setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in out] == [("enable", None), ("exposure", None), ("rules", None)] and "no rule is needed" in out[2]["detail"]
     assert "no switch" in out[0]["detail"]
+
+
+def test_a_target_not_liminals_is_never_touched():
+    """WSL's default distribution or the user's own: no command runs there, the status says why, the setup changes
+    nothing (liminal-libs 1.25.0)."""
+    from liminal_libs.machines.linux import Shell
+
+    ran: list = []
+    p = LinuxFirewallPlugin(shell=Shell("wsl:Ubuntu", runner=lambda args, timeout: ran.append(args) or (0, b"", b"")))
+    st = p.status()
+    assert (st["present"], st["valid"], st["summary"]) == (False, False, "not on Liminal's") and "WSL's Ubuntu is not Liminal's" in st["why"]
+    assert [d["ok"] for d in p.setup(log=lambda m: None)] == [False] and ran == []

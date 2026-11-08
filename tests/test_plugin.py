@@ -1,14 +1,17 @@
 """The Linux firewall plugin over ufw, firewalld and nftables: which one it finds, its status, its setup (on with
 SSH kept open, exposure, the services' rules), Liminal's rules made and removed and no other touched, all
-through a stand-in for the commands in a WSL distribution (nothing runs here)."""
+through a stand-in for this machine's commands (nothing runs here); only on a native Linux machine: on Windows,
+macOS or in a WSL distribution nothing runs at all."""
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
-from liminal_libs.machines.firewall import Rule
-from liminal_libs.machines.linux import Shell
+from liminal_libs.machines import linux as linux_mod
+from liminal_libs.machines.firewall import FirewallError, Rule
+from liminal_libs.machines.linux import Shell, why_not_native
 
 import plugin_platform_firewall_linux as fl
 from plugin_platform_firewall_linux import MACHINE, DETECT, SSH_LISTENING, LinuxFirewallPlugin, NoFirewall, Nft, Ufw, Firewalld, nft_view, spans
@@ -18,7 +21,7 @@ APP = [8765, 8775, 8785, 8795, 8796]
 
 
 class FakeLinux:
-    """Answers the commands a WSL distribution would, for one firewall: ufw, firewalld, nft or none."""
+    """Answers the commands a Linux machine would, for one firewall: ufw, firewalld, nft or none."""
 
     def __init__(self, backend="ufw", active=False, ssh=False):
         self.backend = backend
@@ -42,7 +45,7 @@ class FakeLinux:
 
     def __call__(self, args, timeout):
         self.calls.append(list(args))
-        cmd = args[args.index("--exec") + 1:] if "--exec" in args else args
+        cmd = args[2:] if args[:2] == ["sudo", "-n"] else args  # through sudo -n unless the platform is root
         if cmd == ["sh", "-c", DETECT]:
             return 0, {"ufw": "ufw", "firewalld": "firewalld", "nft": "nft"}.get(self.backend, "none") + "\n", ""
         if cmd == ["sh", "-c", SSH_LISTENING]:
@@ -150,20 +153,30 @@ class FakeLinux:
         return 1, "", f"nft: unknown {cmd}\n"
 
 
+@pytest.fixture(autouse=True)
+def root(monkeypatch):
+    """The platform runs as root here (no sudo in the commands); a test that wants otherwise says so."""
+    monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 0, raising=False)
+
+
 def plugin(fake) -> LinuxFirewallPlugin:
-    p = LinuxFirewallPlugin(shell=Shell("wsl:Liminal-Ubuntu", runner=fake))
+    """The plugin on a native Linux machine (the test's word), its commands through the stand-in."""
+    p = LinuxFirewallPlugin(shell=Shell("local", runner=fake), native="")
     p.wanted = lambda: list(WANTED)
     return p
 
 
-def test_the_plugin_its_target_and_the_firewall_it_finds(monkeypatch):
-    assert MACHINE.name == "firewall-linux" and MACHINE.KIND == "machine" and MACHINE.options == ("FIREWALL_LINUX_TARGET",)
-    monkeypatch.setenv("FIREWALL_LINUX_TARGET", "wsl:Liminal-Ubuntu")
-    assert LinuxFirewallPlugin().shell.target == "wsl:Liminal-Ubuntu" and LinuxFirewallPlugin().shell.where == "WSL's Liminal-Ubuntu"
+def test_the_plugin_and_the_firewall_it_finds(monkeypatch):
+    assert MACHINE.name == "firewall-linux" and MACHINE.KIND == "machine" and MACHINE.options == ()
+    assert (plugin(FakeLinux()).shell.target, plugin(FakeLinux()).shell.where) == ("local", "this machine")
     for backend, kind in (("ufw", Ufw), ("firewalld", Firewalld), ("nft", Nft), ("none", NoFirewall)):
         assert isinstance(plugin(FakeLinux(backend)).driver(), kind)
     none = plugin(FakeLinux("none"))
     assert not none.present() and none.status()["summary"] == "not present"
+    monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 1000, raising=False)  # not root: sudo -n, never a password asked
+    fake = FakeLinux()
+    plugin(fake).driver()
+    assert fake.calls == [["sudo", "-n", "sh", "-c", DETECT]]
     assert spans("Anywhere") is None and spans("25,587/tcp") == [(25, 25), (587, 587)] and spans("8000:8100/tcp (v6)") == [(8000, 8100)]
     assert spans("OpenSSH") == []
 
@@ -177,14 +190,14 @@ def test_ufw_turned_on_with_ssh_kept_open_exposure_found_and_the_services_rules_
                      "[ 4] 8775/tcp                   ALLOW IN    127.0.0.1\n"
                      "[ 5] 8780:8790/tcp              ALLOW IN    Anywhere\n")
     fw = plugin(fake)
-    assert fw.status()["summary"] == "ufw on WSL's Liminal-Ubuntu: off (ufw off); 0 Liminal rule(s)"
+    assert fw.status()["summary"] == "ufw on this machine: off (ufw off); 0 Liminal rule(s)"
     done = fw.setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in done] == [("enable", True), ("exposure", False), ("rules", True)]
-    cmds = [c[c.index("--exec") + 1:] for c in fake.calls]
+    cmds = list(fake.calls)
     ssh_rule = cmds.index(["ufw", "allow", "proto", "tcp", "from", "any", "to", "any", "port", "22", "comment", "liminal:ssh"])
     assert ssh_rule < cmds.index(["ufw", "--force", "enable"])  # SSH kept open before the firewall goes up
     assert ["ufw", "allow", "proto", "tcp", "from", "any", "to", "any", "port", "25,587", "comment", "liminal:mail-example-test"] in cmds
-    assert all(c[:5] == ["wsl", "-d", "Liminal-Ubuntu", "-u", "root"] for c in fake.calls)
+    assert not any(c[0] in ("wsl", "sudo") for c in fake.calls)  # this machine's own commands, as root
     hits = fw.exposing(APP)
     assert {p for p, _ in hits} == set(APP) and any("[3] Anywhere from 10.0.0.0/8" in label for _, label in hits)
     assert not any("[4]" in label for _, label in hits) and (8785, "ufw rule [5] 8780:8790/tcp from Anywhere") in hits
@@ -221,7 +234,7 @@ def test_firewalld_services_rich_rules_reload_and_exposure():
     off = FakeLinux("firewalld", active=False)
     fw_off = plugin(off)
     assert fw_off.status()["enabled"] is False and fw_off.list_rules() == []  # read through firewall-offline-cmd
-    assert any(c[c.index("--exec") + 1] == "firewall-offline-cmd" for c in off.calls)
+    assert any(c[0] == "firewall-offline-cmd" for c in off.calls)
     assert fw_off.setup(log=lambda m: None, steps=("enable",))[0]["ok"] is True and off.running
 
 
@@ -240,11 +253,11 @@ def test_nftables_rules_by_comment_no_switch_and_what_filters():
                            dport(8785), {"accept": None}])]
     fw = plugin(fake)
     st = fw.status()
-    assert st["enabled"] and st["profiles"] == {"inet filter input": True} and st["summary"].startswith("nftables on WSL's Liminal-Ubuntu: on")
+    assert st["enabled"] and st["profiles"] == {"inet filter input": True} and st["summary"].startswith("nftables on this machine: on")
     done = fw.setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in done] == [("enable", None), ("exposure", False), ("rules", True)]
     assert done[0]["detail"] == "on: inet filter input" and "charts (8765)" in done[1]["detail"] and "platform (8775)" in done[1]["detail"] and "8785" not in done[1]["detail"]
-    insert = next(c[c.index("--exec") + 1:] for c in fake.calls if "insert" in c)
+    insert = next(c for c in fake.calls if "insert" in c)
     assert insert == ["nft", "insert", "rule", "inet", "filter", "input", "tcp", "dport", "{", "25,", "587", "}", "accept", "comment",
                       '"liminal:mail-example-test:tcp:25,587:any"']
     (mine,) = fw.list_rules()
@@ -259,13 +272,28 @@ def test_nftables_rules_by_comment_no_switch_and_what_filters():
     assert "no switch" in out[0]["detail"]
 
 
-def test_a_target_not_liminals_is_never_touched():
-    """WSL's default distribution or the user's own: no command runs there, the status says why, the setup changes
-    nothing (liminal-libs 1.25.0)."""
-    from liminal_libs.machines.linux import Shell
-
-    ran: list = []
-    p = LinuxFirewallPlugin(shell=Shell("wsl:Ubuntu", runner=lambda args, timeout: ran.append(args) or (0, b"", b"")))
-    st = p.status()
-    assert (st["present"], st["valid"], st["summary"]) == (False, False, "not on Liminal's") and "WSL's Ubuntu is not Liminal's" in st["why"]
-    assert [d["ok"] for d in p.setup(log=lambda m: None)] == [False] and ran == []
+def test_only_a_native_linux_machine_has_its_firewall_driven():
+    """The user, 2026-11-08: "the scope of linux administration is only on native linux O/S"; "it's not for
+    administrating WSL instances"; "Yes, firewall too": on Windows, macOS or in a WSL distribution no command runs at
+    all, the status says why with applies False (the platform shows "Not for this machine", no setup), the setup and
+    every command are refused (liminal-libs 1.27.0)."""
+    windows = why_not_native("The Linux firewall", "win32", "10", {})
+    wsl = why_not_native("The Linux firewall", "linux", "6.18.54.1-microsoft-standard-WSL2", {"WSL_DISTRO_NAME": "Liminal-Ubuntu"})
+    assert windows.startswith("The Linux firewall is for a native Linux machine, and this one runs Windows")
+    assert wsl.endswith("this is WSL's Liminal-Ubuntu on Windows")
+    if sys.platform == "win32":
+        assert MACHINE.not_for_here() == windows and not MACHINE.present()  # this PC: asked nothing
+    for note in (windows, wsl):
+        ran: list = []
+        p = LinuxFirewallPlugin(shell=Shell("local", runner=lambda args, timeout: ran.append(args) or (0, b"", b"")), native=note)
+        st = p.status()
+        assert (st["present"], st["valid"], st["applies"], st["summary"], st["why"]) == (False, False, False, "not for this machine", note)
+        assert not p.present() and p.setup(log=lambda m: None) == [{"step": "enable", "ok": False, "detail": note}]
+        for ask in (lambda: p.run("true"), lambda: p.allow("web", (8443,)), lambda: p.remove("web"), p.list_rules,
+                    lambda: p.exposing([8765]), p.backend, p.state):
+            with pytest.raises(FirewallError, match="native Linux machine"):
+                ask()
+        assert ran == []  # nothing ran anywhere
+    in_wsl = LinuxFirewallPlugin(shell=Shell("wsl:Liminal-Ubuntu", runner=lambda args, timeout: (0, b"", b"")), native="")
+    with pytest.raises(FirewallError, match="never WSL's Liminal-Ubuntu"):
+        in_wsl.run("true")

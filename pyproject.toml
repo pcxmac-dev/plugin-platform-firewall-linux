@@ -4,12 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plugin-platform-firewall-linux"
-version = "0.2.0"  # the plugin's own release (CHANGELOG.md); the app shows it on the Plugins view
+version = "0.3.0"  # the plugin's own release (CHANGELOG.md); the app shows it on the Plugins view
 description = "Linux firewall for Liminal: ufw, firewalld or nftables on a Linux machine or in a WSL distribution, on, the framework's pages kept to the machine, the ports its services need opened as Liminal's own rules."
 readme = "README.md"
 requires-python = ">=3.10"
 # the library it plugs into (the machine kind: liminal_libs.machines, plugin API 2.1)
-dependencies = ["liminal-libs>=1.25.0"]
+dependencies = ["liminal-libs>=1.27.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

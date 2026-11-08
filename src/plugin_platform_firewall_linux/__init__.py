@@ -1,9 +1,10 @@
 """Linux firewalls for Liminal (the user, 2026-11-07: "i also need a windows and linux firewall plugin for the
-platform"): ufw (Ubuntu), firewalld (Fedora) or nftables (Gentoo, minimal systems), whichever the machine
-has, on a Linux machine or in a WSL distribution on this Windows PC, through the library's
-machines.linux.Shell (root through `sudo -n` here, never a password asked; `wsl -u root` in WSL), the target
-by FIREWALL_LINUX_TARGET: local, wsl or wsl:<distribution> (local on Linux, the default WSL distribution on
-Windows). On; no rule letting another machine reach the framework's pages; the ports the framework's services
+platform"): ufw (Ubuntu), firewalld (Fedora) or nftables (Gentoo, minimal systems), whichever the machine has, on the
+native Linux machine the platform runs on and nowhere else (the user, 2026-11-08: "the scope of linux administration
+is only on native linux O/S"; "it's not for administrating WSL instances"; "Yes, firewall too"): on Windows, on macOS
+and inside a WSL distribution it runs no command at all (the library's machines.linux.why_not_native). Through the
+library's machines.linux.Shell on this machine (root through `sudo -n`, never a password asked). On; no rule letting
+another machine reach the framework's pages; the ports the framework's services
 need opened as Liminal's own rules, the only rules it changes: a ufw rule commented liminal:<name>, a
 firewalld service named liminal-<name>, an nftables rule commented liminal:<name>:<protocol>:<ports>:<remote>.
 Before ufw is turned on, an SSH server listening keeps its port open (a VPS stays reachable). The library's
@@ -15,15 +16,13 @@ Firewall base holds the rules, the status and the setup; this module drives Linu
 from __future__ import annotations
 
 import json
-import os
 import re
 
 from liminal_libs.machines.firewall import NAME, PREFIX, Firewall, FirewallError, FirewallNotNeeded, Rule
-from liminal_libs.machines.linux import Shell
+from liminal_libs.machines.linux import Shell, why_not_native
 from liminal_libs.machines.plugin import CommandError
 
-__version__ = "0.2.0"
-TARGET_VAR = "FIREWALL_LINUX_TARGET"
+__version__ = "0.3.0"
 DETECT = ("if command -v ufw >/dev/null 2>&1; then echo ufw; "
           "elif command -v firewall-cmd >/dev/null 2>&1; then echo firewalld; "
           "elif command -v nft >/dev/null 2>&1; then echo nft; else echo none; fi")
@@ -420,36 +419,47 @@ DRIVERS = {"ufw": Ufw, "firewalld": Firewalld, "nft": Nft}
 class LinuxFirewallPlugin(Firewall):
     name = "firewall-linux"
     title = "Linux firewall"
-    about = ("ufw, firewalld or nftables on a Linux machine or in a WSL distribution: on, the framework's pages kept to this "
-             "machine, the ports its services need opened as Liminal's own rules")
+    about = ("ufw, firewalld or nftables on the native Linux machine the platform runs on, never a WSL distribution: on, the "
+             "framework's pages kept to this machine, the ports its services need opened as Liminal's own rules")
     api = "2.1"
     order = 711
 
-    def __init__(self, shell: Shell | None = None, runner=None):
+    def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None):
         self._shell = shell
         self._runner = runner
-        self._drivers: dict[str, object] = {}
+        self._native = native  # a test's word for why_not_native(): "" on a native Linux machine, else why not
+        self._driver = None
 
-    @property
-    def options(self) -> tuple[str, ...]:
-        return (TARGET_VAR,)
+    def not_for_here(self) -> str:
+        """Why the machine the platform runs on is not a native Linux one, in words ("" when it is): the library's
+        status and setup honor it (applies False, nothing changed)."""
+        return why_not_native("The Linux firewall") if self._native is None else self._native
 
     @property
     def shell(self) -> Shell:
-        """The target as FIREWALL_LINUX_TARGET says now (or the shell given)."""
-        return self._shell if self._shell is not None else Shell(os.environ.get(TARGET_VAR), runner=self._runner)
+        """This native Linux machine's commands (root through sudo -n); refused anywhere else, and for a WSL target."""
+        note = self.not_for_here()
+        if note:
+            raise FirewallError(note)
+        sh = self._shell if self._shell is not None else Shell("local", runner=self._runner)
+        if sh.target != "local":
+            raise FirewallError(f"The Linux firewall is for this native Linux machine, never {sh.where}")
+        return sh
 
     def driver(self):
-        sh = self.shell
-        if sh.target not in self._drivers:
+        """ufw, firewalld or nftables, whichever this machine has (asked once)."""
+        if self._driver is None:
+            sh = self.shell
             found = (sh.sh(DETECT, timeout=60).strip().splitlines() or ["none"])[-1].strip()
-            self._drivers[sh.target] = DRIVERS.get(found, NoFirewall)(sh)
-        return self._drivers[sh.target]
+            self._driver = DRIVERS.get(found, NoFirewall)(sh)
+        return self._driver
 
     def present(self) -> bool:
+        """A firewall this plugin drives on a native Linux machine: never on Windows, macOS or in WSL."""
+        if self.not_for_here():
+            return False
         try:
-            sh = self.shell
-            return sh.here and not isinstance(self.driver(), NoFirewall)
+            return self.shell.here and not isinstance(self.driver(), NoFirewall)
         except CommandError:
             return False
 
@@ -480,7 +490,7 @@ class LinuxFirewallPlugin(Firewall):
         return self.driver().exposing(ports)
 
     def run(self, *command: str, **options) -> str:
-        """A command on the target, as root, its output."""
+        """A command on this machine, as root, its output."""
         return self.shell.run(*command)
 
 

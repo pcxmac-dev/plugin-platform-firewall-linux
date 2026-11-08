@@ -1,6 +1,6 @@
 # plugin-platform-firewall-linux
 
-Linux firewall for Liminal: ufw, firewalld or nftables on a Linux machine or in a WSL distribution, on, the framework's pages kept to the machine, the ports its services need opened as Liminal's own rules.
+Linux firewall for Liminal: ufw, firewalld or nftables on the native Linux machine the platform runs on, on, the framework's pages kept to the machine, the ports its services need opened as Liminal's own rules.
 
 The user's words (2026-11-07): "the platform is the interface for the software/hardware which facilitates the
 liminal framework"; "i also need a windows and linux firewall plugin for the platform"; "and a windows and
@@ -9,8 +9,8 @@ linux admin plugin for platform".
 ## What it does
 
 A machine plugin of the platform (`liminal_libs.machines.firewall.Firewall`, plugin API 2.1) driving whichever
-firewall the machine has, through the library's `machines.linux.Shell` (root through `sudo -n` here, never a
-password asked; `wsl -u root` in a WSL distribution):
+firewall the machine has, through the library's `machines.linux.Shell` (root through `sudo -n`, never a password
+asked), on the native Linux machine the platform runs on and nowhere else:
 
 - ufw (Ubuntu): Liminal's rules commented `liminal:<name>`, read with `ufw show added` (on or off); before ufw is
   turned on, an SSH server listening keeps port 22 open as `liminal:ssh`, so a VPS stays reachable.
@@ -24,9 +24,16 @@ password asked; `wsl -u root` in a WSL distribution):
 The setup's steps: `enable`, `exposure` (a finding, never a change), `rules` (the ports the framework's services
 need, a domain login's mail server container). `allow(name, ports)`, `remove(name)`: Liminal's own rules only.
 
-Variables: `FIREWALL_LINUX_TARGET`: `local`, `wsl` or `wsl:<distribution>` (unset: this machine on Linux, Liminal's own
-WSL distribution on Windows, Liminal-Ubuntu first). On a target that is not Liminal's (the user's own distribution)
-the plugin runs no command at all.
+## Native Linux only
+
+The user's words (2026-11-08): "the scope of linux administration is only on native linux O/S"; "it's not for
+administrating WSL instances"; and, asked whether the firewall follows, "Yes, firewall too". The plugin drives the
+firewall of the Linux machine the platform runs on and nothing else: on Windows, on macOS and inside a WSL
+distribution (its kernel's release names Microsoft or WSL, or WSL's variables are set: the library's
+`machines.linux.why_not_native`) it runs no command at all. Its status says why and that it does not apply
+(`applies` False), so the platform shows it disabled with no setup offered; its setup and every command are refused.
+A Windows PC's own firewall is the Windows firewall plugin's. It has no variables (`FIREWALL_LINUX_TARGET` is gone
+since 0.3.0).
 
 ## From the command line
 

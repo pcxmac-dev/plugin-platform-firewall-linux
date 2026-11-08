@@ -47,6 +47,9 @@ A change that can cut SSH or open everything needs a second confirmation (`accep
 
 **Tests.** They run over recorded machines.
 
+**Its icon.** Tux as a wall of bricks (`ICON = "tuxbricks"`, liminal-libs 1.33.0; the user: "for the firewalls, lets use
+an icon of TUX penguin or Windows and then convert it to a patchwork of bricks"). It now needs liminal-libs>=1.33.0.
+
 ## 0.3.0 (2026-11-08)
 
 Native Linux only, as Linux administration (the user: "the scope of linux administration is only on native linux

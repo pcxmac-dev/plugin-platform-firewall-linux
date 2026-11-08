@@ -71,6 +71,7 @@ def test_the_status_is_the_whole_configuration_as_tables_and_valid_whenever_read
     ssh = next(r for r in rules["rows"] if "tcp dport 22" in str(r[6]))
     assert ssh[8] == {"form": "remove", "title": "Remove…", "values": {"where": "inet filter input", "rule": 'tcp dport 22 counter accept comment "ssh"'},
                       "label": 'Remove tcp dport 22 counter accept comment "ssh"'}
+    assert MACHINE.ICON == "tuxbricks"  # Tux as a wall of bricks (liminal-libs 1.33.0)
     assert set(MACHINE.HOOKS) >= {"refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch", "save_rules"}
     hooks = fw.interface()["hooks"]
     assert all(f["hook"] in hooks for f in st["forms"])  # every form asks a hook the platform may ask

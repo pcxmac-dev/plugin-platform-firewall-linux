@@ -58,6 +58,7 @@ class LinuxFirewallPlugin(Firewall):
              "under systemd, OpenRC or SysV scripts; never a WSL distribution")
     api = "2.1"
     order = 711
+    ICON = "tuxbricks"  # Tux as a wall of bricks (liminal-libs 1.33.0; the user: "an icon of TUX penguin ... a patchwork of bricks")
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
              "save_rules")
 

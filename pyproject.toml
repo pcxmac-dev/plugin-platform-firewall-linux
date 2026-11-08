@@ -9,7 +9,7 @@ description = "Linux firewall for Liminal: the native Linux machine's whole fire
 readme = "README.md"
 requires-python = ">=3.10"
 # the library it plugs into (the machine kind: liminal_libs.machines, plugin API 2.1)
-dependencies = ["liminal-libs>=1.27.0"]
+dependencies = ["liminal-libs>=1.33.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]

@@ -78,8 +78,8 @@ printf '\n@@ conntrack 0\n'
 cat /proc/sys/net/netfilter/nf_conntrack_count /proc/sys/net/netfilter/nf_conntrack_max 2>/dev/null
 if have ip; then sec addr ip -j addr show; if [ "$rc" != 0 ]; then sec addr.text ip addr show; fi; fi
 if have bpftool; then sec bpf bpftool -j net show; fi
-if have ss; then sec listen ss -ltnpH; sec established ss -tnH state established
-elif have netstat; then sec listen.netstat netstat -ltnp; fi
+if have ss; then sec listen ss -ltnpH; sec listen.udp ss -lunpH; sec established ss -tnH state established
+elif have netstat; then sec listen.netstat netstat -ltnp; sec listen.udp.netstat netstat -lunp; fi
 printf '\n@@ services 0\n'
 for s in nftables iptables ip6tables ipset firewalld ufw netfilter-persistent ebtables nftables-restore iptables-restore \
   ip6tables-restore nftables-load nftables-store iptables-store ip6tables-store; do
@@ -474,6 +474,15 @@ def parse(text: str, at: float | None = None) -> Config:
                 prog = parts[6].split("/", 1)[-1]
                 if port.isdecimal():
                     sysm.listening.setdefault(prog, set()).add(int(port))
+    if get("listen.udp")[0] == 0:  # the programs listening for UDP too (0.5.0: what a rule's group is found by)
+        sysm.listening_udp = sys_mod.parse_sockets(get("listen.udp")[1])
+    elif get("listen.udp.netstat")[0] == 0:
+        for line in get("listen.udp.netstat")[1].splitlines():
+            parts = line.split()
+            if len(parts) >= 6 and parts[0].startswith("udp") and "/" in parts[-1]:
+                port = parts[3].rsplit(":", 1)[-1]
+                if port.isdecimal():
+                    sysm.listening_udp.setdefault(parts[-1].split("/", 1)[-1], set()).add(int(port))
     ssh = sysm.ssh_ports
     if ssh and get("established")[0] == 0:
         n = 0

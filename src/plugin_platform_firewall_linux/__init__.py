@@ -22,6 +22,13 @@ this machine off over SSH or open it to everyone needs a second confirmation (ch
 The library's Firewall base still holds the framework's own part (its setup: on, the framework's pages kept to this
 machine, the ports its services need as Liminal's rules), over the same read.
 
+The rules in groups (0.5.0; the user: "for both firewalls, i need to have groups, like system or application and then
+unassociated rules not tied to a specific application or system process can be in an other, i can create labels, like
+system or application, as well and move the rules in to that"): every rule sorted (groups.sort_entry) into System,
+Application or Other by whose it is, what it is for, the service or profile it names and the program listening on its
+port; the user's labels and moves are the library's (rulegroups), kept through the platform's login, never in the
+firewall.
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND
 """
@@ -33,15 +40,18 @@ import time
 from liminal_libs.machines.firewall import Firewall, FirewallError, FirewallNotNeeded, Rule, app_ports
 from liminal_libs.machines.linux import Shell, why_not_native
 from liminal_libs.machines.plugin import CommandError
+from liminal_libs.machines.rulegroups import RuleGroups, Sorted
 
 from . import changes as ch
 from . import nftables as nft_mod
 from . import read as read_mod
 from .changes import ACCEPT, NotNeeded, Risky
+from .groups import key as rule_key
+from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -200,6 +210,11 @@ class LinuxFirewallPlugin(Firewall):
             self.forget()
         return ran
 
+    def sorted_rules(self) -> dict[str, Sorted]:
+        """Every rule read, by its key, with its own group (groups.sort_entry): what a move checks."""
+        cfg = self.config()
+        return {rule_key(e): sort_entry(e, cfg.system.listening, cfg.system.listening_udp) for e in cfg.entries()}
+
     # -- the hooks the page asks ---------------------------------------------------------------------------------------
     def refresh(self) -> dict:
         cfg = self.config(fresh=True)
@@ -274,7 +289,7 @@ class LinuxFirewallPlugin(Firewall):
                "readAt": time.strftime("%H:%M:%S", time.localtime(cfg.at))}
         if cfg.problems:
             out["problems"] = list(cfg.problems)
-        out["tables"] = tables(cfg, preset, find)
+        out["tables"] = tables(cfg, preset, find, self.groups)
         out["forms"] = forms(cfg)
         out["actions"] = [{"hook": "refresh", "args": [], "title": "Refresh", "note": "reads the whole configuration again now"}]
         return out
@@ -450,32 +465,43 @@ def policies_table(cfg: Config) -> dict:
             "rows": rows, "empty": "No default policy here."}
 
 
-def rules_table(cfg: Config, preset: str, find: str) -> dict:
+GROUP_NOTES = {
+    "system": "the system's own: its services (SSH, DNS, DHCP, time...), its own traffic, ICMP",
+    "application": "a program's: one listening on the port, or one making its own rules (Docker's, Liminal's...)",
+    "other": "tied to no program or service: a port or an address alone",
+}
+
+
+def rules_table(cfg: Config, preset: str, find: str, groups: RuleGroups | None = None) -> dict:
+    """The rules shown, in their groups (0.5.0): System, Application, Other and the user's labels, each listing its first
+    MAX_ROWS; a rule's group found by groups.sort_entry, or where the user moved it."""
     entries = cfg.entries()
     shown = [e for e in entries if e.shown(preset) and e.found(find)]
     rows = []
-    for e in shown[:MAX_ROWS]:
+    for e in shown:
         does = e.action + (f" {e.target}" if e.target and e.action in ("jump", "goto", "nat") else "")
         port = f"{e.protocol} {e.ports}".strip() if e.ports or e.protocol else "every"
         frm = e.source or ("anywhere" if e.direction in ("in", "fwd") else "")
         button = ({"form": "remove", "title": "Remove…", "values": {"where": e.where, "rule": e.text}, "label": f"Remove {e.text}"}
                   if e.removable else "")
-        rows.append([_cell(e.where, e.kind), DIRECTIONS.get(e.direction, e.direction), does, port,
-                     _cell(frm, f"on {e.interface}" if e.interface else None) if frm or e.interface else "", e.destination,
-                     _cell(e.text, e.comment if e.comment and e.comment not in e.text else None), OWNER_WORDS.get(e.owner, e.owner), button])
-    more = len(shown) - len(rows)
-    note = (f"{len(shown)} of {len(entries)} rules" + (f", the first {len(rows)} shown: Find narrows it" if more > 0 else "")
-            + (f"; finding {find!r}" if find else "") + ". A program's own rules (Docker's...) are read only: it makes them again.")
+        rows.append((rule_key(e), sort_entry(e, cfg.system.listening, cfg.system.listening_udp), [
+            _cell(e.where, e.kind), DIRECTIONS.get(e.direction, e.direction), does, port,
+            _cell(frm, f"on {e.interface}" if e.interface else None) if frm or e.interface else "", e.destination,
+            _cell(e.text, e.comment if e.comment and e.comment not in e.text else None), OWNER_WORDS.get(e.owner, e.owner), button]))
+    note = (f"{len(shown)} of {len(entries)} rules" + (f"; finding {find!r}" if find else "")
+            + ". A program's own rules (Docker's...) are read only: it makes them again. Moving a rule to another group changes"
+            " nothing in the firewall.")
     actions = [{"form": "make", "title": "Add a rule…"}, {"form": "find", "title": "Find…", "values": {"words": find}},
                {"hook": "refresh", "args": [], "title": "Refresh", "note": "reads the whole configuration again now"}]
     if find:
         actions.insert(2, {"hook": "find_rules", "args": [""], "title": "Show all", "note": "the Find's words cleared"})
-    return {"title": "Rules", "note": note,
+    base = {"title": "Rules", "note": note,
             "options": [{"title": "Rules shown", "hook": "show_rules", "value": preset,
                          "choices": [{"value": v, "title": t, "note": n} for v, t, n in PRESETS]}],
             "columns": [{"title": "Where"}, {"title": "Way"}, {"title": "Does"}, {"title": "Port"}, {"title": "From"},
                         {"title": "To"}, {"title": "Rule"}, {"title": "Whose"}, {"title": ""}],
-            "rows": rows, "empty": "No rule of the choice shown" + (" with those words." if find else "."), "actions": actions}
+            "empty": "No rule of the choice shown" + (" with those words." if find else "."), "actions": actions}
+    return (groups or RuleGroups("", lambda: None)).table(base, rows, per_group=MAX_ROWS, notes=GROUP_NOTES)
 
 
 def sets_table(cfg: Config) -> dict | None:
@@ -487,7 +513,7 @@ def sets_table(cfg: Config) -> dict | None:
             "rows": rows}
 
 
-def tables(cfg: Config, preset: str = "in-allow", find: str = "") -> list[dict]:
+def tables(cfg: Config, preset: str = "in-allow", find: str = "", groups: RuleGroups | None = None) -> list[dict]:
     out = [parts_table(cfg), interfaces_table(cfg)]
     z = zones_table(cfg)
     if z:
@@ -495,7 +521,7 @@ def tables(cfg: Config, preset: str = "in-allow", find: str = "") -> list[dict]:
     pol = policies_table(cfg)
     if pol["rows"] or not z:
         out.append(pol)
-    out.append(rules_table(cfg, preset, find))
+    out.append(rules_table(cfg, preset, find, groups))
     s = sets_table(cfg)
     if s:
         out.append(s)
@@ -574,7 +600,7 @@ def forms(cfg: Config) -> list[dict]:
         out.append({"id": "save", "hook": "save_rules", "title": "Save the rules",
                     "fields": [{"name": "kind", "label": "Rules", "type": "fixed"}],
                     "confirm": {"title": "Save {kind}' rules for the next restart?", "words": words, "yes": "Save them"}})
-    return out
+    return out + RuleGroups.forms()  # a label made, renamed or removed (0.5.0)
 
 
 MACHINE = LinuxFirewallPlugin()

@@ -161,7 +161,7 @@ def parse_bpf_net(text: str) -> list[str]:
 
 
 def parse_sockets(listening: str) -> dict:
-    """`ss -ltnpH`: the TCP ports listening by program ({"sshd": {22}, ...})."""
+    """`ss -ltnpH` (`ss -lunpH`): the TCP (UDP) ports listening by program ({"sshd": {22}, ...})."""
     out: dict = {}
     for line in (listening or "").splitlines():
         parts = line.split()
@@ -261,6 +261,7 @@ class System:
     bpf: list = field(default_factory=list)
     conntrack: tuple = (None, None)  # (count, max)
     listening: dict = field(default_factory=dict)  # program -> its TCP ports
+    listening_udp: dict = field(default_factory=dict)  # program -> its UDP ports (0.5.0)
     ssh_sessions: int = 0
 
     @property

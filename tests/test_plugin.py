@@ -49,6 +49,11 @@ def table(st: dict, title: str) -> dict:
     return next(t for t in st["tables"] if t["title"] == title)
 
 
+def cells(t: dict) -> list:
+    """A grouped table's rows as their cells (0.5.0: each row {cells, key, group, own, why})."""
+    return [r["cells"] for r in t["rows"]]
+
+
 def texts(rows) -> list:
     return [[c.get("text", c.get("title", "")) if isinstance(c, dict) else c for c in r] for r in rows]
 
@@ -59,16 +64,16 @@ def test_the_status_is_the_whole_configuration_as_tables_and_valid_whenever_read
     assert st["valid"] and st["why"] == "" and st["present"] and st.get("applies") is not False
     assert st["summary"] == "nftables 1.1.3: on; 22 rule(s) read, 0 of them Liminal's; Debian GNU/Linux 13 (trixie), systemd"
     assert [t["title"] for t in st["tables"]] == ["Firewall", "Interfaces", "Default policies", "Rules", "Sets"]
-    assert [f["id"] for f in st["forms"]] == ["make", "remove", "find", "policy", "switch", "save"]
+    assert [f["id"] for f in st["forms"]] == ["make", "remove", "find", "policy", "switch", "save", "label-new", "label-rename", "label-remove"]
     assert st["actions"] == [{"hook": "refresh", "args": [], "title": "Refresh", "note": "reads the whole configuration again now"}]
     assert "rules" not in st  # every rule is in the Rules table, Liminal's among them (its preset)
     parts = texts(table(st, "Firewall")["rows"])
     assert [r[0] for r in parts] == ["nftables", "iptables", "conntrack", "eBPF and XDP"] and parts[0][4:] == ["Turn off…", "Save…"]
     rules = table(st, "Rules")
     assert rules["options"][0]["hook"] == "show_rules" and rules["options"][0]["value"] == "in-allow"
-    assert [a.get("form") or a.get("hook") for a in rules["actions"]] == ["make", "find", "refresh"]
+    assert [a.get("form") or a.get("hook") for a in rules["actions"]] == ["make", "find", "refresh", "label-new"]
     assert len(rules["rows"]) == 6 and rules["note"].startswith("6 of 22 rules")
-    ssh = next(r for r in rules["rows"] if "tcp dport 22" in str(r[6]))
+    ssh = next(r for r in cells(rules) if "tcp dport 22" in str(r[6]))
     assert ssh[8] == {"form": "remove", "title": "Remove…", "values": {"where": "inet filter input", "rule": 'tcp dport 22 counter accept comment "ssh"'},
                       "label": 'Remove tcp dport 22 counter accept comment "ssh"'}
     assert MACHINE.ICON == "wallfire"  # a brick wall with a flame before it, the user's picture (liminal-libs 1.34.0)
@@ -102,18 +107,18 @@ def test_one_read_kept_a_minute_refreshed_and_read_again_after_a_change(monkeypa
 def test_presets_and_find():
     fw = plugin(FakeLinux("debian-13-nftables"))
     assert fw.show_rules("all") == {"said": "showing all"}
-    assert len(table(fw.status(), "Rules")["rows"]) == 22
+    assert len(cells(table(fw.status(), "Rules"))) == 22
     fw.show_rules("fwd")
-    assert {r[1] for r in table(fw.status(), "Rules")["rows"]} == {"forwarded", "NAT"}
+    assert {r[1] for r in cells(table(fw.status(), "Rules"))} == {"forwarded", "NAT"}
     fw.show_rules("in-block")
-    assert [r[6] for r in table(fw.status(), "Rules")["rows"]] == ["ct state invalid drop", "ip saddr @blocked counter drop"]
+    assert [r[6] for r in cells(table(fw.status(), "Rules"))] == ["ct state invalid drop", "ip saddr @blocked counter drop"]
     fw.show_rules("all")
     fw.find_rules("docker dnat")
-    rows = table(fw.status(), "Rules")["rows"]
+    rows = cells(table(fw.status(), "Rules"))
     assert len(rows) == 1 and rows[0][7] == "Docker" and rows[0][8] == ""  # a program's own rule: no Remove
     fw.find_rules("9100")
     st = fw.status()
-    assert [r[6]["text"] if isinstance(r[6], dict) else r[6] for r in table(st, "Rules")["rows"]] == [
+    assert [r[6]["text"] if isinstance(r[6], dict) else r[6] for r in cells(table(st, "Rules"))] == [
         'ip saddr 192.168.1.0/24 tcp dport 9100 accept comment "node exporter from the LAN"']
     assert any(a.get("hook") == "find_rules" and a["args"] == [""] for a in table(st, "Rules")["actions"])
     with pytest.raises(ValueError):

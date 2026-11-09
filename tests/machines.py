@@ -14,7 +14,8 @@ ORDER = ("os", "kernel", "init", "tools", "nft.version", "nft", "nft.err", "ipta
          "iptables.legacy", "ip6tables.legacy", "ebtables.version", "arptables.version", "ipset.version", "ipset",
          "firewalld.state", "firewalld.version", "firewalld.default", "firewalld.zones", "firewalld.policies",
          "firewalld.services", "firewalld.conf", "ufw.version", "ufw.verbose", "ufw.numbered", "ufw.added", "conntrack", "addr",
-         "addr.text", "bpf", "listen", "listen.netstat", "established", "services", "files", "conf")
+         "addr.text", "bpf", "listen", "listen.netstat", "listen.udp", "listen.udp.netstat", "established", "services", "files",
+         "conf")
 
 
 def recorded(machine: str) -> dict:

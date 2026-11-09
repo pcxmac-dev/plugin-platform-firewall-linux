@@ -41,7 +41,7 @@ from .changes import ACCEPT, NotNeeded, Risky
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.4.0"
+__version__ = "0.4.1"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -58,7 +58,7 @@ class LinuxFirewallPlugin(Firewall):
              "under systemd, OpenRC or SysV scripts; never a WSL distribution")
     api = "2.1"
     order = 711
-    ICON = "tuxbricks"  # Tux as a wall of bricks (liminal-libs 1.33.0; the user: "an icon of TUX penguin ... a patchwork of bricks")
+    ICON = "wallfire"  # a brick wall with a flame before it (liminal-libs 1.34.0; the user's picture: "use this icon for linux firewall")
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
              "save_rules")
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.1 (2026-11-08)
+
+Its icon is the one the user picked ("use this icon for linux firewall"): a brick wall with a flame before it, drawn in
+the library's line (liminal-libs 1.34.0's `wallfire`). Needs liminal-libs>=1.34.0.
+
 ## 0.4.0 (2026-11-08)
 
 The firewall read whole and changed from the platform's page, as the Windows firewall plugin is.

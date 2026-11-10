@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 
 from liminal_libs.machines.firewall import PREFIX
 
-from .model import Entry, digest, owner_by_interface, owner_by_name, ports_text, spans_of
+from .model import UNREACHED, Entry, digest, owner_by_interface, owner_by_name, ports_text, spans_of
 
 BUILTIN = {"INPUT": "in", "OUTPUT": "out", "FORWARD": "fwd", "PREROUTING": "pre", "POSTROUTING": "post"}
 TARGETS = {"ACCEPT": "accept", "DROP": "drop", "REJECT": "reject", "RETURN": "return", "LOG": "log", "NFLOG": "log",
@@ -233,7 +233,8 @@ def _word(a: str) -> str:
 
 def entries(saved: Saved, binary: str = "") -> list[Entry]:
     """Every rule as an Entry. `binary`: the command that changes these rules (iptables-legacy for the legacy ones
-    beside an nf_tables iptables), named in each one's ref."""
+    beside an nf_tables iptables), named in each one's ref. A rule in a chain no built-in chain jumps or goes to is
+    turned off (0.6.0: nothing reaches it)."""
     hooks = reached(saved)
     out = []
     tool = binary or saved.tool
@@ -253,7 +254,7 @@ def entries(saved: Saved, binary: str = "") -> list[Entry]:
                          direction=direction, action=v["action"], text=text, target=v["target"], protocol=v["protocol"],
                          ports=v["ports"], spans=v["spans"], source=v["source"], destination=v["destination"],
                          interface=v["interface"], state=v["state"], comment=v["comment"], owner=rule_owner(r, v),
-                         family=family, number=r.number))
+                         family=family, number=r.number, off="" if (r.table, r.chain) in hooks else UNREACHED))
     return out
 
 

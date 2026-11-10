@@ -3,8 +3,10 @@ sources, services, ports, forwarding, masquerade, forward ports, ICMP blocks, ri
 policies between zones, since 0.9) and `--info-service` for the services the zones use (their ports); through
 `firewall-offline-cmd` while the daemon is stopped. Every service, port, source, forward port and rich rule of a zone
 is an `Entry` (firewalld's, removable; Liminal's: a service liminal-<name>); firewalld's own nftables table is its
-machinery, read through the zones instead. The commands are built here, never run: each change made in the running
-firewall and in its permanent configuration alike."""
+machinery, read through the zones instead. A zone bound to nothing, the default zone while every interface in use is
+bound to another zone, a policy turned off, and everything while firewalld is stopped, are listed too, turned off (0.6.0).
+The commands are built here, never run: each change made in the running firewall and in its permanent configuration
+alike."""
 from __future__ import annotations
 
 import re
@@ -157,19 +159,65 @@ def rich_view(rule: str) -> dict:
     return out
 
 
-def entries(st: FirewalldState) -> list[Entry]:
-    """The zones' services, ports, sources, forward ports and rich rules, the policies' too: active zones first."""
+OFF_STOPPED = "firewalld is stopped"  # why every rule of its filters nothing (0.6.0)
+NOT_ACTIVE = " (not active)"  # a zone's Where while its rules filter nothing (left out of a rule's key: its moves kept)
+IDLE = ("down", "lowerlayerdown", "notpresent")  # an interface's states in which nothing comes in on it
+
+
+def unbound(st: FirewalldState, interfaces) -> list[str] | None:
+    """The interfaces in use that no zone is bound to (0.6.0), which the default zone takes: firewalld uses it for
+    everything not bound to another zone. In use: every interface read but loopback (firewalld lets it in itself), one
+    down, a bridge's or a bond's port (what it carries comes in through that one), and a container's or a VM's end of
+    its link (veth, vnet: the same, through its bridge). None when the interfaces could not be read."""
+    if not interfaces:
+        return None
+    bound = {i for z in st.zones if not z.policy for i in z.words("interfaces")}
+    return [i.name for i in interfaces if i.name != "lo" and (i.state or "").lower() not in IDLE and not i.master
+            and not i.name.startswith(("veth", "vnet")) and i.name not in bound]
+
+
+def applies(z: Zone, takes=None) -> bool:
+    """Whether a zone's or a policy's rules filter while firewalld runs (0.6.0): an active zone's (an interface or a
+    source bound to it); the default zone's while it takes an interface in use bound to no other zone (`takes`: those,
+    from `unbound`; none known when the interfaces could not be read); a policy's active and not turned off. The rest
+    are listed apart, turned off (`entries(resting=True)`)."""
+    if z.policy:
+        return z.active and not z.disabled
+    return z.active or (z.default and bool(takes))
+
+
+def off_of(z: Zone, running: bool, takes=None) -> str:
+    """Why a zone's or a policy's rules filter nothing now, in words ("" when they are in force)."""
+    if not running:
+        return OFF_STOPPED
+    if z.policy:
+        return "the policy is turned off" if z.disabled else "" if z.active else "its zones are not in use"
+    if applies(z, takes):
+        return ""
+    if z.default:
+        return ("every interface in use is bound to another zone" if takes is not None
+                else "no interface is bound to it, and the interfaces could not be read")
+    return "the zone is bound to nothing"
+
+
+def entries(st: FirewalldState, resting: bool = False, takes=None) -> list[Entry]:
+    """The zones' services, ports, sources, forward ports and rich rules, the policies' too, of the zones and policies
+    that filter while firewalld runs (`applies`): active zones first, and the default zone while it takes an interface
+    in use bound to no other zone (`takes`: those, from `unbound`). `resting` (0.6.0; the user: "also rules that are
+    turned off should be shown as well"): those of every other zone and policy instead (a zone bound to nothing, the
+    default zone while every interface in use is bound to another, a policy turned off or between zones not in use). A
+    rule says why it filters nothing in `off`, as every rule does while firewalld is stopped."""
     out: list[Entry] = []
 
     def add(z: Zone, what: str, value: str, **kw):
         where = f"{'policy' if z.policy else 'zone'} {z.name}"
         out.append(Entry(ref=f"fwd|{'policy' if z.policy else 'zone'}|{z.name}|{what}|{value}|{digest(z.name, what, value)}",
-                         kind="firewalld", where=where + ("" if z.active or z.policy else " (not active)"),
-                         text=kw.pop("text", f"{what} {value}"), **kw))
+                         kind="firewalld", where=where + ("" if z.policy or applies(z, takes) else NOT_ACTIVE),
+                         text=kw.pop("text", f"{what} {value}"), off=off_of(z, st.running, takes), **kw))
 
     zones = sorted(st.zones, key=lambda z: (not z.active, not z.default, z.name)) + st.policies
     for z in zones:
-        if not z.active or z.disabled:  # a zone bound to nothing, a policy between zones not in force: no rules in force
+        if applies(z, takes) == resting:  # the rules that filter while it runs, or those listed apart (turned off)
             continue
         direction = "in"
         if z.policy:

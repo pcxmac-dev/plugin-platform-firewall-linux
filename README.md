@@ -58,15 +58,93 @@ The plugin's status holds tables for the platform's page (liminal-platform 0.6.0
 - **Zones**: firewalld only: interfaces and sources, target, services, ports, rich rules. Each zone has a Target… button.
 - **Default policies**: ufw's three defaults, this machine's own nftables base chains, iptables' built-in chains,
   each with a Set… button. Other programs' chains are listed read only.
-- **Rules**: every rule.
+- **Rules**: every rule, the turned-off ones too, in groups (below).
   - Presets: inbound allowed, inbound blocked, outbound, forwarded and NAT, Liminal's, all.
-  - Find: every word must be in the rule; a number also finds the rules for that port.
-  - Buttons under it: Add a rule…, Find…, Refresh.
+  - Find: every word must be in the rule, or in the name of the service or program it is under; a number also finds
+    the rules for that port; "turned off" finds those.
+  - Buttons under it: Add a rule…, Find…, Refresh, New label….
   - Each removable rule has its own Remove….
 - **Sets**: nftables' sets and ipset's.
 
 Valid whenever the firewall can be read, as the Windows firewall plugin is: off, or without Liminal's rules, is said in
 the summary and the tables, not as invalid.
+
+## The rules in groups
+
+The user's words. 2026-11-08: "for both firewalls, i need to have groups, like system or application and then
+unassociated rules not tied to a specific application or system process can be in an other, i can create labels, like
+system or application, as well and move the rules in to that"; "just use basic expansion like a (+) to open and close
+labels". 2026-11-09: "for the windows and linux firewall, lets have the same system and application and other, but lets
+group by application under apps or system, try best to organize under system and applications. Like system has 'core
+networking' or WSD or UPnP or RA Server or Remote Assistance or network discovery or ... applications has like
+starcraft or edge"; "try to group the system by 'services'"; "also rules that are turned off should be shown as well".
+
+Each rule is in one of three groups, and System and Application are grouped again by name. Each group and each name is
+a heading, opened with (+) and closed with (−). As the rules are sorted, no name is a heading in both groups; a rule
+moved into the other one by hand keeps its name there.
+
+- **System**: the operating system's own, under its service. A service has one name whichever way its rule is
+  recognised: firewalld's service ssh, ufw's profile OpenSSH, sshd listening on port 22 and port 22 alone are all SSH.
+  The services are SSH, DNS, DHCP, DHCPv6, NTP, mDNS, LLMNR, NetBIOS, Samba, NFS, rpcbind, Printing (CUPS), Cockpit,
+  Kerberos, LDAP, SNMP, Syslog, WSD, SSDP (UPnP), TFTP, and a few more the system's programs serve. A program serving
+  several is named by its port: systemd's socket on 9090 is Cockpit, and systemd-resolved on 5355 is LLMNR. A ufw
+  profile is the system's by a whole word of its name (OpenSSH, CUPS, Kerberos KDC), never by a short word inside
+  another (PowerDNS is an application's). Beside them: This machine's own traffic (loopback and the replies to its
+  connections), ICMP, Invalid packets, and the system's programs making their own rules (systemd, NetworkManager,
+  Fail2ban, CrowdSec, SSHGuard).
+- **Application**: a program's, under the program, one name however its rule is found.
+  - A program making its own rules is under its own name: Docker, Podman, libvirt, Incus, LXD, Kubernetes, Calico,
+    Cilium, flannel, Weave, Tailscale, Waydroid, WireGuard. Liminal's own rules are under Liminal, and so is a rule for
+    a port one of Liminal's own pages listens on.
+  - A firewalld service is under what it is for. http, https and http3 are Web server (HTTP, HTTPS); smtp, imap, pop3
+    and their secure forms are the Mail server; the kube services are Kubernetes. A service not known here keeps its
+    own name.
+  - A ufw profile is under its application: its name without the words saying which of its ports. Nginx Full and Nginx
+    HTTPS are both Nginx. ufw's own profiles take firewalld's names: WWW Full is the Web server, SMTP and IMAPS the Mail
+    server.
+  - A program listening on the rule's port is under its application's name: apache2 is Apache, mosh-server Mosh,
+    Postfix's master the Mail server. A part of a program making its own rules is under that program, so docker-proxy
+    is Docker. A program not known here keeps its own name (python3, node).
+- **Other**: tied to no program or service, a port or an address alone. It is one list.
+
+How a rule's group is found, in order:
+
+1. Whose it is: a program making its own rules, or Liminal's.
+2. What it is for: this machine's own traffic, ICMP, invalid packets.
+3. The firewalld service or ufw profile it names.
+4. The program listening on a port it names. A port the kernel serves itself, with no program shown (nfsd, WireGuard),
+   names nothing here.
+5. A port of the system's own services.
+
+Each rule says why on hover. The user's labels are single lists too. A rule moved into System or Application keeps its
+name there. Each service, each program and Other list their first 1000 rules. Find narrows them, and finds a rule by
+the name it is listed under too. Moving a rule changes nothing in the firewall: the labels and moves are kept through
+the platform's login.
+
+**Rules turned off** are listed too, under the group and name they have when on, and the page shows them dimmed. The
+Where of each says why it filters nothing now:
+
+- ufw's rules while ufw is off: ufw is off;
+- all of firewalld's while it is stopped: firewalld is stopped;
+- a firewalld zone's that is bound to nothing ("zone home (not active)"): the zone is bound to nothing;
+- the default zone's while every interface in use is bound to another zone. firewalld uses the default zone for every
+  interface bound to no other zone, so its rules are in force while it takes an interface in use: any but loopback, one
+  that is down, a bridge's or a bond's port, and a container's or a virtual machine's end of its link (veth, vnet);
+- a firewalld policy's that is turned off, or between zones not in use;
+- a dormant nftables table's: its table is dormant;
+- a rule in a chain no hook reaches, nftables' or iptables': nothing jumps to its chain.
+
+They can be found, moved and removed like any other rule. A rule moved while its zone was bound to nothing stays where
+it was put when the zone comes into use.
+
+A rule turned off never stands for a rule in force. The second confirmation, the exposure check and the firewall's
+state go by the rules in force, and no rule is made in a dormant table. Removing a rule turned off asks nothing more:
+it cuts nothing. A change to a front end that is off is judged by its own rules, which filter again once it is on:
+ufw's default set while ufw is off, and a firewalld zone's target set or one of its rules removed while firewalld is
+stopped.
+
+firewalld's permanent configuration while it runs, and the rules a distribution keeps in a file but has not loaded, are
+not read, so they are not listed.
 
 ## What it changes
 

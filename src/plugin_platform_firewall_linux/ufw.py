@@ -1,11 +1,13 @@
 """ufw read from `ufw status verbose` (on or off, logging, the defaults for incoming, outgoing and routed), `ufw status
 numbered` (its rules as it numbers them, while it is on) and `ufw show added` (its rules as they were added, on or
-off): every rule an `Entry` (ufw's own rules: the user's, removable; Liminal's by their comment liminal:<name>). ufw
-keeps its rules itself (/etc/ufw/user.rules), so nothing here needs saving. The commands are built here, never run."""
+off): every rule an `Entry` (ufw's own rules: the user's, removable; Liminal's by their comment liminal:<name>), turned
+off while ufw is off (0.6.0). ufw keeps its rules itself (/etc/ufw/user.rules), so nothing here needs saving. The
+commands are built here, never run."""
 from __future__ import annotations
 
 import ipaddress
 import re
+import shlex
 from dataclasses import dataclass, field
 
 from liminal_libs.machines.firewall import PREFIX
@@ -18,6 +20,8 @@ SPEC_ACTIONS = {"allow": "accept", "deny": "drop", "reject": "reject", "limit": 
 DIRECTIONS = {"IN": "in", "OUT": "out", "FWD": "fwd"}
 APPS = {"openssh": (22, 22)}  # an application profile's port, where the lockout check needs it
 DEFAULTS = re.compile(r"(\w+)\s+\((incoming|outgoing|routed)\)")
+KEYWORDS = ("on", "proto", "from", "to", "port", "app")  # the words of a rule's full form, as added
+OFF = "ufw is off"  # why its rules as added filter nothing (0.6.0)
 
 
 @dataclass
@@ -111,9 +115,31 @@ def row_entry(row, active: bool) -> Entry:
                  interface=interface, comment=comment, owner=owner, family="ipv6" if v6 else "ipv4", number=number)
 
 
-def spec_entry(spec: str, comment: str) -> Entry:
-    """One of `ufw show added`'s rules (ufw off): `allow 22/tcp`, `allow in on eth0 from 10.0.0.0/8 to any port 22 proto tcp`."""
-    words = spec.split()
+def spec_words(spec: str) -> list[str]:
+    """A rule as added, in its words: a quoted profile's name one word ('Nginx Full')."""
+    try:
+        return shlex.split(spec)
+    except ValueError:
+        return spec.split()
+
+
+def _app_of(words: list[str]) -> str:
+    """The application profile a rule as added names (0.6.0): after `app` (allow from 10.0.0.0/8 to any app OpenSSH), or
+    alone after its action and direction (allow OpenSSH, allow 'Nginx Full'); "" when it names a port or nothing."""
+    if "app" in words:
+        rest = words[words.index("app") + 1:]
+        return " ".join(rest[:next((i for i, w in enumerate(rest) if w in KEYWORDS), len(rest))])
+    rest = [w for w in words[1:] if w not in ("in", "out", "log", "log-all")]
+    if rest and not any(w in KEYWORDS for w in rest) and not re.match(r"^\d", rest[0]):
+        return " ".join(rest)
+    return ""
+
+
+def spec_entry(spec: str, comment: str, off: str = "") -> Entry:
+    """One of `ufw show added`'s rules (ufw off): `allow 22/tcp`, `allow in on eth0 from 10.0.0.0/8 to any port 22 proto tcp`,
+    `allow 'Nginx Full'` (an application profile: its name kept as its ports, as `ufw status` shows it). `off`: why it
+    filters nothing now (ufw is off)."""
+    words = spec_words(spec)
     route = bool(words) and words[0] == "route"
     if route:
         words = words[1:]
@@ -129,22 +155,21 @@ def spec_entry(spec: str, comment: str) -> Entry:
         port_text, _, p = simple.partition("/")
         proto = proto or p
     spans = spans_of(port_text)
-    if not spans:
-        app = next((w for w in words[1:] if w.lower() in APPS), "")
-        if app:
-            spans, proto = (APPS[app.lower()],), proto or "tcp"
+    app = "" if spans else _app_of(words)
+    if app.lower() in APPS:  # a profile's ports, where the lockout check needs them
+        spans, proto = (APPS[app.lower()],), proto or "tcp"
     owner = "liminal" if comment.startswith(PREFIX + ":") else "ufw"
     return Entry(ref=f"ufw-spec|{digest(spec, comment)}", kind="ufw", where="ufw (off)", direction=direction, action=action,
                  text=f"ufw {spec}" + (f" comment '{comment}'" if comment else ""), protocol=proto,
-                 ports=ports_text(spans) if spans else "", spans=spans, source="" if src in ("", "any") else src,
-                 interface=interface, comment=comment, owner=owner)
+                 ports=app or (ports_text(spans) if spans else ""), spans=spans, source="" if src in ("", "any") else src,
+                 interface=interface, comment=comment, owner=owner, off=off)
 
 
 def entries(st: UfwState) -> list[Entry]:
-    """Its rules: as numbered while it is on, as added while it is off."""
+    """Its rules: as numbered while it is on, as added while it is off (0.6.0: turned off then, filtering nothing)."""
     if st.active and st.rows:
         return [row_entry(r, True) for r in st.rows]
-    return [spec_entry(s, c) for s, c in st.added]
+    return [spec_entry(s, c, off="" if st.active else OFF) for s, c in st.added]
 
 
 # -- the commands that change it ------------------------------------------------------------------------------------

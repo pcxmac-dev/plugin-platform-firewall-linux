@@ -134,12 +134,16 @@ def sections(text: str) -> dict:
 
 
 def _text_addresses(text: str) -> list:
-    """`ip addr show` in words (BusyBox's ip has no JSON): each interface, its state and addresses."""
+    """`ip addr show` in words (BusyBox's ip has no JSON): each interface, its state and addresses, and the bridge or
+    bond it is a port of."""
     out, cur = [], None
     for line in (text or "").splitlines():
         m = re.match(r"^\d+:\s+([^:@\s]+)[^:]*:\s+<[^>]*>.*?(?:state\s+(\S+))?", line)
         if m:
+            master = re.search(r"\smaster\s+(\S+)", line)
             cur = {"ifname": m.group(1), "operstate": (m.group(2) or "").lower(), "addr_info": []}
+            if master:
+                cur["master"] = master.group(1)
             out.append(cur)
             continue
         a = re.match(r"^\s+inet6?\s+([0-9a-fA-F.:]+)/(\d+)", line)
@@ -170,6 +174,7 @@ class Config:
     problems: list = field(default_factory=list)
     _entries: list | None = None
     _hidden: dict = field(default_factory=dict)
+    _off: list | None = None
 
     @property
     def hidden(self) -> dict:
@@ -182,11 +187,17 @@ class Config:
     def readable(self) -> bool:
         return self.nft is not None or bool(self.saved) or self.ufw.installed or self.firewalld.installed
 
+    def dormant_tables(self) -> set:
+        """nftables' tables turned off (the dormant flag: their base chains are off their hooks, nothing of them is
+        evaluated): {(family, name)}."""
+        return {(t.family, t.name) for t in self.nft.tables if "dormant" in t.flags} if self.nft is not None else set()
+
     def own_filter_chains(self, hook: str = "input") -> list:
-        """nftables' base chains of the filter type on `hook` in this machine's own tables (or Liminal's)."""
+        """nftables' base chains of the filter type on `hook` in this machine's own tables (or Liminal's), a dormant
+        table's left out (0.6.0: they filter nothing, so a rule made in one would not either)."""
         if self.nft is None:
             return []
-        skip = self.skipped_tables()
+        skip = self.skipped_tables() | self.dormant_tables()
         owners = {(t.family, t.name): nft_mod.table_owner(t, self.nft.chains) for t in self.nft.tables}
         return [c for c in self.nft.chains if c.base and c.hook == hook and c.type == "filter" and (c.family, c.table) not in skip
                 and owners.get((c.family, c.table), "own") in ("own", "liminal")]
@@ -261,7 +272,7 @@ class Config:
             out += ufw_mod.entries(self.ufw)
         if self.firewalld.installed:
             fronts.append("firewalld")
-            out += fwd_mod.entries(self.firewalld)
+            out += fwd_mod.entries(self.firewalld, takes=self.unbound_interfaces())
         kept = []
         for e in out:
             if e.owner in fronts and e.kind in ("nftables", "iptables", "ip6tables"):
@@ -272,15 +283,37 @@ class Config:
         self._entries = kept
         return kept
 
+    def unbound_interfaces(self) -> list[str] | None:
+        """The interfaces in use bound to no firewalld zone, which its default zone takes (firewalld.unbound); None when
+        the interfaces could not be read."""
+        return fwd_mod.unbound(self.firewalld, self.system.interfaces)
+
+    def turned_off(self) -> list[Entry]:
+        """The rules there but turned off that `entries` leaves out (0.6.0; the user: "also rules that are turned off
+        should be shown as well"): firewalld's in a zone bound to nothing, in the default zone while every interface in
+        use is bound to another zone, and in a policy not in force. They are shown and can be moved and removed, but
+        never stand for a rule in force (the risks, the exposure)."""
+        if self._off is None:
+            self._off = (fwd_mod.entries(self.firewalld, resting=True, takes=self.unbound_interfaces())
+                         if self.firewalld.installed else [])
+        return self._off
+
+    def listed(self) -> list[Entry]:
+        """Every rule the Rules table lists: the rules read (`entries`; among them, turned off, ufw's while it is off,
+        firewalld's while it is stopped, a dormant table's and those in a chain nothing jumps to), then those turned off
+        beside them (`turned_off`)."""
+        return self.entries() + self.turned_off()
+
     def entry(self, where: str, text: str) -> Entry | None:
-        return next((e for e in self.entries() if e.where == where and e.text == text), None)
+        return next((e for e in self.listed() if e.where == where and e.text == text), None)
 
     # -- what the library's Firewall base asks ---------------------------------------------------------------------------
     def input_chains(self) -> list:
-        """nftables' input base chains of the filter type, but those read another way (iptables-nft's, firewalld's)."""
+        """nftables' input base chains of the filter type, but those read another way (iptables-nft's, firewalld's) and a
+        dormant table's (0.6.0: turned off, they filter nothing)."""
         if self.nft is None:
             return []
-        skip = self.skipped_tables()
+        skip = self.skipped_tables() | self.dormant_tables()
         return [c for c in self.nft.chains if c.base and c.hook == "input" and c.type in ("filter", "") and (c.family, c.table) not in skip]
 
     def dropping(self, chain) -> bool:
@@ -312,12 +345,13 @@ class Config:
         return {"enabled": False, "profiles": {}}
 
     def exposing(self, ports) -> list[tuple[int, str]]:
-        """The rules letting another machine reach any of `ports` inbound where something filters: (the port, the rule)."""
+        """The rules letting another machine reach any of `ports` inbound where something filters: (the port, the rule).
+        A rule turned off is never one (0.6.0)."""
         m = self.manager
         hits: list = []
 
         def take(e: Entry, label: str):
-            if e.direction != "in" or e.action not in ("accept", "limit") or e.local:
+            if e.off or e.direction != "in" or e.action not in ("accept", "limit") or e.local:
                 return
             hits.extend((p, label) for p in ports if e.covers(p))
 
@@ -327,9 +361,11 @@ class Config:
                 if e.kind == "ufw":
                     take(e, f"ufw rule [{e.number}] {e.text.split('  ')[0]} from {e.source or 'Anywhere'}" + (f" ({e.comment})" if e.comment else ""))
         elif m == "firewalld" and self.firewalld.running:
+            takes = self.unbound_interfaces() or []  # what the default zone takes besides its own (0.6.0)
             for z in self.firewalld.zones:  # a zone accepting everything, but one bound only to a program's bridge (Docker's)
-                bound = [i for i in z.words("interfaces") if not owner_by_interface(i)] + z.words("sources")
-                if z.active and z.target == "ACCEPT" and bound:
+                bound = ([i for i in z.words("interfaces") + (takes if z.default else []) if not owner_by_interface(i)]
+                         + z.words("sources"))
+                if z.target == "ACCEPT" and bound:
                     hits.extend((p, f"the zone {z.name} accepts everything ({' '.join(bound)})") for p in ports)
             for e in entries:
                 if e.kind == "firewalld":

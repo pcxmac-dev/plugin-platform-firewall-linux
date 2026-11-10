@@ -2,7 +2,9 @@
 `Entry` says where it is, which way it filters, what it does to what, in its own syntax too, and whose it is: Liminal's
 own (a comment liminal:<name>, a firewalld service liminal-<name>), this machine's own (its administrator's), a front
 end's (ufw's rules, firewalld's zones), or another program's (Docker, Podman, libvirt, Kubernetes, Fail2ban...), which
-makes its rules again and is never changed here. The Rules table's presets and its Find read these."""
+makes its rules again and is never changed here. The Rules table's presets and its Find read these. A rule there but
+turned off (0.6.0: ufw's while ufw is off, firewalld's while it is stopped or in a zone bound to nothing, a dormant
+nftables table's, one in a chain nothing jumps to) says why in `off`."""
 from __future__ import annotations
 
 import hashlib
@@ -48,7 +50,8 @@ PRESETS = (  # the Rules table's choices: (value, title, note)
     ("all", "All", "every rule read"),
 )
 PRESET_NAMES = tuple(p[0] for p in PRESETS)
-MAX_ROWS = 200  # the Rules table's rows at most; Find narrows it
+UNREACHED = "nothing jumps to its chain"  # why a rule in a chain no hook reaches filters nothing (0.6.0)
+MAX_ROWS = 1000  # the Rules table's rows at most under one service or program, and in Other (0.6.0); Find narrows it
 
 
 def owner_by_name(name: str) -> str:
@@ -167,6 +170,7 @@ class Entry:
     family: str = ""  # ipv4 | ipv6 | "" (both)
     number: int = 0  # its place in its chain (iptables), its number (ufw)
     counted: str = ""  # packets and bytes counted, when it counts
+    off: str = ""  # why it is there but turned off, filtering nothing now ("" when in force): ufw off, firewalld stopped... (0.6.0)
 
     @property
     def removable(self) -> bool:
@@ -226,11 +230,13 @@ class Entry:
             return self.owner == "liminal"
         return True
 
-    def found(self, words: str) -> bool:
-        """Whether a Find's words are in it (every word, any case); a number also finds the rules for that port."""
+    def found(self, words: str, also: str = "") -> bool:
+        """Whether a Find's words are in it (every word, any case); a number also finds the rules for that port. `also`:
+        more words it is known by (0.6.0: the name of the service or program it is listed under)."""
         hay = " ".join((self.kind, self.where, self.direction, DIRECTIONS.get(self.direction, ""), self.action, self.target,
                         self.protocol, self.ports, self.source, self.destination, self.interface, self.state, self.comment,
-                        self.owner, OWNER_WORDS.get(self.owner, ""), self.text)).lower()
+                        self.owner, OWNER_WORDS.get(self.owner, ""), self.text, f"turned off {self.off}" if self.off else "",
+                        also)).lower()
         for w in str(words or "").lower().split():
             if w.isdecimal() and self.spans and any(a <= int(w) <= b for a, b in self.spans):
                 continue
@@ -243,4 +249,4 @@ class Entry:
                 "target": self.target, "protocol": self.protocol, "ports": self.ports, "source": self.source,
                 "destination": self.destination, "interface": self.interface, "state": self.state, "comment": self.comment,
                 "owner": self.owner, "removable": self.removable, "family": self.family, "text": self.text,
-                "counted": self.counted}
+                "counted": self.counted, "off": self.off}

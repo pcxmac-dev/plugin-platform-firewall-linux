@@ -120,16 +120,26 @@ def _ssh_note(cfg: Config) -> str:
     return f"; {n} SSH session{'s are' if n != 1 else ' is'} connected now" if n else ""
 
 
-def ssh_allowed(cfg: Config, entries, port: int, leaving: Entry | None = None) -> bool:
-    """Whether a rule (but `leaving`) still lets SSH in on `port` from everywhere."""
-    return any(e is not leaving and e.direction == "in" and e.action in ALLOWS and e.covers(port) and not e.local and e.from_anywhere
-               for e in entries)
+FRONT_OFF = (ufw_mod.OFF, fwd_mod.OFF_STOPPED)  # why a front end's rules filter nothing: the front end itself is off
 
 
-def ssh_only_from(entries, port: int, leaving: Entry | None = None) -> list[str]:
+def counts(e: Entry, front: str = "") -> bool:
+    """Whether a rule stands for what lets traffic in (0.6.0): one in force, never one turned off; but for a change to a
+    front end that is off (`front`: ufw while it is off, firewalld while it is stopped), its own rules count too, as they
+    filter again once it is on."""
+    return not e.off or (bool(front) and e.kind == front and e.off in FRONT_OFF)
+
+
+def ssh_allowed(cfg: Config, entries, port: int, leaving: Entry | None = None, front: str = "") -> bool:
+    """Whether a rule (but `leaving`) still lets SSH in on `port` from everywhere: one in force (`counts`)."""
+    return any(e is not leaving and counts(e, front) and e.direction == "in" and e.action in ALLOWS and e.covers(port)
+               and not e.local and e.from_anywhere for e in entries)
+
+
+def ssh_only_from(entries, port: int, leaving: Entry | None = None, front: str = "") -> list[str]:
     """The networks a rule (but `leaving`) lets SSH in from on `port`, where none lets it in from everywhere."""
-    return sorted({e.source for e in entries if e is not leaving and e.direction == "in" and e.action in ALLOWS and e.covers(port)
-                   and not e.local and not e.from_anywhere})
+    return sorted({e.source for e in entries if e is not leaving and counts(e, front) and e.direction == "in"
+                   and e.action in ALLOWS and e.covers(port) and not e.local and not e.from_anywhere})
 
 
 def risk_of_make(cfg: Config, spec: Spec, framework_ports) -> str:
@@ -154,20 +164,27 @@ def risk_of_make(cfg: Config, spec: Spec, framework_ports) -> str:
 
 
 def risk_of_remove(cfg: Config, e: Entry) -> str:
+    """Why removing `e` may cut this machine off ("" when it cannot). A rule turned off filters nothing, so removing it
+    cuts nothing (0.6.0; ufw's while it is off neither: turning ufw on keeps SSH open first), but firewalld's while it
+    is stopped, in a zone that filters once it runs: judged among firewalld's own then."""
     entries = cfg.entries()
+    later = e.kind == "firewalld" and e.off == fwd_mod.OFF_STOPPED and any(x is e for x in entries)
+    if e.off and not later:
+        return ""
+    front = "firewalld" if later else ""
     if e.direction == "in" and e.action in ALLOWS:
-        if e.local and e.state:
+        if e.local and e.state and not later:
             return ("It lets the replies to this machine's own connections back in: without it, where nothing else does, every "
                     "connection this machine makes (name lookups, updates, SSH's replies) may stop.")
-        if e.local:
+        if e.local and not later:
             return "It lets this machine reach itself (loopback): the framework's pages at 127.0.0.1 may stop answering."
-        cut = [p for p in sorted(cfg.system.ssh_ports) if e.covers(p) and not ssh_allowed(cfg, entries, p, leaving=e)]
+        cut = [p for p in sorted(cfg.system.ssh_ports) if e.covers(p) and not ssh_allowed(cfg, entries, p, leaving=e, front=front)]
         if cut:
-            only = sorted({s for p in cut for s in ssh_only_from(entries, p, leaving=e)})
-            return (f"It is what lets SSH in (sshd listens on {', '.join(map(str, cut))}"
+            only = sorted({s for p in cut for s in ssh_only_from(entries, p, leaving=e, front=front)})
+            return (f"It is what lets SSH in{' once firewalld runs again' if later else ''} (sshd listens on {', '.join(map(str, cut))}"
                     + (f"; another rule lets it in only from {', '.join(only)}" if only else "") + f"{_ssh_note(cfg)}): without it, "
                     "whoever reaches this machine over SSH may be cut off, perhaps you.")
-        if re.search(r"ipv6-icmp|icmpv6|neighbou?r-|router-advertisement|nd-", f"{e.protocol} {e.text}"):
+        if not later and re.search(r"ipv6-icmp|icmpv6|neighbou?r-|router-advertisement|nd-", f"{e.protocol} {e.text}"):
             return ("It lets IPv6's own messages in (neighbour discovery, router advertisements): without them this machine "
                     "may lose its IPv6 neighbours and routes, and IPv6 may stop working.")
     return ""
@@ -332,7 +349,7 @@ def plan_remove(cfg: Config, e: Entry, check_risk: bool = True) -> Plan:
         if parts[0] == "ufw":
             return Plan([Step(["ufw", "--force", "delete", str(e.number)])], f"removed from ufw: {e.text}", risk)
         spec = re.sub(r"\s+comment\s+'[^']*'\s*$", "", e.text[4:] if e.text.startswith("ufw ") else e.text)
-        return Plan([Step(["ufw", "--force", "delete", *spec.split()])], f"removed from ufw: {e.text}", risk)
+        return Plan([Step(["ufw", "--force", "delete", *ufw_mod.spec_words(spec)])], f"removed from ufw: {e.text}", risk)
     if e.kind == "firewalld":
         scope, name, what, value = parts[1], parts[2], parts[3], "|".join(parts[4:-1])  # a rich rule's words may hold a |
         running = cfg.firewalld.running
@@ -401,14 +418,15 @@ def plan_policy(cfg: Config, where: str, policy: str) -> Plan:
         raise ValueError(f"{where}'s policy is one of {', '.join(p.choices)}")
     opens = policy.lower() in ("accept", "allow")
     risk = ""
+    front = p.kind if p.kind in ("ufw", "firewalld") else ""  # its own rules count while it is off (`counts`)
     if p.inbound and opens:
         risk = (f"{where} lets in by default what no rule drops: every port of this machine is reached from outside "
                 "unless a rule stops it.")
     elif p.inbound and not opens and cfg.system.ssh_ports:
         entries = cfg.entries()
-        cut = [port for port in sorted(cfg.system.ssh_ports) if not ssh_allowed(cfg, entries, port)]
+        cut = [port for port in sorted(cfg.system.ssh_ports) if not ssh_allowed(cfg, entries, port, front=front)]
         if cut:
-            only = sorted({s for port in cut for s in ssh_only_from(entries, port)})
+            only = sorted({s for port in cut for s in ssh_only_from(entries, port, front=front)})
             risk = (f"No rule lets SSH in from everywhere (sshd listens on {', '.join(map(str, cut))}"
                     + (f"; only from {', '.join(only)}" if only else "") + f"{_ssh_note(cfg)}): with {where} dropping by default, "
                     "whoever reaches this machine over SSH may be cut off, perhaps you.")

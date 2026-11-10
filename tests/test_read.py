@@ -243,6 +243,8 @@ def test_firewalld_blocks_of_every_version():
                                                                          ("gateway-lan-to-world", False, True, "ACCEPT")]
     st = fwd.FirewalldState(installed=True, running=True, policies=pols)
     assert [e.where for e in fwd.entries(st)] == ["policy allow-host-ipv6"]  # a disabled policy has no rules in force
+    assert [(e.text, e.off) for e in fwd.entries(st, resting=True)] == [  # its own are listed apart, turned off (0.6.0)
+        ("service ftp", "the policy is turned off"), ("service tftp", "the policy is turned off")]
     zones = fwd.parse_blocks("public (default, active)\n  target: default\n  interfaces: eth0\n  forward-ports: \n"
                              "\tport=2222:proto=tcp:toport=22:toaddr=10.0.0.5\n  rich rules: \n"
                              "\trule priority=\"-100\" family=\"ipv4\" source address=\"203.0.113.7\" drop\n"

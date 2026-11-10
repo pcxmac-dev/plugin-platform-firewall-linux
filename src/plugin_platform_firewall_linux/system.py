@@ -91,10 +91,12 @@ class Interface:
     state: str
     addresses: tuple = ()
     xdp: str = ""  # "xdp generic: program 42"
+    master: str = ""  # the bridge or bond it is a port of (br0, docker0, bond0): what it carries comes in through that (0.6.0)
 
 
 def parse_addresses(text: str) -> list[Interface]:
-    """`ip -j addr show`: each interface, its state, addresses and an XDP program attached."""
+    """`ip -j addr show`: each interface, its state, addresses, an XDP program attached, and the bridge or bond it is a
+    port of."""
     try:
         data = json.loads(text or "[]")
     except ValueError:
@@ -116,7 +118,7 @@ def parse_addresses(text: str) -> list[Interface]:
                 xdp = f"XDP {mode}: programs {', '.join(ids)}"
             else:
                 xdp = f"XDP {mode}" + (f": program {pid}" if pid is not None else "")
-        out.append(Interface(i["ifname"], str(i.get("operstate") or "").lower(), addrs, xdp))
+        out.append(Interface(i["ifname"], str(i.get("operstate") or "").lower(), addrs, xdp, str(i.get("master") or "")))
     return out
 
 

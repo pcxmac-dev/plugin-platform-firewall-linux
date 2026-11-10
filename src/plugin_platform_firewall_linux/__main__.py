@@ -30,9 +30,10 @@ def main(argv: list[str] | None = None) -> int:
         if what == "rules":
             preset = rest[0] if rest and rest[0] in PRESET_NAMES else "all"
             words = " ".join(rest[1:] if rest and rest[0] in PRESET_NAMES else rest)
-            for e in MACHINE.config().entries():
+            for e in MACHINE.config().listed():  # the turned-off ones too (0.6.0), said so
                 if e.shown(preset) and e.found(words):
-                    print(f"{e.kind:9} {e.where:32} {e.direction:5} {e.action:8} {e.owner:10} {e.text}")
+                    print(f"{e.kind:9} {e.where:32} {e.direction:5} {e.action:8} {e.owner:10} {e.text}"
+                          + (f"  [turned off: {e.off}]" if e.off else ""))
             return 0
         if what == "setup":
             done = MACHINE.setup(log=print, steps=rest or None)

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from liminal_libs.machines.firewall import PREFIX
 
-from .model import Entry, digest, owner_by_interface, owner_by_name, ports_text
+from .model import UNREACHED, Entry, digest, owner_by_interface, owner_by_name, ports_text
 
 VERDICTS = ("accept", "drop", "reject", "jump", "goto", "return", "continue", "queue")
 NAT = ("masquerade", "snat", "dnat", "redirect")
@@ -19,6 +19,7 @@ L4 = ("tcp", "udp", "sctp", "dccp", "udplite", "icmp", "icmpv6", "ah", "esp", "c
 HOOK_DIRECTION = {"input": "in", "output": "out", "forward": "fwd"}
 IPTABLES_TABLES = ("filter", "nat", "mangle", "raw", "security")
 IPTABLES_FAMILIES = {"ip": "iptables", "ip6": "ip6tables", "arp": "arptables", "bridge": "ebtables"}
+DORMANT = "its table is dormant"  # why a dormant table's rules filter nothing (0.6.0)
 
 
 @dataclass(frozen=True)
@@ -309,6 +310,15 @@ def rule_text(rule: Rule) -> str:
 
 
 # -- what a rule is for ---------------------------------------------------------------------------------------------
+def vmap_pairs(s: dict) -> list:
+    """A vmap statement's pairs written in the rule ([key, verdict], ...); none for a map declared apart (`vmap @name`,
+    its data a name: 0.6.0, before which such a rule stopped the read)."""
+    o = s.get("vmap") if isinstance(s, dict) else None
+    data = o.get("data") if isinstance(o, dict) else None
+    pairs = data.get("set") if isinstance(data, dict) else None
+    return [p for p in pairs if isinstance(p, list) and len(p) == 2] if isinstance(pairs, list) else []
+
+
 def _right_values(right) -> list:
     if isinstance(right, dict) and "set" in right:
         return right["set"] if isinstance(right["set"], list) else [right["set"]]
@@ -334,8 +344,7 @@ def view(rule: Rule) -> dict:
             out["action"] = "vmap"
             key = (s["vmap"] or {}).get("key")
             if isinstance(key, dict) and "ct" in key and (key["ct"] or {}).get("key") == "state":
-                pairs = ((s["vmap"] or {}).get("data") or {}).get("set") or []
-                accepted = [p[0] for p in pairs if isinstance(p, list) and len(p) == 2 and isinstance(p[1], dict) and "accept" in p[1]]
+                accepted = [p[0] for p in vmap_pairs(s) if isinstance(p[1], dict) and "accept" in p[1]]
                 out["state"] = ",".join(str(a) for a in accepted)
             continue
         for k in NAT:
@@ -428,9 +437,8 @@ def reached(rs: Ruleset) -> dict:
                 if k in s and isinstance(s[k], dict):
                     targets.setdefault(r.chain_key, set()).add(f"{r.family} {r.table} {s[k].get('target', '')}")
             if "vmap" in s:
-                pairs = ((s["vmap"] or {}).get("data") or {}).get("set") or []
-                for p in pairs:
-                    if isinstance(p, list) and len(p) == 2 and isinstance(p[1], dict):
+                for p in vmap_pairs(s):
+                    if isinstance(p[1], dict):
                         for k in ("jump", "goto"):
                             if k in p[1] and isinstance(p[1][k], dict):
                                 targets.setdefault(r.chain_key, set()).add(f"{r.family} {r.table} {p[1][k].get('target', '')}")
@@ -467,6 +475,17 @@ def reachable_from(rs: Ruleset, chain: Chain) -> set:
     return seen
 
 
+def vmap_by_name(rule: Rule) -> bool:
+    """Whether a rule decides through a verdict map declared apart (`vmap @name`): the chains it jumps to are not read
+    here, so none of its table's chains is said to be reached by nothing."""
+    for s in rule.expr:
+        if isinstance(s, dict) and isinstance(s.get("vmap"), dict):
+            data = s["vmap"].get("data")
+            if not (isinstance(data, dict) and isinstance(data.get("set"), list)):
+                return True
+    return False
+
+
 def direction_of(hooks) -> str:
     names = {h for h, _ in hooks}
     for hook in ("input", "output", "forward"):
@@ -479,9 +498,12 @@ def direction_of(hooks) -> str:
 
 def entries(rs: Ruleset, skip: set = frozenset()) -> list[Entry]:
     """Every rule as an Entry, those of the tables in `skip` ({(family, name)}: iptables-nft's, read in its own syntax)
-    left out."""
+    left out; turned off (0.6.0), a dormant table's (its base chains are off their hooks, so none of it is evaluated) and
+    one in a chain no base chain jumps or goes to."""
     hooks = reached(rs)
     owners = {(t.family, t.name): table_owner(t, rs.chains) for t in rs.tables}
+    dormant = {(t.family, t.name) for t in rs.tables if "dormant" in t.flags}
+    by_map = {(r.family, r.table) for r in rs.rules if vmap_by_name(r)}  # its chains may be reached through such a map
     chain_by = {c.key: c for c in rs.chains}
     out = []
     for r in rs.rules:
@@ -507,7 +529,10 @@ def entries(rs: Ruleset, skip: set = frozenset()) -> list[Entry]:
                          kind="nftables", where=f"{r.family} {r.table} {r.chain}", direction=direction, action=v["action"],
                          text=text, target=v["target"], protocol=v["protocol"], ports=v["ports"], spans=v["spans"],
                          source=v["source"], destination=v["destination"], interface=v["interface"], state=v["state"],
-                         comment=r.comment, owner=owner, family=family, number=r.handle, counted=v["counted"]))
+                         comment=r.comment, owner=owner, family=family, number=r.handle, counted=v["counted"],
+                         off=DORMANT if (r.family, r.table) in dormant
+                         else UNREACHED if c is not None and not c.base and not hk and (r.family, r.table) not in by_map
+                         else ""))
     return out
 
 

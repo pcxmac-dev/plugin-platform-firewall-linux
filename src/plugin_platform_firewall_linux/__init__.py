@@ -29,6 +29,17 @@ Application or Other by whose it is, what it is for, the service or profile it n
 port; the user's labels and moves are the library's (rulegroups), kept through the platform's login, never in the
 firewall.
 
+System and Application grouped again (0.6.0; the user: "for the windows and linux firewall, lets have the same system and
+application and other, but lets group by application under apps or system, try best to organize under system and
+applications", "try to group the system by 'services'"): each System rule named by its service, one name whichever way
+it was recognised (SSH, DNS, DHCP, mDNS, Samba...; this machine's own traffic, ICMP, invalid packets), each Application
+rule by its program (Docker, libvirt, Tailscale, Liminal; Web server (HTTP, HTTPS) for firewalld's http and https; a ufw
+profile's application; the program listening), a heading of its own under its group (liminal-libs 1.41.0). And the
+rules turned off are shown too ("also rules that are turned off should be shown as well"), dimmed: ufw's while ufw is
+off, firewalld's while it is stopped, in a zone bound to nothing or in a policy turned off, a dormant nftables table's,
+one in a chain nothing jumps to. A rule turned off never stands for one in force (the second confirmation, the
+exposure).
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND
 """
@@ -43,6 +54,7 @@ from liminal_libs.machines.plugin import CommandError
 from liminal_libs.machines.rulegroups import RuleGroups, Sorted
 
 from . import changes as ch
+from . import firewalld as fwd_mod
 from . import nftables as nft_mod
 from . import read as read_mod
 from .changes import ACCEPT, NotNeeded, Risky
@@ -51,7 +63,7 @@ from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -211,9 +223,11 @@ class LinuxFirewallPlugin(Firewall):
         return ran
 
     def sorted_rules(self) -> dict[str, Sorted]:
-        """Every rule read, by its key, with its own group (groups.sort_entry): what a move checks."""
+        """Every rule listed (the turned-off ones too), by its key, with its own group and name (groups.sort_entry): what
+        a move checks."""
         cfg = self.config()
-        return {rule_key(e): sort_entry(e, cfg.system.listening, cfg.system.listening_udp) for e in cfg.entries()}
+        ports = liminal_ports()
+        return {rule_key(e): sort_entry(e, cfg.system.listening, cfg.system.listening_udp, ports) for e in cfg.listed()}
 
     # -- the hooks the page asks ---------------------------------------------------------------------------------------
     def refresh(self) -> dict:
@@ -295,6 +309,11 @@ class LinuxFirewallPlugin(Firewall):
         return out
 
 
+def liminal_ports() -> frozenset:
+    """The framework's own pages' ports (the library's app_ports): a program listening on one is Liminal's."""
+    return frozenset(app_ports().values())
+
+
 def _named(manager: str, cfg: Config) -> str:
     if manager == "ufw":
         return f"ufw {cfg.ufw.version}".strip()
@@ -311,8 +330,10 @@ def _summary(cfg: Config) -> str:
     m = cfg.manager
     on = "on" if cfg.state().get("enabled") else "off"
     over = f" over nftables {cfg.nft_version}" if cfg.nft is not None and m != "nftables" else ""
-    return (f"{_named(m, cfg)}{over}: {on}; {len(cfg.entries())} rule(s) read, {len(cfg.liminal_rules())} of them Liminal's; "
-            f"{cfg.system.name}, {cfg.system.init_words}")
+    listed = cfg.listed()
+    off = sum(1 for e in listed if e.off)
+    return (f"{_named(m, cfg)}{over}: {on}; {len(listed)} rule(s) read" + (f", {off} of them turned off" if off else "")
+            + f", {len(cfg.liminal_rules())} of them Liminal's; {cfg.system.name}, {cfg.system.init_words}")
 
 
 # -- the tables (liminal-platform 0.7.0: a table's own options and actions; cell buttons opening forms) ----------------------
@@ -423,10 +444,13 @@ def zones_table(cfg: Config) -> dict | None:
     if not f.installed or not f.zones:
         return None
     rows = []
+    takes = cfg.unbound_interfaces()
     for z in sorted(f.zones, key=lambda z: (not z.active, not z.default, z.name)):
         if not (z.active or z.default):
             continue
-        rows.append([_cell(z.name, "default" if z.default else None), " ".join(z.words("interfaces") + z.words("sources")) or "–",
+        off = fwd_mod.off_of(z, True, takes) if z.default else ""  # the default zone taking no interface in use (0.6.0)
+        rows.append([_cell(z.name, ("default" + (f"; turned off: {off}" if off else "")) if z.default else None),
+                     " ".join(z.words("interfaces") + z.words("sources")) or "–",
                      z.target, " ".join(z.words("services")) or "–", " ".join(z.words("ports")) or "–", len(z.rich),
                      {"form": "policy", "title": "Target…", "values": {"where": f"zone {z.name}", "policy": z.target},
                       "label": f"Set the zone {z.name}'s target"}])
@@ -446,12 +470,13 @@ def policies_table(cfg: Config) -> dict:
                                                             "label": f"Set {p.where}'s default"}])
     settable = {p.where for p in ch.policies(cfg)}
     if cfg.nft is not None:  # the other base chains, read only: another program's, or a front end's machinery
-        skip = cfg.skipped_tables()
+        skip, dormant = cfg.skipped_tables(), cfg.dormant_tables()
         for c in cfg.nft.chains:
             if c.base and (c.family, c.table) not in skip and c.key not in settable:
                 t = cfg.nft.table(c.family, c.table)
                 owner = nft_mod.table_owner(t, cfg.nft.chains) if t else "own"
-                rows.append([c.key, OWNER_WORDS.get(owner, owner), c.policy or "accept", f"{c.type} {c.hook}, priority {c.prio}", ""])
+                rows.append([c.key, OWNER_WORDS.get(owner, owner), c.policy or "accept", f"{c.type} {c.hook}, priority {c.prio}"
+                             + (f"; turned off: {nft_mod.DORMANT}" if (c.family, c.table) in dormant else ""), ""])
     for tool, saved in cfg.saved.items():  # iptables' built-in chains, read only unless iptables is in charge
         for c in saved.chains:
             where = f"{tool} {c.table} {c.name}"
@@ -466,29 +491,37 @@ def policies_table(cfg: Config) -> dict:
 
 
 GROUP_NOTES = {
-    "system": "the system's own: its services (SSH, DNS, DHCP, time...), its own traffic, ICMP",
-    "application": "a program's: one listening on the port, or one making its own rules (Docker's, Liminal's...)",
+    "system": "the system's own, by service (SSH, DNS, DHCP, NTP...), with its own traffic, ICMP and invalid packets",
+    "application": "a program's, by program: one making its own rules (Docker's, Liminal's...), or one listening on the port",
     "other": "tied to no program or service: a port or an address alone",
 }
 
 
 def rules_table(cfg: Config, preset: str, find: str, groups: RuleGroups | None = None) -> dict:
-    """The rules shown, in their groups (0.5.0): System, Application, Other and the user's labels, each listing its first
-    MAX_ROWS; a rule's group found by groups.sort_entry, or where the user moved it."""
-    entries = cfg.entries()
-    shown = [e for e in entries if e.shown(preset) and e.found(find)]
+    """The rules shown, in their groups (0.5.0): System, Application, Other and the user's labels; System's by service and
+    Application's by program (0.6.0), each service, program and Other listing its first MAX_ROWS (Find finds a rule by
+    its heading's name too); a rule's group and name found by groups.sort_entry, or its group where the user moved it. A
+    rule turned off is listed too, dimmed (0.6.0)."""
+    listed = cfg.listed()
+    ports = liminal_ports()
+    sorts = [(e, sort_entry(e, cfg.system.listening, cfg.system.listening_udp, ports)) for e in listed]
+    picked = [(e, s) for e, s in sorts if e.shown(preset) and e.found(find, s.name)]
+    shown = [e for e, _ in picked]
     rows = []
-    for e in shown:
+    for e, s in picked:
         does = e.action + (f" {e.target}" if e.target and e.action in ("jump", "goto", "nat") else "")
         port = f"{e.protocol} {e.ports}".strip() if e.ports or e.protocol else "every"
         frm = e.source or ("anywhere" if e.direction in ("in", "fwd") else "")
         button = ({"form": "remove", "title": "Remove…", "values": {"where": e.where, "rule": e.text}, "label": f"Remove {e.text}"}
                   if e.removable else "")
-        rows.append((rule_key(e), sort_entry(e, cfg.system.listening, cfg.system.listening_udp), [
-            _cell(e.where, e.kind), DIRECTIONS.get(e.direction, e.direction), does, port,
-            _cell(frm, f"on {e.interface}" if e.interface else None) if frm or e.interface else "", e.destination,
-            _cell(e.text, e.comment if e.comment and e.comment not in e.text else None), OWNER_WORDS.get(e.owner, e.owner), button]))
-    note = (f"{len(shown)} of {len(entries)} rules" + (f"; finding {find!r}" if find else "")
+        row = (rule_key(e), s, [
+            _cell(e.where, f"{e.kind}, turned off: {e.off}" if e.off else e.kind), DIRECTIONS.get(e.direction, e.direction), does,
+            port, _cell(frm, f"on {e.interface}" if e.interface else None) if frm or e.interface else "", e.destination,
+            _cell(e.text, e.comment if e.comment and e.comment not in e.text else None), OWNER_WORDS.get(e.owner, e.owner), button])
+        rows.append((*row, {"off": True}) if e.off else row)
+    off = sum(1 for e in shown if e.off)
+    note = (f"{len(shown)} of {len(listed)} rules" + (f", {off} of them turned off (they filter nothing now)" if off else "")
+            + (f"; finding {find!r}" if find else "")
             + ". A program's own rules (Docker's...) are read only: it makes them again. Moving a rule to another group changes"
             " nothing in the firewall.")
     actions = [{"form": "make", "title": "Add a rule…"}, {"form": "find", "title": "Find…", "values": {"words": find}},
@@ -570,7 +603,8 @@ def forms(cfg: Config) -> list[dict]:
          "confirm": {"title": "Remove this rule?", "words": "{rule} is removed from {where}." + lasting, "yes": "Remove the rule",
                      "danger": True}},
         {"id": "find", "hook": "find_rules", "title": "Find rules", "confirm": False,
-         "note": "Every word must be in the rule (any case); a number finds the rules for that port too.",
+         "note": ("Every word must be in the rule, or in the name of the service or program it is listed under (any case); "
+                  "a number finds the rules for that port too."),
          "fields": [{"name": "words", "label": "Words", "type": "text", "placeholder": "22, docker, 10.0.0.0/8, drop",
                      "note": "none shows every rule of the choice"}],
          "submit": "Find"},

@@ -280,6 +280,44 @@ Reading and changing the firewall need root. The plugin runs its commands throug
 root, and never asks for a password. Without the rights, its status says "cannot be read" with sudo's words: run the
 platform as root, or let sudo run `sh` and the firewall's tools without a password.
 
+## Its API
+
+The user's words (2026-11-11): "each plugin should reflect the the API its attached to, and present links that provide
+documentation, the plugin interface should more or less contain what it already has, BUT, it should also expose more of
+what the API is about". Since 0.7.0 (plugin API 2.2) the plugin declares what it attaches to (`apis.py`), and the
+platform's page draws each card: what the API is, its links, every part of it (those the plugin uses first, the rest
+under "more of the API") and every call it makes, with the API's other notable calls beside them.
+
+- **nftables**: [the nftables wiki](https://wiki.nftables.org/wiki-nftables/index.php/Main_Page),
+  [nft(8)](https://www.netfilter.org/projects/nftables/manpage.html),
+  [libnftables-json(5)](https://manpages.debian.org/unstable/libnftables1/libnftables-json.5.en.html).
+- **iptables and ip6tables**: [the project](https://www.netfilter.org/projects/iptables/),
+  [iptables(8)](https://man7.org/linux/man-pages/man8/iptables.8.html),
+  [iptables-save(8)](https://man7.org/linux/man-pages/man8/iptables-save.8.html),
+  [xtables-nft(8)](https://manpages.debian.org/unstable/iptables/xtables-nft.8.en.html).
+- **ebtables and arptables**: [ebtables](https://ebtables.netfilter.org/),
+  [ebtables-nft(8)](https://man7.org/linux/man-pages/man8/ebtables-nft.8.html),
+  [arptables-nft(8)](https://man7.org/linux/man-pages/man8/arptables-nft.8.html) (their versions only).
+- **ipset**: [ipset](https://ipset.netfilter.org/), [ipset(8)](https://ipset.netfilter.org/ipset.man.html).
+- **firewalld**: [its documentation](https://firewalld.org/documentation/),
+  [firewall-cmd(1)](https://firewalld.org/documentation/man-pages/firewall-cmd.html),
+  [firewalld.zones(5)](https://firewalld.org/documentation/man-pages/firewalld.zones.html).
+- **ufw**: [ufw(8)](https://manpages.ubuntu.com/manpages/resolute/man8/ufw.8.html),
+  [Firewalls (Ubuntu Server)](https://ubuntu.com/server/docs/how-to/security/firewalls/).
+- **conntrack**: [the kernel's conntrack sysctls](https://docs.kernel.org/networking/nf_conntrack-sysctl.html),
+  [conntrack-tools](https://conntrack-tools.netfilter.org/).
+- **eBPF (bpftool)**: [the kernel's BPF documentation](https://docs.kernel.org/bpf/),
+  [bpftool-net(8)](https://manpages.debian.org/unstable/bpftool/bpftool-net.8.en.html) (read only).
+- **iproute2**: [ip-address(8)](https://man7.org/linux/man-pages/man8/ip-address.8.html),
+  [ss(8)](https://man7.org/linux/man-pages/man8/ss.8.html).
+- **The firewall's services** under systemd, OpenRC or SysV scripts, and **sudo** (`sudo -n`, never a password).
+
+`api_facts()` says what the last read found, asking nothing: each tool's version and variant, the tables, the sets,
+firewalld's state, backend and default zone, ufw on or off, the connections tracked, the programs on the network's
+hooks, the machine (its distribution, kernel and init) and when it was read. Every address on the cards was read on
+2026-11-11; the test `test_the_cards_pages_answer` asks each of them again when `LIMINAL_VENDOR_PAGES=1` is set (it is
+skipped otherwise).
+
 ## From the command line
 
 ```

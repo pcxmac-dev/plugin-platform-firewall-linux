@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.0 (2026-11-11)
+
+Its API on its page, plugin API 2.2 (the user: "each plugin should reflect the the API its attached to, and present
+links that provide documentation, the plugin interface should more or less contain what it already has, BUT, it should
+also expose more of what the API is about"). Eleven cards (`apis.py`), each with the makers' pages, every part of the
+API said covered or not, and every call the plugin makes beside the API's other notable ones: nftables (the wiki,
+nft(8), libnftables-json(5)), iptables and ip6tables (both variants, saving and the distributions' own saves),
+ebtables and arptables, ipset, firewalld (zones, policies, services, rich rules, the offline tool), ufw, connection
+tracking, eBPF through bpftool, iproute2's ip and ss, the init's firewall services, and sudo.
+
+`api_facts()` says what the last read found, asking nothing: the tools' versions and variants, what each holds,
+firewalld's and ufw's state, the connections tracked, the programs on the network's hooks, the machine and when. Tests:
+the cards name every command of the read script and every change the plugin runs over the recorded machines, and the
+commands its plans give each init and distribution; a link check runs with LIMINAL_VENDOR_PAGES=1. Needs
+liminal-libs>=1.49.0.
+
 ## 0.6.0 (2026-11-09)
 
 System and Application grouped again, each rule under the service or the program it is for (the user: "for the windows

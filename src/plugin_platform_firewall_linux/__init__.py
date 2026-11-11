@@ -40,6 +40,12 @@ off, firewalld's while it is stopped, in a zone bound to nothing or in a policy 
 one in a chain nothing jumps to. A rule turned off never stands for one in force (the second confirmation, the
 exposure).
 
+What it attaches to (0.7.0, plugin API 2.2; the user, 2026-11-11: "each plugin should reflect the the API its attached
+to, and present links that provide documentation"): nftables, iptables and ip6tables, ebtables and arptables, ipset,
+firewalld, ufw, conntrack, eBPF (bpftool), iproute2, the init's firewall services and sudo, each with its makers' pages,
+its parts and its calls (apis.py), drawn on the plugin's page; `api_facts` says what the last read found of them (each
+tool's version and what it holds), asking nothing.
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND
 """
@@ -57,13 +63,15 @@ from . import changes as ch
 from . import firewalld as fwd_mod
 from . import nftables as nft_mod
 from . import read as read_mod
+from .apis import APIS
+from .apis import facts as api_facts_of
 from .changes import ACCEPT, NotNeeded, Risky
 from .groups import key as rule_key
 from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -78,7 +86,8 @@ class LinuxFirewallPlugin(Firewall):
     about = ("the native Linux machine's firewall, read whole and changed from the platform's page: nftables, iptables "
              "(nf_tables and legacy), ebtables, arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP (read only), "
              "under systemd, OpenRC or SysV scripts; never a WSL distribution")
-    api = "2.1"
+    api = "2.2"
+    apis = APIS  # what it attaches to: nftables, iptables, ebtables, ipset, firewalld, ufw, conntrack, eBPF... (apis.py)
     order = 711
     ICON = "wallfire"  # a brick wall with a flame before it (liminal-libs 1.34.0; the user's picture: "use this icon for linux firewall")
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
@@ -93,6 +102,11 @@ class LinuxFirewallPlugin(Firewall):
         self._read: tuple[float, Config] | None = None
         self._preset = "in-allow"
         self._find = ""
+
+    def api_facts(self) -> dict:
+        """What the last read found of its APIs, asking nothing (a read under way is not waited for): each tool's version
+        and what it holds, the connections tracked, the programs on the network's hooks, the machine and when."""
+        return api_facts_of(self)
 
     # -- where it works -------------------------------------------------------------------------------------------------
     def not_for_here(self) -> str:

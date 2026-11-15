@@ -21,7 +21,7 @@ from plugin_platform_firewall_linux.read import SCRIPT
 from machines import FakeLinux
 
 WANTED = [Rule("mail-example-test", ports=(25, 587), detail="the mail server container")]
-APP = [8765, 8775, 8785, 8795, 8796]
+APP = [8765, 8775, 8785, 8795]
 
 
 class Clock:

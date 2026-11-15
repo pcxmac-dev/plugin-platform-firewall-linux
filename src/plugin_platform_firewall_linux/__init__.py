@@ -71,7 +71,7 @@ from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")

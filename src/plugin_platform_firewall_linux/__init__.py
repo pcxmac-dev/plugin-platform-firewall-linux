@@ -71,7 +71,7 @@ from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.7.1"
+__version__ = "0.7.2"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -90,6 +90,7 @@ class LinuxFirewallPlugin(Firewall):
     apis = APIS  # what it attaches to: nftables, iptables, ebtables, ipset, firewalld, ufw, conntrack, eBPF... (apis.py)
     order = 711
     ICON = "wallfire"  # a brick wall with a flame before it (liminal-libs 1.34.0; the user's picture: "use this icon for linux firewall")
+    SECTION = "os"  # drawn under the platform's OS plugins (liminal-platform 0.26.0)
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
              "save_rules")
 

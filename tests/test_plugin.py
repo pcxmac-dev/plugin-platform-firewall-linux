@@ -307,6 +307,50 @@ def test_a_failure_is_said_with_what_was_done_before_it():
     assert not st["valid"] and st["why"].startswith("cannot be read:") and "a password is required" in st["why"]
 
 
+def test_what_the_firewall_needs_is_said_when_it_cannot_be_read_or_there_is_none(monkeypatch):
+    """0.8.1 (the user: "still need linux firewall"; found inside WSL's Ubuntu: sudo asks for a password there, and no
+    firewall tool is installed). When the read is refused for want of root, or there is no firewall software, the page's
+    tables say what the firewall needs here (root for the read, a firewall tool), each with what to do, and inside WSL
+    what WSL changes after it. The tools are looked for by their files, without root: nothing runs but the read, through
+    sudo -n, which never asks for a password."""
+    import types
+
+    monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 1000, raising=False)  # the platform is no root: sudo -n asks
+    ran: list = []
+
+    def refused(args, timeout):
+        ran.append(args)
+        return 1, b"", b"sudo: a password is required"
+    looked: list = []
+    fw = LinuxFirewallPlugin(shell=Shell("local", runner=refused), native="", which=lambda tool: looked.append(tool))
+    st = fw.status()
+    assert not st["valid"] and st["why"].startswith("cannot be read: sh needs root on this machine")
+    needs = st["tables"][0]
+    assert needs["title"] == "What the firewall needs here" and [r[0] for r in needs["rows"]] == ["Root for the read", "A firewall tool"]
+    assert needs["rows"][0][1] == "sudo asks for a password" and "sudo -n, which never asks" in needs["rows"][0][2]
+    assert needs["rows"][1][1].startswith("none installed") and "apt install nftables (Debian, Ubuntu)" in needs["rows"][1][2]
+    assert [c["title"] for c in needs["columns"]] == ["What", "Here", "What to do"] and len(st["tables"]) == 1
+    assert looked == ["nft", "iptables", "ufw", "firewall-cmd"] and ran and all(a[:2] == ["sudo", "-n"] for a in ran)
+    nft = LinuxFirewallPlugin(shell=Shell("local", runner=refused), native="", which=lambda t: "/usr/sbin/nft" if t == "nft" else None)
+    assert nft.status()["tables"][0]["rows"][1][1:] == ["nftables installed", "none needed"]
+    under = {"title": "Under WSL", "note": "What running inside a WSL distribution changes for this plugin.",
+             "columns": [{"title": "What"}, {"title": "Here"}, {"title": "What it means"}],
+             "rows": [["Packet filter", "the kernel's own", "nftables and iptables work here once their tools are installed"]]}
+    monkeypatch.setattr(linux_mod, "wsl_table", lambda kind, *a, **k: under if kind == "firewall" else None, raising=False)
+    assert [t["title"] for t in fw.status()["tables"]] == ["What the firewall needs here", "Under WSL"]  # inside WSL
+    # a read that failed otherwise: its own words, and the tool as found
+    odd = LinuxFirewallPlugin(shell=Shell("local", runner=lambda a, t: (2, b"", b"sh: 1: Syntax error")), native="",
+                              which=lambda t: None)
+    assert odd.status()["tables"][0]["rows"][0][:2] == ["The read", "failed: sh: 1: Syntax error"]
+    # no firewall software at all (the read ran, as root, and found none): the tool, what to do, and WSL's table
+    monkeypatch.setattr(LinuxFirewallPlugin, "config", lambda self, fresh=False: types.SimpleNamespace(manager=""))
+    bare = LinuxFirewallPlugin(shell=Shell("local", runner=refused), native="", which=lambda t: 1 / 0)  # not looked for
+    st = bare.status()
+    assert (st["present"], st["valid"], st["summary"]) == (False, False, "no firewall software here")
+    assert [r[:2] for r in st["tables"][0]["rows"]] == [["A firewall tool", "none installed: no nft, iptables, ufw or firewall-cmd here"]]
+    assert [t["title"] for t in st["tables"]] == ["What the firewall needs here", "Under WSL"]
+
+
 class Numbered(FakeLinux):
     """ufw's numbered rules as ufw keeps them: a rule deleted by its number, the ones after it numbered again."""
 

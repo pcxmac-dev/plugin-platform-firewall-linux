@@ -290,6 +290,15 @@ Reading and changing the firewall need root. The plugin runs its commands throug
 root, and never asks for a password. Without the rights, its status says "cannot be read" with sudo's words: run the
 platform as root, or let sudo run `sh` and the firewall's tools without a password.
 
+Then, and when there is no firewall software at all, its page has a table, **What the firewall needs here** (0.8.1):
+- root for the read, as above;
+- a firewall tool: which of nftables, iptables, ufw and firewalld is installed, found by their files without root and
+  running nothing. With none, it says how to install nftables on each distribution.
+
+Inside WSL the "Under WSL" table follows it. Both are an administrator's to put right; the plugin installs and changes
+nothing for them. liminal-platform 0.29.0 draws a plugin's tables while it is not valid yet; an older platform shows the
+reason alone.
+
 The World Wide Web tab's capture needs less: root, or CAP_NET_RAW alone, for the platform alone (below). It never needs
 CAP_NET_ADMIN, which is the right to rewrite the firewall.
 

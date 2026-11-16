@@ -72,6 +72,7 @@ all under WSL 1). On Windows and macOS the tab says it is not for this machine, 
 from __future__ import annotations
 
 import ipaddress
+import shutil
 import threading
 import time
 
@@ -94,13 +95,24 @@ from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.8.0"
+__version__ = "0.8.1"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
 POLICY_ORDER = ("default", "allow", "accept", "ACCEPT", "deny", "drop", "DROP", "reject", "%%REJECT%%")
 POLICY_NOTES = {"allow": "let in", "accept": "let in", "ACCEPT": "let in", "deny": "dropped", "drop": "dropped", "DROP": "dropped",
                 "reject": "refused", "%%REJECT%%": "refused (firewalld's)", "default": "firewalld's default: refused"}
+# What the firewall needs here, said when it cannot be read or there is none (0.8.1; the user: "still need linux
+# firewall"): the tools looked for without root, by their files (no command run), in the folders root's PATH holds
+TOOLS = (("nftables", "nft"), ("iptables", "iptables"), ("ufw", "ufw"), ("firewalld", "firewall-cmd"))
+TOOL_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+NEEDS_TITLE = "What the firewall needs here"
+INSTALL = ("install nftables, the kernel's own: apt install nftables (Debian, Ubuntu), dnf install nftables (Fedora), "
+           "pacman -S nftables (Arch), apk add nftables (Alpine), emerge net-firewall/nftables (Gentoo); as root, so it is "
+           "an administrator's to do")
+ROOT_FOR_READ = ("run the platform as root, or let sudo run sh and the firewall's tools without a password for the user "
+                 "the platform runs as (a sudoers rule): every read and change here runs through sudo -n, which never asks "
+                 "for one, so a password typed here is never what it waits for")
 
 
 class LinuxFirewallPlugin(Firewall):
@@ -126,11 +138,13 @@ class LinuxFirewallPlugin(Firewall):
     GEOIP_URL, GEOIP_LICENCE = cards.GEOIP_URL, cards.GEOIP_LICENCE
     ATTRIBUTION, PUBLIC_DNS = cards.ATTRIBUTION, cards.PUBLIC_DNS
 
-    def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None, clock=time.monotonic):
+    def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None, clock=time.monotonic,
+                 which=None):
         self._shell = shell
         self._runner = runner
         self._native = native  # a test's word for why_not_native(): "" on Linux, else why not
         self._clock = clock
+        self._which = which  # a test's stand-in for finding a tool's file without root (tools_here)
         self._lock = threading.RLock()
         self._read: tuple[float, Config] | None = None
         self._preset = "in-allow"
@@ -333,7 +347,9 @@ class LinuxFirewallPlugin(Firewall):
     # -- the status ---------------------------------------------------------------------------------------------------
     def status(self) -> dict:
         """Valid whenever the firewall can be read (the Windows firewall plugin's rule): the base's "no Liminal rules"
-        and "off" are said in the summary and the tables, not as invalid."""
+        and "off" are said in the summary and the tables, not as invalid. When it cannot be read, or there is no
+        firewall software, its tables say what the firewall needs here (needs_table: root for the read, a firewall
+        tool) and, inside WSL, what WSL changes (0.8.1; the user: "still need linux firewall")."""
         here = self.not_for_here()
         if here:  # not for this machine at all (on Windows or macOS): asked nothing, no setup offered
             return self.not_here_status(here, backend="", enabled=False, profiles={}, rules=[])
@@ -341,10 +357,12 @@ class LinuxFirewallPlugin(Firewall):
             cfg = self.config()
         except CommandError as e:
             return {"present": True, "backend": "", "enabled": False, "profiles": {}, "problem": str(e),
-                    "summary": f"cannot be read: {e}", "valid": False, "why": f"cannot be read: {e}"}
+                    "summary": f"cannot be read: {e}", "valid": False, "why": f"cannot be read: {e}",
+                    "tables": [self.needs_table(e), *under_wsl()]}
         if not cfg.manager:
             return {"present": False, "backend": "", "enabled": False, "profiles": {}, "summary": "no firewall software here",
-                    "valid": False, "why": "no firewall software here: nftables, iptables, ufw or firewalld"}
+                    "valid": False, "why": "no firewall software here: nftables, iptables, ufw or firewalld",
+                    "tables": [self.needs_table(None, tools=[]), *under_wsl()]}
         with self._lock:
             preset, find = self._preset, self._find
         out = {"present": True, "backend": _named(cfg.manager, cfg), **cfg.state(), "summary": _summary(cfg), "valid": True,
@@ -356,6 +374,37 @@ class LinuxFirewallPlugin(Firewall):
         out["forms"] = forms(cfg)
         out["actions"] = [{"hook": "refresh", "args": [], "title": "Refresh", "note": "reads the whole configuration again now"}]
         return out
+
+    # -- what the firewall needs here (0.8.1): said when it cannot be read, or there is none ---------------------------
+    def tools_here(self) -> list[str]:
+        """The firewall tools installed on this machine, found without root by their files (no command run, nothing
+        asked of sudo), in the folders root's PATH holds (TOOL_PATH): nftables, iptables, ufw, firewalld."""
+        which = self._which or (lambda tool: shutil.which(tool, path=TOOL_PATH))
+        found = []
+        for name, tool in TOOLS:
+            try:
+                if which(tool):
+                    found.append(name)
+            except (OSError, ValueError):
+                continue
+        return found
+
+    def needs_table(self, error: CommandError | None, tools: list[str] | None = None) -> dict:
+        """What the firewall needs here, as a table for the page: root for its read when the read was refused for want
+        of it (`error`, denied: sudo -n asked for a password), or the read's own words when it failed otherwise; and a
+        firewall tool, as installed (`tools`: what is known already; else tools_here), with what to do for each."""
+        rows = []
+        if error is not None:
+            if error.denied:
+                rows.append(["Root for the read", "sudo asks for a password", ROOT_FOR_READ])
+            else:
+                rows.append(["The read", f"failed: {error}", "the read is put right where it failed; Refresh reads again"])
+        tools = self.tools_here() if tools is None else list(tools)
+        rows.append(["A firewall tool", f"{', '.join(tools)} installed" if tools
+                     else "none installed: no nft, iptables, ufw or firewall-cmd here",
+                     "none needed" if tools else INSTALL])
+        return {"title": NEEDS_TITLE, "note": "What this plugin needs before it can read and change the firewall here.",
+                "columns": [{"title": "What"}, {"title": "Here"}, {"title": "What to do"}], "rows": rows}
 
     # -- the World Wide Web tab (0.8.0): the base's, and what the last read found that its capture cannot see ----------
     def world(self) -> dict:

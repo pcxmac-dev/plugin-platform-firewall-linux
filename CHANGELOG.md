@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.1 (2026-11-16)
+
+What the firewall needs here, said where it cannot be read. The user: "still need linux firewall". Inside WSL's Ubuntu
+the plugin said only "cannot be read: sh needs root on this machine ... (sudo: a password is required)", and Ubuntu there
+had no firewall tool either.
+
+- **What the firewall needs here.** When the read is refused for want of root, or finds no firewall software, the
+  status's tables begin with this table:
+  - **Root for the read.** Run the platform as root, or add a sudoers rule letting sudo run `sh` and the firewall's tools
+    without a password. Every read and change goes through `sudo -n`, which never asks for one.
+  - **A firewall tool.** Which of nftables, iptables, ufw and firewalld is installed, found by their files without root
+    and running nothing (`tools_here`). With none, how to install nftables on each distribution.
+
+  A read that failed for another reason is said in its own words.
+- **Under WSL.** The "Under WSL" table now follows it in these states too. Before, it was drawn only once the firewall
+  could be read.
+- **Where it shows.** liminal-platform 0.29.0 draws a plugin's tables while the plugin is not valid. An older platform
+  shows only the reason, as before.
+
+The plugin installs and changes nothing for this: what is missing is an administrator's to put right.
+
+Tests: the read refused (sudo asking for a password), a tool found and none, a read that failed otherwise, no firewall
+software at all, and inside WSL.
+
 ## 0.8.0 (2026-11-16)
 
 The World Wide Web tab. The user, 2026-11-14: "so for the firewall's both are going to get a 'world wide web view' that

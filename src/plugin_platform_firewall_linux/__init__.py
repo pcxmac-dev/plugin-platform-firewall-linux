@@ -5,9 +5,12 @@ the firewall configurations"; then "lets mirror that for linux firewall, except 
 make sure its compatable with systemd/openrc it has access nftables, iptables, all the firewall technologies and
 libraries for the most modern kernels, make sure its compatible with major distributions and gentoo linxu").
 
-An interface to the firewall of the native Linux machine the platform runs on, and nowhere else (the user, 2026-11-08:
-"the scope of linux administration is only on native linux O/S"; "Yes, firewall too"; on Windows, macOS and inside a
-WSL distribution it runs no command at all: the library's machines.linux.why_not_native). It reads the whole
+An interface to the firewall of the Linux the platform runs on, and nowhere else: a machine of its own, or a WSL
+distribution the platform runs inside (the user, 2026-11-08: "the scope of linux administration is only on native linux
+O/S"; "Yes, firewall too"; and 2026-11-15: "wsl and firewall linux should always work under linux, if wsl prevents or
+misses some capability this should reflect in the plugin": inside WSL its page ends with what WSL changes, the library's
+machines.linux.wsl_table). On Windows and macOS it runs no command at all (the library's machines.linux.why_not_native),
+and a platform on Windows never reaches into a WSL distribution from outside. It reads the whole
 configuration in one read (read.SCRIPT, as root through the library's machines.linux.Shell: `sudo -n`, never a password
 asked), kept READ_S and read again after each change: nftables' ruleset, iptables and ip6tables (the nf_tables variant
 and legacy x_tables), ebtables, arptables, ipset, firewalld's zones and policies, ufw, the connections tracked, the
@@ -46,19 +49,39 @@ firewalld, ufw, conntrack, eBPF (bpftool), iproute2, the init's firewall service
 its parts and its calls (apis.py), drawn on the plugin's page; `api_facts` says what the last read found of them (each
 tool's version and what it holds), asking nothing.
 
+The World Wide Web tab (0.8.0; the user, 2026-11-14: "so for the firewall's both are going to get a 'world wide web view'
+that shows the globe and the routes incoming all traffic, as well as monitoring port traffic stats"): the library's
+Firewall base's (liminal-libs 1.55.0, machines/world.py), after Main and API. While it is shown, and for 20 s after, libpcap
+watches every TCP and UDP packet at the adapter of this machine's way out (as root, or with CAP_NET_RAW alone given to
+the platform alone: its system unit's AmbientCapabilities=, or setcap on a copy of Python that is its own; never the
+system's Python, never CAP_NET_ADMIN); the page draws each place traffic came from and went to on the globe with its
+route to this machine, the busiest ports' bytes in and out, and tables of the ports and the places. Only counts are
+kept, in memory. Packets are seen before nftables and iptables decide, so what they drop shows as unanswered; what an
+XDP program drops is never seen, and the page says so when the last read found one at the adapter watched
+(xdp_unseen). Places come from DB-IP's Lite City file on this machine, downloaded only when the user accepts its
+licence on the tab; no address is sent anywhere. Home is the place the user sets (LIMINAL_HOME_PLACE, through the
+login), else where the file puts this network's public address, asked of OpenDNS's and Google's name servers. This
+plugin names the download, its licence and attribution and the name servers (apis.py: GEOIP_URL, GEOIP_LICENCE,
+ATTRIBUTION, PUBLIC_DNS) and their cards. Inside a WSL distribution the tab ends with what WSL changes for it (the
+library's world.under_wsl: the distribution's own adapter, nothing from the internet but through Windows, nothing at
+all under WSL 1). On Windows and macOS the tab says it is not for this machine, and nothing is watched or downloaded.
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND
 """
 from __future__ import annotations
 
+import ipaddress
 import threading
 import time
 
+from liminal_libs.machines import linux as linux_mod
 from liminal_libs.machines.firewall import Firewall, FirewallError, FirewallNotNeeded, Rule, app_ports
 from liminal_libs.machines.linux import Shell, why_not_native
 from liminal_libs.machines.plugin import CommandError
 from liminal_libs.machines.rulegroups import RuleGroups, Sorted
 
+from . import apis as cards
 from . import changes as ch
 from . import firewalld as fwd_mod
 from . import nftables as nft_mod
@@ -71,7 +94,7 @@ from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 
-__version__ = "0.7.2"
+__version__ = "0.8.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -83,21 +106,30 @@ POLICY_NOTES = {"allow": "let in", "accept": "let in", "ACCEPT": "let in", "deny
 class LinuxFirewallPlugin(Firewall):
     name = "firewall-linux"
     title = "Linux firewall"
-    about = ("the native Linux machine's firewall, read whole and changed from the platform's page: nftables, iptables "
-             "(nf_tables and legacy), ebtables, arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP (read only), "
-             "under systemd, OpenRC or SysV scripts; never a WSL distribution")
+    about = ("the firewall of the Linux the platform runs on (a WSL distribution it runs inside too, what WSL changes said), "
+             "read whole and changed from the platform's page: nftables, iptables (nf_tables and legacy), ebtables, "
+             "arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP (read only), under systemd, OpenRC or SysV "
+             "scripts; never reached from Windows or macOS. Its World Wide Web tab draws where this machine's traffic "
+             "comes from and goes to on a globe, and its ports' traffic, while the tab is shown")
     api = "2.2"
     apis = APIS  # what it attaches to: nftables, iptables, ebtables, ipset, firewalld, ufw, conntrack, eBPF... (apis.py)
     order = 711
     ICON = "wallfire"  # a brick wall with a flame before it (liminal-libs 1.34.0; the user's picture: "use this icon for linux firewall")
     SECTION = "os"  # drawn under the platform's OS plugins (liminal-platform 0.26.0)
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
-             "save_rules")
+             "save_rules")  # the base's world and world_geoip among them (the World Wide Web tab, 0.8.0)
+    # The World Wide Web tab (0.8.0): the base's (its TABS, JOB_HOOKS, keys, world, world_geoip, detach; world with the XDP
+    # programs the last read found at the adapter watched said beside it, xdp_unseen), watched by libpcap at this
+    # machine's adapter and on the Linux the platform runs on only (not_for_here). What it downloads and asks is this plugin's to
+    # name (apis.py): DB-IP's Lite City, this month's file; its licence, in words; DB-IP's credit beside the places; and the
+    # name servers asked for this network's public address (OpenDNS's and Google's, hw-stats's own).
+    GEOIP_URL, GEOIP_LICENCE = cards.GEOIP_URL, cards.GEOIP_LICENCE
+    ATTRIBUTION, PUBLIC_DNS = cards.ATTRIBUTION, cards.PUBLIC_DNS
 
     def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None, clock=time.monotonic):
         self._shell = shell
         self._runner = runner
-        self._native = native  # a test's word for why_not_native(): "" on a native Linux machine, else why not
+        self._native = native  # a test's word for why_not_native(): "" on Linux, else why not
         self._clock = clock
         self._lock = threading.RLock()
         self._read: tuple[float, Config] | None = None
@@ -111,19 +143,21 @@ class LinuxFirewallPlugin(Firewall):
 
     # -- where it works -------------------------------------------------------------------------------------------------
     def not_for_here(self) -> str:
-        """Why the machine the platform runs on is not a native Linux one, in words ("" when it is): the library's
-        status and setup honor it (applies False, nothing changed)."""
+        """Why the machine the platform runs on is not one this plugin is for, in words ("" when it is): Windows and
+        macOS (the library's why_not_native; inside a WSL distribution it is Linux like any other, with a library that
+        no longer refuses a WSL kernel). The library's status and setup honor it (applies False, nothing changed)."""
         return why_not_native("The Linux firewall") if self._native is None else self._native
 
     @property
     def shell(self) -> Shell:
-        """This native Linux machine's commands (root through sudo -n); refused anywhere else, and for a WSL target."""
+        """The commands of the Linux the platform runs on (root through sudo -n); refused anywhere else, and for a WSL
+        distribution reached from Windows (a target of `wsl -d`)."""
         note = self.not_for_here()
         if note:
             raise FirewallError(note)
         sh = self._shell if self._shell is not None else Shell("local", runner=self._runner)
         if sh.target != "local":
-            raise FirewallError(f"The Linux firewall is for this native Linux machine, never {sh.where}")
+            raise FirewallError(f"The Linux firewall is for the Linux the platform runs on, never {sh.where}")
         return sh
 
     # -- the one read ---------------------------------------------------------------------------------------------------
@@ -147,7 +181,7 @@ class LinuxFirewallPlugin(Firewall):
             self._read = None
 
     def present(self) -> bool:
-        """Firewall tools this plugin reads on a native Linux machine: never on Windows, macOS or in WSL."""
+        """Firewall tools this plugin reads on the Linux the platform runs on: never on Windows or macOS."""
         if self.not_for_here():
             return False
         try:
@@ -301,7 +335,7 @@ class LinuxFirewallPlugin(Firewall):
         """Valid whenever the firewall can be read (the Windows firewall plugin's rule): the base's "no Liminal rules"
         and "off" are said in the summary and the tables, not as invalid."""
         here = self.not_for_here()
-        if here:  # not for this machine at all (on Windows, macOS or in WSL): asked nothing, no setup offered
+        if here:  # not for this machine at all (on Windows or macOS): asked nothing, no setup offered
             return self.not_here_status(here, backend="", enabled=False, profiles={}, rules=[])
         try:
             cfg = self.config()
@@ -318,10 +352,73 @@ class LinuxFirewallPlugin(Firewall):
                "readAt": time.strftime("%H:%M:%S", time.localtime(cfg.at))}
         if cfg.problems:
             out["problems"] = list(cfg.problems)
-        out["tables"] = tables(cfg, preset, find, self.groups)
+        out["tables"] = [*tables(cfg, preset, find, self.groups), *under_wsl()]
         out["forms"] = forms(cfg)
         out["actions"] = [{"hook": "refresh", "args": [], "title": "Refresh", "note": "reads the whole configuration again now"}]
         return out
+
+    # -- the World Wide Web tab (0.8.0): the base's, and what the last read found that its capture cannot see ----------
+    def world(self) -> dict:
+        """The base's World Wide Web tab (liminal-libs 1.55.0), and one thing more the firewall's last read knows: an XDP
+        program at the adapter watched drops packets before libpcap is handed them, so what it drops is neither counted
+        nor drawn (what nftables and iptables drop comes after the capture: that shows as unanswered). Said from the
+        read kept, never a new one: the tab runs no command."""
+        page = super().world()
+        unseen = self.xdp_unseen()
+        if unseen and isinstance(page.get("note"), str):
+            page["note"] = f"{page['note']} {unseen}"
+        return page
+
+    def xdp_unseen(self) -> str:
+        """The XDP programs the last read found at the adapter the World Wide Web tab watches, in words: "" for none,
+        before a read, before the tab was asked, and on a machine the plugin is not for. Asking nothing: the read kept
+        and the tab's view as they are (world_view(make=False))."""
+        if self.not_for_here():
+            return ""
+        kept, view = self._read, self.world_view(make=False)
+        address = str(getattr(view, "address", "") or "") if view is not None else ""
+        return xdp_words(kept[1], address) if kept and address else ""
+
+
+def under_wsl() -> list[dict]:
+    """Inside a WSL distribution: what WSL changes for a firewall, as the last of the page's tables (the user, 2026-11-15:
+    "if wsl prevents or misses some capability this should reflect in the plugin"; the library's linux.wsl_table: the
+    packet filter WSL's kernel gives, WSL's network behind Windows' firewall). Nothing on a machine of its own, nor with a
+    library from before the Linux plugins worked inside WSL (it refuses a WSL kernel, so the page says that instead)."""
+    table = getattr(linux_mod, "wsl_table", None)
+    try:
+        under = table("firewall") if callable(table) else None
+    except Exception:  # noqa: BLE001 - a check that cannot say: nothing said
+        return []
+    return [under] if under else []
+
+
+def xdp_words(cfg: Config, address: str) -> str:
+    """The XDP programs at the adapter holding `address` (and at the ports of its bridge or bond, which carry what comes in
+    to it) as the read found them, in words; "" for none, or for an address no adapter of the read holds."""
+    try:
+        watched = ipaddress.ip_address(str(address).split("%")[0])
+    except ValueError:
+        return ""
+
+    def holds(interface) -> bool:
+        for a in interface.addresses:
+            try:
+                if ipaddress.ip_address(str(a).split("/")[0].split("%")[0]) == watched:
+                    return True
+            except ValueError:
+                continue
+        return False
+    interfaces = list(cfg.system.interfaces or ())
+    adapter = next((i for i in interfaces if holds(i)), None)
+    if adapter is None:
+        return ""
+    at = [i for i in interfaces if i.xdp and adapter.name in (i.name, i.master)]
+    if not at:
+        return ""
+    where = "; ".join(f"{i.name}: {i.xdp}" for i in at)
+    return (f"The firewall's last read found XDP at the adapter watched ({where}): what XDP drops never reaches libpcap, "
+            "so it is neither counted nor drawn here; what nftables and iptables drop is, as unanswered.")
 
 
 def liminal_ports() -> frozenset:

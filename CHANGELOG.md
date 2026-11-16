@@ -1,5 +1,93 @@
 # Changelog
 
+## 0.8.0 (2026-11-16)
+
+The World Wide Web tab. The user, 2026-11-14: "so for the firewall's both are going to get a 'world wide web view' that
+shows the globe and the routes incoming all traffic, as well as monitoring port traffic stats". The tab is the library's
+Firewall base's (liminal-libs 1.55.0, `machines/world.py`). liminal-platform 0.27.0 draws it after Main and API.
+
+- **What it shows.** The globe, with each place traffic came from or went to and its route to this machine: allowed in,
+  unanswered in (dashed) and out. The four busiest ports here, their bytes in and out over the last ten minutes. Tables
+  of the busiest ports here, the places and the ports elsewhere. The local network's peers are summed apart and never
+  placed.
+- **Watching only while you look.** Each ask of the tab (every 2 s while it is shown) keeps a libpcap capture going at
+  the adapter of this machine's way out: every TCP and UDP packet, IPv4 and IPv6, the headers alone. It stops by itself
+  20 s after the last ask, and when the plugin is detached. Only counts are kept, in memory.
+- **What it sees.** Packets are seen before nftables and iptables decide, so an attempt they drop shows as unanswered.
+  What an XDP program drops never reaches libpcap. When the firewall's last read found an XDP program at the adapter
+  watched (or at a port of its bridge or bond), the tab says so, from the read it has and running no command
+  (`xdp_unseen`).
+- **The right to capture: CAP_NET_RAW alone, for the platform alone.** The capture runs as root, or with CAP_NET_RAW.
+  When libpcap says the right is missing and the platform is not root, the tab gives an administrator two ways, and it
+  never asks for a password:
+  - under systemd, `AmbientCapabilities=CAP_NET_RAW` under `[Service]` in the platform's system unit
+    (`liminal-platform-boot.service`, the Linux administration plugin's boot service);
+  - or `setcap cap_net_raw=ep` on a copy of Python that is the platform's own (`python3 -m venv --copies`,
+    `chmod 0750`): under OpenRC or another init, this way alone. It lasts until that file is written again, and the tab
+    then says so again. A file with a second name (a hard link to the system's interpreter) is never taken for the
+    platform's own.
+
+  Never the system's Python, which a venv's `python` links to, and never CAP_NET_ADMIN, the right to rewrite the
+  firewall. As root, the tab says what else may forbid packet sockets (a container, AppArmor, SELinux). Any other
+  failure is said in libpcap's own words. These are liminal-libs 1.55.0's words (`world.capture_help`), and the libpcap
+  card and this README say the same.
+- **Places stay on this machine.** They come from DB-IP's IP to City Lite file, looked up here with maxminddb. The file
+  is mapped only while the tab is watched. No address is sent anywhere, and none is looked up by name.
+- **The GeoIP file is downloaded on your word.** While none is installed, the tab offers Install the GeoIP file….
+  - Its first confirmation says what is downloaded, from download.db-ip.com, and to where, and shows the licence.
+  - The second asks you to accept the licence (CC BY 4.0) in so many words (liminal-platform 0.28.0 or newer, which
+    carries the licence's refusal back to the page; 0.27.0 shows it in the job's panel instead).
+  - Then this month's file is downloaded (`https://download.db-ip.com/free/dbip-city-lite-{year}-{month}.mmdb.gz`,
+    about 60 MB), or last month's while this month's is not out yet. The platform runs it as a job (the base's
+    `JOB_HOOKS`): its progress shows in the plugin's panel, and it stops by itself after 30 minutes. Every hop is https,
+    from download.db-ip.com alone. One copy is kept in the data folder.
+  - Update… is offered once the file is older than this month.
+  - "IP Geolocation by DB-IP", linked to db-ip.com, is shown wherever places are, as DB-IP's licence asks.
+- **Home.** The place you set: Home on the globe in the plugin's Settings (`LIMINAL_HOME_PLACE`, `lat,lon[,label]`), kept
+  through the platform's login. Else, where the GeoIP file puts this network's public address. That address is asked of
+  OpenDNS's resolver1 and Google's ns1 (the name servers hw-stats asks), and only once a GeoIP file is installed. Each
+  name is asked as an absolute one, with a trailing dot, and the question names no other machine. Without nslookup, the
+  tab says which package to install.
+- **The Linux the platform runs on, WSL included.** The user, 2026-11-15: "wsl and firewall linux should always work
+  under linux, if wsl prevents or misses some capability this should reflect in the plugin". Inside a WSL distribution
+  the plugin is Linux like any other once the library's check no longer refuses a WSL kernel (that library change
+  follows 1.55.0). Its page then ends with an "Under WSL" table (`linux.wsl_table`): the packet filter WSL's kernel
+  gives, and WSL's network behind Windows' firewall. The World Wide Web tab's page ends with its own (`world.under_wsl`):
+  the distribution's own adapter is watched, Windows' own traffic is the Windows firewall's tab's, nothing comes in
+  from the internet but through Windows, and under WSL 1 nothing can be watched. With a library that still refuses a
+  WSL kernel, the plugin says so there and runs nothing, as before. On Windows and macOS the tab says "Not for this
+  machine", and nothing is watched or downloaded; a platform on Windows never reaches into a distribution from outside.
+- **The GeoIP file installed as root stays readable.** liminal-libs 1.55.0 installs it with the mode every file the
+  platform makes has (0644 less the umask, not 0600), so the account that runs the platform later reads it. An install
+  refused for want of the right says whose the folder is.
+
+The plugin names what is its own in `apis.py`: `GEOIP_URL`, `GEOIP_LICENCE`, `ATTRIBUTION` and `PUBLIC_DNS`, set on the
+plugin. The library names no outside host. Its hooks gain the base's `world` and `world_geoip`, and its keys the base's
+`LIMINAL_HOME_PLACE`.
+
+**Four more cards** (plugin API 2.2), every address on them read on 2026-11-15:
+
+- **libpcap (packet capture)**: tcpdump.org's pages, packet(7), capabilities(7), systemd.exec(5)'s
+  AmbientCapabilities=, setcap(8) and venv's --copies. Every libpcap call the library's capture makes is marked used,
+  with the rest of the API beside them. The right to capture's two ways are an administrator's calls, never made here.
+- **DB-IP Lite City (GeoIP)**: IP to City Lite, its MMDB fields, the Lite databases' licence and attribution, CC BY 4.0,
+  the MaxMind DB format, and maxminddb (its documentation, source, changes and PyPI page).
+- **OpenDNS** and **Google's name servers**: the questions asked for this network's public address, each exactly as the
+  library asks it (`nslookup -type=a -timeout=3 -retry=1 myip.opendns.com. 208.67.222.222`), with nslookup(1).
+
+`api_facts` also says what the tab watched (where, and the packets read, or why it cannot) and which GeoIP file it has
+open, or last had open once watching stopped. It asks nothing, and says nothing of the tab before the tab is first
+shown: it reads the tab through the base's `world_view(make=False)`, which never makes one.
+
+Needs liminal-libs>=1.55.0 with its geo extra (maxminddb 3.2). Tests: the tab through the plugin with stand-ins for the
+capture, the download, the name servers and the clocks, over a tiny GeoIP file the tests write (`tests/test_world.py`,
+`tests/mmdb_file.py`). libpcap, the route, nslookup and urllib fail a test that reaches them, and no command runs. What
+the tab says about the right to capture is tested as a Linux machine's page says it, as root and not. The machine the
+tests run on never shows through (`tests/conftest.py`: not inside WSL, no init known), so the suite reads alike inside
+a WSL distribution, on a Linux of any init and on Windows. The
+cards are tied to the calls the library makes: libpcap's in `capture.py`, maxminddb's in `geo.py`, nslookup's in
+`dns.py` (each question as `dns.public_address` asks it, through a stand-in that runs nothing).
+
 ## 0.7.2 (2026-11-15)
 
 Drawn under the platform's OS plugins section, in the list on the left (the user: "then OS plugins" (the WSL distributions, the admin and the firewall plugins, as chosen)): `SECTION = "os"`, liminal-libs 1.51.0's machine-plugin attribute. liminal-platform 0.26.0 draws it; an older platform keeps the plugin under Machine plugins. Nothing else changes.

@@ -1,16 +1,23 @@
 """What the Linux firewall attaches to (plugin API 2.2): its cards are sound; they name every command of the read script
 and every change the plugin runs (driven over the recorded machines: Debian's nftables, Gentoo's under OpenRC, Ubuntu's
-ufw, Fedora's firewalld, Alpine's iptables), and the commands its plans give each init and distribution; its facts are
-what the last read found, asked without a command; and the cards' pages answer (LIMINAL_VENDOR_PAGES=1 only, the one
-test that reaches the network)."""
+ufw, Fedora's firewalld, Alpine's iptables), and the commands its plans give each init and distribution; the World Wide
+Web tab's cards (0.8.0) name every libpcap call the library's capture makes, the download the tab asks for and the
+reader's calls the library makes, and each question the tab asks of a name server; its facts are what the last read
+found, asked without a command; and the cards' pages answer (LIMINAL_VENDOR_PAGES=1 only, the one test that reaches the
+network)."""
 from __future__ import annotations
 
+import inspect
 import os
 import re
+import subprocess
+from datetime import datetime, timezone
 
 import pytest
 
+from liminal_libs import capture, dns, geo
 from liminal_libs.machines import linux as linux_mod
+from liminal_libs.machines import world
 from liminal_libs.machines.linux import Shell
 from liminal_libs.sources.apis import dead_links, problems
 from plugin_platform_firewall_linux import MACHINE, LinuxFirewallPlugin
@@ -144,12 +151,16 @@ def canonical(cmd: list[str]) -> str | None:
 
 
 def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
-    assert problems(MACHINE.apis) == [] and MACHINE.apis == cards.APIS
+    assert problems(MACHINE.apis) == [] and MACHINE.apis == cards.APIS == cards.FIREWALL + cards.WORLD
     assert [a.name for a in MACHINE.apis] == [
         "nftables (nft)", "iptables and ip6tables", "ebtables and arptables", "ipset", "firewalld", "ufw",
         "Connection tracking (conntrack)", "eBPF on the network (bpftool)", "iproute2 (ip and ss)",
-        "The firewall's services (systemd, OpenRC, SysV)", "sudo"]
-    assert all(a.docs and a.verified == "2026-11-11" and a.used and a.covered for a in MACHINE.apis)
+        "The firewall's services (systemd, OpenRC, SysV)", "sudo",
+        # the World Wide Web tab's (0.8.0)
+        "libpcap (packet capture)", "DB-IP Lite City (GeoIP)", "OpenDNS (myip.opendns.com)",
+        "Google's name servers (o-o.myaddr.l.google.com)"]
+    assert all(a.verified == "2026-11-11" for a in cards.FIREWALL) and all(a.verified == "2026-11-15" for a in cards.WORLD)
+    assert all(a.docs and a.used and a.covered for a in MACHINE.apis)
     assert all(len(a.areas) > len(a.covered) for a in MACHINE.apis)  # more of each API than the plugin uses
     assert cards.NFTABLES.link("spec").endswith("libnftables-json.5.en.html")
     assert not any(c.costs for a in MACHINE.apis for c in a.calls)  # nothing here costs money
@@ -158,7 +169,7 @@ def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
 def test_the_cards_name_every_command_of_the_read_and_every_change(monkeypatch):
     ran, read_calls = drive(monkeypatch)
     pool = [SCRIPT.replace("$fc", "firewall-cmd"), *(" ".join(c) for c in (*ran, *read_calls)), *planned()]
-    never = [f"{api.name}: {call.name}" for api in MACHINE.apis for call in api.used
+    never = [f"{api.name}: {call.name}" for api in cards.FIREWALL for call in api.used
              if not any(pattern(call.name).search(t) for t in pool)]
     assert never == []
     changes = {canonical(c) for c in ran} - {None}
@@ -182,6 +193,77 @@ def test_its_facts_are_what_the_last_read_found_and_asking_them_runs_nothing(mon
     ufw = plugin(FakeLinux("ubuntu-24.04-ufw"))
     ufw.status()
     assert ufw.api_facts()["ufw"]["ufw"].split(",")[1].strip() in ("on", "off")
+    assert not set(facts) & {a.name for a in cards.WORLD}  # the World Wide Web tab never shown: nothing said of it
+
+
+# -- the World Wide Web tab's cards (0.8.0) ------------------------------------------------------------------------------
+def test_the_capture_card_names_every_libpcap_call_the_librarys_capture_makes(monkeypatch):
+    declared = set(re.findall(r"lib\.(pcap_\w+)", inspect.getsource(capture._declared)))
+    assert {c.name for c in cards.CAPTURE.used} == declared  # each call the capture makes said used, and no other
+    assert {"pcap_open_live", "pcap_next_ex", "pcap_setnonblock", "pcap_get_selectable_fd"} <= declared
+    # the capture the tab makes: every TCP and UDP packet, the headers alone (world.default_capture)
+    assert next(c for c in cards.CAPTURE.calls if c.name == "pcap_compile").used == capture.bpf((), None, True) == "(tcp or udp)"
+    assert "128 bytes" in next(c for c in cards.CAPTURE.calls if c.name == "pcap_open_live").used and capture.SNAPLEN == 128
+    # the right to capture, as the tab says it on a Linux machine to a platform that is not root (no init known: both
+    # ways, tests/conftest.py): each way it gives an administrator is a call on the card (CAP_NET_RAW alone, for the
+    # platform alone), never made from here
+    denied = "the adapter could not be opened: socket: Operation not permitted" + world.LIBRARY_HINT
+    ways = [c for c in cards.CAPTURE.calls if c.area == "The right to capture"]
+    for python in (("/usr/bin/python3.13", False), ("/opt/liminal/.venv/bin/python3", True)):  # the system's; its own copy
+        monkeypatch.setattr(world, "_python", lambda python=python: python)
+        told = world.capture_help(denied, windows=False, root=False)
+        assert [c.name for c in ways if pattern(c.name).search(told)] == [c.name for c in ways], told
+    assert all(c.writes and not c.used for c in ways)  # an administrator's
+    assert "CAP_NET_RAW alone" in cards.CAPTURE.auth and "never a password" in cards.CAPTURE.auth
+    assert cards.AMBIENT in {x.url for x in cards.CAPTURE.links} and cards.VENV in {x.url for x in cards.CAPTURE.links}
+    assert "On the Linux the platform runs on only" in cards.CAPTURE.about and "inside a WSL distribution its own adapter" in cards.CAPTURE.about
+    assert "none at all under WSL 1" in cards.CAPTURE.about and "on Windows and macOS nothing is opened" in cards.CAPTURE.about
+    # what the capture cannot see: before nftables and iptables, after XDP
+    assert "before nftables and iptables decide" in cards.CAPTURE.about and "What an XDP program drops" in cards.CAPTURE.about
+
+
+def test_the_db_ip_card_names_the_download_the_tab_makes_and_the_readers_calls_the_library_makes():
+    [download] = [c for c in cards.DBIP_LITE.used if c.name.startswith("GET ")]
+    now = datetime(2026, 11, 15, tzinfo=timezone.utc).timestamp()
+    for year, month in world.months(now):  # this month's file and last month's: the two the tab asks for (a GET of each)
+        assert pattern(download.name).fullmatch(world.month_url(MACHINE.GEOIP_URL, year, month))
+    assert cards.DBIP_LITE.base.startswith(MACHINE.GEOIP_URL.replace("{year}", "<year>").replace("{month}", "<month>"))
+    assert cards.DBIP_LITE.link("terms") == "https://db-ip.com/db/lite.php"  # its licence and the credit it asks for
+    assert "https://creativecommons.org/licenses/by/4.0/" in {x.url for x in cards.DBIP_LITE.links}
+    assert MACHINE.ATTRIBUTION["url"] + "/" == cards.DBIP  # the credit links DB-IP's own site
+    # the reader's calls, as the library's geo.py makes them; the whole file never read into memory
+    source = inspect.getsource(geo)
+    made = {"maxminddb.open_database(<file>, MODE_MMAP_EXT)": r"open_database\(.*MODE_MMAP_EXT\)",
+            "Reader.get(<address>)": r"_reader\.get\(address\)",
+            "Reader.get_with_prefix_len(<address>)": r"\.get_with_prefix_len\(",
+            "Reader.metadata()": r"\.metadata\(\)"}
+    assert {c.name for c in cards.DBIP_LITE.used} == {download.name, *made}
+    for call, said in made.items():
+        assert re.search(said, source), call
+    [memory] = [c for c in cards.DBIP_LITE.calls if "MODE_MEMORY" in c.name]
+    assert not memory.used and "maxminddb.MODE_MEMORY" not in source
+    assert "no address is sent anywhere" in cards.DBIP_LITE.about
+
+
+def test_the_name_servers_cards_name_each_question_the_tab_asks(monkeypatch):
+    # each question exactly as the library asks it (dns.public_address over this plugin's servers, by IP version, the
+    # names made absolute: world.servers_of), its nslookup a stand-in that keeps what it was given: nothing runs
+    ran: list[list[str]] = []
+
+    def nslookup(args, **_):
+        ran.append(list(args))
+        return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
+    monkeypatch.setattr(dns.subprocess, "run", nslookup)
+    for version in (4, 6):
+        assert dns.public_address(version, world.servers_of(MACHINE.PUBLIC_DNS, version))[0] is None
+    asked = [" ".join(a) for a in ran]
+    assert len(asked) == len(MACHINE.PUBLIC_DNS) and all(a.split()[-2].endswith(".") for a in asked)  # a trailing dot
+    for name, rtype, server, whose in MACHINE.PUBLIC_DNS:
+        card = cards.OPENDNS if whose == "OpenDNS" else cards.GOOGLE
+        [question] = [a for a in asked if a.split()[-1] == server and f"-type={rtype}" in a.split()]
+        assert question in {c.name for c in card.used}, (whose, server)
+    assert sorted(c.name for c in (*cards.OPENDNS.used, *cards.GOOGLE.used)) == sorted(asked)  # those, and no other
+    assert all(cards.NSLOOKUP in {x.url for x in card.links} for card in (cards.OPENDNS, cards.GOOGLE))
 
 
 @pytest.mark.skipif(os.environ.get("LIMINAL_VENDOR_PAGES") != "1", reason="reaches the makers' pages: LIMINAL_VENDOR_PAGES=1")

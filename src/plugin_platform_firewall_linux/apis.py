@@ -3,14 +3,31 @@ should reflect the the API its attached to, and present links that provide docum
 of what the API is about"): nftables, iptables and ip6tables, ebtables and arptables, ipset, firewalld, ufw, conntrack,
 eBPF through bpftool, iproute2's ip and ss, the init's firewall services, and sudo (how root's rights are had), each as
 its makers' pages describe it. Every address was read on 2026-11-11 (`VERIFIED`). `facts` says what the last read
-found of them (the tools' versions, what each holds), asking nothing."""
+found of them (the tools' versions, what each holds), asking nothing.
+
+And the World Wide Web tab's (0.8.0; the user, 2026-11-14: "so for the firewall's both are going to get a 'world wide
+web view' that shows the globe and the routes incoming all traffic, as well as monitoring port traffic stats"): libpcap,
+which watches the packets; DB-IP's Lite City, the GeoIP file that places them, read with maxminddb; and OpenDNS's and
+Google's name servers, asked for this network's public address. Their addresses were read on 2026-11-15
+(`WORLD_VERIFIED`). The tab itself is the library's Firewall base's. What it downloads and asks is named here, since the
+library names no outside host: GEOIP_URL (this month's GeoIP file), GEOIP_LICENCE (its licence in words, shown before
+the download), ATTRIBUTION (DB-IP's credit, beside the places) and PUBLIC_DNS (the name servers). `facts` says what the
+tab watched and which GeoIP file it has open (or last had open, once it was let go), asking nothing either: it reads
+the tab through the base's world_view(make=False), which never makes one.
+
+The right to capture is CAP_NET_RAW alone, for the platform alone (the card's auth and its calls, as the library's
+world.capture_help words it since 1.55.0): AmbientCapabilities=CAP_NET_RAW in the platform's system unit, or setcap
+cap_net_raw=ep on a copy of Python that is the platform's own. Never on the system's Python, which every program and
+every user runs, and never CAP_NET_ADMIN, which is the right to rewrite the firewall this plugin keeps."""
 from __future__ import annotations
 
 import time
 
+from liminal_libs import geo
 from liminal_libs.sources.apis import Api, Area, Call, Link
 
 VERIFIED = "2026-11-11"
+WORLD_VERIFIED = "2026-11-15"  # the World Wide Web tab's cards (0.8.0): every address on them read on this day
 NFT_WIKI = "https://wiki.nftables.org/wiki-nftables/index.php/"
 NFT_MAN = "https://www.netfilter.org/projects/nftables/manpage.html"
 NFT_JSON = "https://manpages.debian.org/unstable/libnftables1/libnftables-json.5.en.html"
@@ -20,6 +37,37 @@ FIREWALLD = "https://firewalld.org/documentation/"
 UFW_MAN = "https://manpages.ubuntu.com/manpages/resolute/man8/ufw.8.html"
 SYSTEMD = "https://www.freedesktop.org/software/systemd/man/latest/"
 OPENRC = "https://github.com/OpenRC/openrc/blob/master/"
+PCAP = "https://www.tcpdump.org/manpages/"
+DBIP = "https://db-ip.com/"
+READER = "https://github.com/maxmind/MaxMind-DB-Reader-python"
+READER_DOCS = "https://maxminddb.readthedocs.io/"
+NSLOOKUP = DEBIAN + "bind9-dnsutils/nslookup.1.en.html"
+AMBIENT = SYSTEMD + "systemd.exec.html#AmbientCapabilities="  # a unit's ambient capabilities (systemd.exec(5))
+VENV = "https://docs.python.org/3/library/venv.html"  # python3 -m venv --copies: a copy of Python of the platform's own
+
+# -- what the World Wide Web tab downloads and asks (0.8.0): the library's Firewall base reads these off the plugin ------
+# this month's GeoIP file, DB-IP's IP to City Lite in MaxMind DB form: {year} and {month} filled in by the library
+# (dbip-city-lite-2026-11.mmdb.gz), last month's tried when this month's is not out yet; downloaded only on the user's word
+GEOIP_URL = "https://download.db-ip.com/free/dbip-city-lite-{year}-{month}.mmdb.gz"
+GEOIP_LICENCE = (  # DB-IP's own terms (db-ip.com/db/lite.php), in plain words, shown before the download and accepted
+    "DB-IP's IP to City Lite database is licensed under the Creative Commons Attribution 4.0 International License "
+    "(CC BY 4.0). You may use, share and adapt it for any purpose, even commercially, provided you credit DB-IP.com for "
+    "the data, with a link back to db-ip.com on every page that shows or uses its results: this tab shows \"IP "
+    "Geolocation by DB-IP\", linked, wherever its places are. It is DB-IP's free subset of its paid data, updated "
+    "monthly, with reduced accuracy. The download is about 60 MB (about 121 MB unpacked), and one copy is kept on this "
+    "machine.")
+ATTRIBUTION = {"text": "IP Geolocation by DB-IP", "url": "https://db-ip.com"}  # DB-IP's own link, as its terms give it
+# the name servers asked for this network's public address, which the GeoIP file places as home when the user set no
+# place of their own: each answers with the asker's own address, and the question names no other machine. (the name, its
+# type, the server asked directly, whose), split by the server's IP version: an IPv6 address is asked over IPv6. The
+# hw-stats plugin asks the same ones (its network.PUBLIC_SERVERS). The library asks each by its absolute name, a trailing
+# dot added (world.servers_of, liminal-libs 1.55.0: myip.opendns.com.), so no search domain of this machine's goes with it.
+PUBLIC_DNS = (
+    ("myip.opendns.com", "a", "208.67.222.222", "OpenDNS"),  # resolver1.opendns.com: an A record of the asker's address
+    ("o-o.myaddr.l.google.com", "txt", "216.239.32.10", "Google"),  # ns1.google.com: its text record holds it
+    ("myip.opendns.com", "aaaa", "2620:119:35::35", "OpenDNS"),
+    ("o-o.myaddr.l.google.com", "txt", "2001:4860:4802:32::a", "Google"),
+)
 
 NFTABLES = Api(
     name="nftables (nft)",
@@ -614,7 +662,293 @@ SUDO = Api(
     verified=VERIFIED,
 )
 
-APIS = (NFTABLES, IPTABLES, EBTABLES, IPSET, FIREWALLD_API, UFW, CONNTRACK, BPF, IPROUTE2, SERVICES, SUDO)
+# -- the World Wide Web tab's (0.8.0) ------------------------------------------------------------------------------------
+CAPTURE = Api(
+    name="libpcap (packet capture)",
+    maker="the Tcpdump Group",
+    about=("libpcap, the packet capture library tcpdump and Wireshark are built on: an adapter opened, a filter compiled "
+           "and set, each packet read as it arrives, before nftables and iptables decide (a connection they drop still "
+           "shows as its first packet arriving). On Linux it reads through the kernel's packet sockets. What an XDP "
+           "program drops never reaches it: XDP runs before those sockets, so its drops are not seen at all. The "
+           "library's capture.py calls the system's libpcap by ctypes, with no package between. The World "
+           "Wide Web tab watches every TCP and UDP packet, IPv4 and IPv6, at the adapter of this machine's way out, the "
+           "headers alone, only while the tab is shown and for 20 s after; only counts are kept, in memory. On the Linux "
+           "the platform runs on only: inside a WSL distribution its own adapter (none at all under WSL 1, which gives "
+           "libpcap no adapter to open); on Windows and macOS nothing is opened."),
+    kind="sdk",
+    base=("the system's libpcap (libpcap0.8 on Debian and Ubuntu; libpcap on Fedora, Arch and Alpine), through ctypes "
+          "(the library's capture.py)"),
+    version="libpcap 1.10 (1.10.7, of 2026-09-05, the newest stable; 1.11.0 in testing); every call used is in all of 1.x",
+    auth=("root, or CAP_NET_RAW alone (all a capture that is not promiscuous needs), given by an administrator to the "
+          "platform alone: AmbientCapabilities=CAP_NET_RAW in its system unit, or setcap cap_net_raw=ep on a copy of "
+          "Python that is its own (python3 -m venv --copies, chmod 0750); never to the system's Python, which every "
+          "program and every user runs, never CAP_NET_ADMIN, the right to rewrite the firewall, and never a password "
+          "asked here"),
+    limits="",
+    costs="",
+    links=(
+        Link("tcpdump and libpcap", "https://www.tcpdump.org/", "docs"),
+        Link("pcap(3PCAP)", PCAP + "pcap.3pcap.html", "reference"),
+        Link("pcap-filter(7)", PCAP + "pcap-filter.7.html", "reference"),
+        Link("pcap-linktype(7)", PCAP + "pcap-linktype.7.html", "reference"),
+        Link("packet(7): Linux's packet sockets", MAN7 + "man7/packet.7.html", "reference"),
+        Link("capabilities(7): CAP_NET_RAW", MAN7 + "man7/capabilities.7.html", "auth"),
+        Link("systemd.exec(5): AmbientCapabilities=", AMBIENT, "auth"),
+        Link("setcap(8)", MAN7 + "man8/setcap.8.html", "tool"),
+        Link("venv: a copy of Python of its own (--copies)", VENV, "tool"),
+        Link("libpcap's changes", "https://github.com/the-tcpdump-group/libpcap/blob/master/CHANGES", "changelog"),
+        Link("libpcap's source", "https://github.com/the-tcpdump-group/libpcap", "source"),
+    ),
+    areas=(
+        Area("Adapters", "the devices packets can be read from, and their addresses", PCAP + "pcap_findalldevs.3pcap.html",
+             covered=("the adapter holding this machine's way-out address; every adapter's addresses (this machine's own) "
+                      "to tell what came in from what went out, read again every 30 s while watching")),
+        Area("Opening a capture", "an adapter opened, how much of each packet kept, promiscuous or not",
+             PCAP + "pcap_open_live.3pcap.html",
+             covered="the headers alone (128 bytes of each packet), not in promiscuous mode: this machine's own traffic"),
+        Area("Filters", "BPF filters compiled from words and set in the kernel", PCAP + "pcap-filter.7.html",
+             covered="(tcp or udp): every TCP and UDP packet, to and from any of this machine's addresses"),
+        Area("Reading packets", "each packet as it arrives, with its time and its length", PCAP + "pcap_next_ex.3pcap.html",
+             covered=("each packet's addresses, ports, TCP flags, IP version and size; read without blocking, its socket "
+                      "waited on 150 ms at most, so watching stops soon after the tab is left")),
+        Area("Link-layer headers", "what an adapter's packets begin with (Ethernet, Linux's cooked header, raw IP)",
+             PCAP + "pcap-linktype.7.html", covered="where each packet's IP header starts"),
+        Area("The right to capture", "root, or a program given CAP_NET_RAW (a capture that is not promiscuous needs no more)",
+             MAN7 + "man7/capabilities.7.html",
+             covered=("said only when libpcap says the right is missing and the platform is not root: how an "
+                      "administrator gives CAP_NET_RAW alone to the platform alone (its system unit's AmbientCapabilities=, "
+                      "or setcap on a copy of Python that is its own), never to the system's Python; as root, what else "
+                      "may forbid packet sockets (a container, AppArmor, SELinux); no password asked")),
+        Area("Packet sockets", "AF_PACKET, which libpcap reads through on Linux (TPACKET_V3 rings)",
+             MAN7 + "man7/packet.7.html"),
+        Area("Statistics", "the packets received, and those the kernel dropped for want of room", PCAP + "pcap_stats.3pcap.html"),
+        Area("Writing a capture", "packets saved to a file Wireshark reads", PCAP + "pcap_dump_open.3pcap.html"),
+        Area("The newer way to open", "pcap_create, then options (buffer size, immediate mode, time stamps), then pcap_activate",
+             PCAP + "pcap_create.3pcap.html"),
+    ),
+    calls=(
+        Call("pcap_findalldevs", "every capture device and its addresses", "Adapters",
+             used="the adapter holding this machine's way-out address, and this machine's own addresses",
+             docs=PCAP + "pcap_findalldevs.3pcap.html"),
+        Call("pcap_freealldevs", "the device list freed", "Adapters", used="once the adapter is found",
+             docs=PCAP + "pcap_findalldevs.3pcap.html"),
+        Call("pcap_open_live", "a device opened for capture", "Opening a capture",
+             used="the tab's capture: 128 bytes of each packet, not promiscuous", docs=PCAP + "pcap_open_live.3pcap.html"),
+        Call("pcap_compile", "a filter compiled", "Filters", used="(tcp or udp)", docs=PCAP + "pcap_compile.3pcap.html"),
+        Call("pcap_setfilter", "the filter set", "Filters", used="the same", docs=PCAP + "pcap_setfilter.3pcap.html"),
+        Call("pcap_freecode", "the compiled filter freed", "Filters", used="once it is set", docs=PCAP + "pcap_freecode.3pcap.html"),
+        Call("pcap_datalink", "the link-layer header type", "Link-layer headers", used="where each packet's IP header starts",
+             docs=PCAP + "pcap_datalink.3pcap.html"),
+        Call("pcap_setnonblock", "a capture read without blocking", "Reading packets",
+             used="so a read waits on its socket no longer than its timeout", docs=PCAP + "pcap_setnonblock.3pcap.html"),
+        Call("pcap_get_selectable_fd", "the capture's socket, to wait on with poll", "Reading packets",
+             used="waited on for 150 ms at most before each read", docs=PCAP + "pcap_get_selectable_fd.3pcap.html"),
+        Call("pcap_next_ex", "the next packet", "Reading packets", used="each packet while the tab is watched",
+             docs=PCAP + "pcap_next_ex.3pcap.html"),
+        Call("pcap_geterr", "the last error in words", "Reading packets", used="why packets could not be watched, said on the tab",
+             docs=PCAP + "pcap_geterr.3pcap.html"),
+        Call("pcap_close", "the capture closed", "Opening a capture",
+             used="20 s after the tab was last shown, and when the plugin is detached", docs=PCAP + "pcap_close.3pcap.html"),
+        Call("pcap_loop", "packets handed to a callback", "Reading packets", docs=PCAP + "pcap_loop.3pcap.html"),
+        Call("pcap_stats", "the packets received and dropped", "Statistics", docs=PCAP + "pcap_stats.3pcap.html"),
+        Call("pcap_dump_open", "a capture file opened for writing", "Writing a capture", docs=PCAP + "pcap_dump_open.3pcap.html"),
+        Call("pcap_create", "a capture handle made, not yet active", "The newer way to open", docs=PCAP + "pcap_create.3pcap.html"),
+        Call("pcap_activate", "a handle made by pcap_create activated", "The newer way to open",
+             docs=PCAP + "pcap_activate.3pcap.html"),
+        # the two ways the tab gives an administrator (world.capture_help), never made from here
+        Call("AmbientCapabilities=CAP_NET_RAW",
+             ("CAP_NET_RAW given to what a systemd unit starts: under [Service] of the platform's system unit "
+              "(liminal-platform-boot.service, the Linux administration plugin's boot service), the platform and the "
+              "programs it runs have it, and no one else"),
+             "The right to capture", docs=AMBIENT, writes=True),
+        Call("setcap cap_net_raw=ep <the platform's own python>",
+             ("CAP_NET_RAW given to whoever runs that file: a copy of Python that is the platform's own (python3 -m venv "
+              "--copies, chmod 0750, its group the platform's), never the system's; it lasts until the file is written "
+              "again (python3 -m venv --upgrade copies it anew, without the right, and the tab then says so again)"),
+             "The right to capture", docs=MAN7 + "man8/setcap.8.html", writes=True),
+    ),
+    verified=WORLD_VERIFIED,
+)
+
+DBIP_LITE = Api(
+    name="DB-IP Lite City (GeoIP)",
+    maker="DB-IP",
+    about=("DB-IP's free IP to City Lite database: every IPv4 and IPv6 range with its continent, country, region, city and "
+           "an approximate latitude and longitude, a subset of DB-IP's paid data with reduced accuracy, updated monthly, "
+           "under the Creative Commons Attribution 4.0 International License. The World Wide Web tab downloads this "
+           "month's file in MaxMind DB form (about 60 MB, 121 MB unpacked) only when you accept its licence on the tab, "
+           "keeps one copy in the data folder, and looks each network up in it on this machine with the maxminddb "
+           "package: no address is sent anywhere. \"IP Geolocation by DB-IP\", linked to db-ip.com, is shown wherever "
+           "places are."),
+    kind="feed",
+    base=("https://download.db-ip.com/free/dbip-city-lite-<year>-<month>.mmdb.gz, kept in the data folder's geoip/ and "
+          "read there"),
+    version="the November 2026 file (7,777,816 ranges; MaxMind DB format 2.0), read with maxminddb 3.2.0",
+    auth="none: no account and no key; its licence is accepted on the tab before the download",
+    limits=("one file a month; downloaded only when you ask, one download at a time, and not again while that month's file "
+            "is installed"),
+    costs="",
+    links=(
+        Link("IP to City Lite", DBIP + "db/download/ip-to-city-lite", "docs"),
+        Link("The City Lite file's MMDB fields", DBIP + "db/format/ip-to-city-lite/mmdb.html", "reference"),
+        Link("DB-IP's databases", DBIP + "db/", "docs"),
+        Link("The Lite databases: licence and attribution", DBIP + "db/lite.php", "terms"),
+        Link("Creative Commons Attribution 4.0 International", "https://creativecommons.org/licenses/by/4.0/", "terms"),
+        Link("The MaxMind DB format", "https://maxmind.github.io/MaxMind-DB/", "spec"),
+        Link("maxminddb, the reader", READER_DOCS, "sdk"),
+        Link("maxminddb's source", READER, "source"),
+        Link("maxminddb's changes", READER + "/blob/main/HISTORY.rst", "changelog"),
+        Link("maxminddb on PyPI", "https://pypi.org/project/maxminddb/", "tool"),
+    ),
+    areas=(
+        Area("IP to City Lite", "each range's continent, country, region, city and approximate latitude and longitude",
+             DBIP + "db/download/ip-to-city-lite",
+             covered="each public network's place: drawn on the globe, and its country and city in the Places table"),
+        Area("The monthly download", "this month's file, gzipped, updated monthly; no account", DBIP + "db/download/ip-to-city-lite",
+             covered=("downloaded on your word once its licence is accepted (last month's when this month's is not out "
+                      "yet), as a job whose progress shows in the plugin's panel and which stops by itself after 30 "
+                      "minutes; over https from download.db-ip.com alone, a redirect anywhere else refused; unpacked into "
+                      "the data folder in place of the older copy; Update… offered once the file installed is older than "
+                      "this month")),
+        Area("The licence and attribution", "CC BY 4.0: free to use, crediting DB-IP with a link back wherever its results are shown",
+             DBIP + "db/lite.php",
+             covered="shown before the download and accepted in so many words; \"IP Geolocation by DB-IP\" linked beside the places"),
+        Area("The MMDB file", ("a MaxMind DB 2.0 search tree of networks; each record's city.names, location, "
+                               "country.iso_code, continent and subdivisions"), DBIP + "db/format/ip-to-city-lite/mmdb.html",
+             covered=("read with maxminddb, memory-mapped, never read whole into memory, and mapped only while the tab is "
+                      "watched (let go once watching stops, mapped again at its next ask); the last 4096 answers kept, "
+                      "each cut short; the local network's addresses never looked up")),
+        Area("IP to Country Lite", "each range's country alone (732,796 ranges)", DBIP + "db/download/ip-to-country-lite"),
+        Area("IP to ASN Lite", "each range's AS number and organisation (485,292 ranges)", DBIP + "db/download/ip-to-asn-lite"),
+        Area("The CSV files", "the same data as CSV (City Lite's is 660 MB unpacked)", DBIP + "db/download/ip-to-city-lite"),
+        Area("The lookup API", "an address's place asked of DB-IP's servers; never asked here, for it would send the address away",
+             DBIP + "api/doc.php"),
+        Area("The paid databases", "DB-IP's full data: location, ISP and more, more accurate", DBIP + "db/"),
+    ),
+    calls=(
+        Call("GET https://download.db-ip.com/free/dbip-city-lite-<year>-<month>.mmdb.gz", "a month's City Lite file, gzipped",
+             "The monthly download",
+             used=("Install the GeoIP file… and Update the GeoIP file…, on your word, as a job: this month's, then last "
+                   "month's on a 404; https on every hop, from download.db-ip.com alone"),
+             docs=DBIP + "db/download/ip-to-city-lite"),
+        Call("GET https://download.db-ip.com/free/dbip-city-lite-<year>-<month>.csv.gz", "the same as CSV", "The CSV files",
+             docs=DBIP + "db/download/ip-to-city-lite"),
+        Call("GET https://download.db-ip.com/free/dbip-country-lite-<year>-<month>.mmdb.gz", "a month's Country Lite file",
+             "IP to Country Lite", docs=DBIP + "db/download/ip-to-country-lite"),
+        Call("GET https://download.db-ip.com/free/dbip-asn-lite-<year>-<month>.mmdb.gz", "a month's ASN Lite file",
+             "IP to ASN Lite", docs=DBIP + "db/download/ip-to-asn-lite"),
+        Call("maxminddb.open_database(<file>, MODE_MMAP_EXT)", "the file opened, memory-mapped by the C extension",
+             "The MMDB file", used="the file opened for lookups (MODE_MMAP, pure Python, without the extension); a download checked",
+             docs=READER_DOCS),
+        Call("Reader.get(<address>)", "an address's record", "The MMDB file", used="each public network's place", docs=READER),
+        Call("Reader.get_with_prefix_len(<address>)", "a record and its network's prefix length", "The MMDB file",
+             used="a download checked: its search tree leads to a record", docs=READER),
+        Call("Reader.metadata()", "the file's build time, IP version, record size and node count", "The MMDB file",
+             used="the file's date (Update… once it is older than this month), and a download checked", docs=READER_DOCS),
+        Call("maxminddb.open_database(<file>, MODE_MEMORY)", "the whole file read into memory", "The MMDB file",
+             docs=READER_DOCS),
+        Call("GET api.db-ip.com/v2/<key>/<address>", "an address's place, asked of DB-IP", "The lookup API",
+             docs=DBIP + "api/doc.php"),
+    ),
+    verified=WORLD_VERIFIED,
+)
+
+OPENDNS = Api(
+    name="OpenDNS (myip.opendns.com)",
+    maker="Cisco (OpenDNS)",
+    about=("OpenDNS's resolvers answer the name myip.opendns.com, asked of them directly, with the asker's own public "
+           "address: an A record over IPv4, an AAAA record over IPv6. The World Wide Web tab asks resolver1 "
+           "(208.67.222.222, and 2620:119:35::35 over IPv6) for this network's public address, which the GeoIP file "
+           "places as this machine's home on the globe when you set no place of your own: only once a GeoIP file is "
+           "installed, once while the plugin is attached, and again 15 minutes after none was given. The name is asked "
+           "as an absolute one (myip.opendns.com., a trailing dot), so none of this machine's search domains is added to "
+           "it. The question names no other machine: no peer's address is sent. OpenDNS documents its resolvers, not "
+           "this name."),
+    kind="dns",
+    base=("nslookup -type=a -timeout=3 -retry=1 myip.opendns.com. 208.67.222.222; -type=aaaa at 2620:119:35::35 (BIND's "
+          "nslookup: dnsutils on Debian and Ubuntu, bind-utils on Fedora, bind-tools on Arch and Alpine; without it the "
+          "tab says so and asks nothing)"),
+    version="OpenDNS's public resolvers (208.67.222.222, 208.67.220.220)",
+    auth="none: a public DNS question",
+    limits=("none published; the tab asks at most once an IP version while the plugin is attached, and again 15 minutes "
+            "after none was given"),
+    costs="",
+    links=(
+        Link("OpenDNS's setup guide (its resolvers' addresses)", "https://www.opendns.com/setupguide/", "guide"),
+        Link("OpenDNS", "https://www.opendns.com/", "docs"),
+        Link("OpenDNS's support", "https://www.opendns.com/support/", "guide"),
+        Link("Cisco Umbrella's status", "https://status.umbrella.cisco.com/", "status"),
+        Link("OpenDNS's terms", "https://www.opendns.com/consumer-terms/", "terms"),
+        Link("OpenDNS's privacy policy", "https://www.opendns.com/privacy-policy/", "terms"),
+        Link("nslookup(1)", NSLOOKUP, "tool"),
+    ),
+    areas=(
+        Area("The asker's own address", "myip.opendns.com, answered with the address the question came from",
+             "https://www.opendns.com/setupguide/", covered="this network's public IPv4 and IPv6 address: home on the globe"),
+        Area("Its resolvers", "public resolvers anyone may use, with filtering for accounts", "https://www.opendns.com/setupguide/"),
+        Area("FamilyShield", "resolvers that block adult content (208.67.222.123, 208.67.220.123)", "https://www.opendns.com/setupguide/"),
+        Area("Accounts and filtering", "a network's own filtering, set up on its dashboard", "https://www.opendns.com/support/"),
+    ),
+    calls=(
+        # as the library asks them (dns.public_address: each answer waited for 3 s, once more if none; the name absolute)
+        Call("nslookup -type=a -timeout=3 -retry=1 myip.opendns.com. 208.67.222.222", "the asker's IPv4 address",
+             "The asker's own address", used="this network's public IPv4 address (asked first)",
+             docs="https://www.opendns.com/setupguide/"),
+        Call("nslookup -type=aaaa -timeout=3 -retry=1 myip.opendns.com. 2620:119:35::35",
+             "the asker's IPv6 address, asked over IPv6", "The asker's own address",
+             used="this network's public IPv6 address, when no IPv4 one was given"),
+        Call("nslookup <name> 208.67.222.222", "any name resolved by OpenDNS", "Its resolvers",
+             docs="https://www.opendns.com/setupguide/"),
+    ),
+    verified=WORLD_VERIFIED,
+)
+
+GOOGLE = Api(
+    name="Google's name servers (o-o.myaddr.l.google.com)",
+    maker="Google",
+    about=("Google's own name servers (ns1.google.com) answer the text record of o-o.myaddr.l.google.com with the address "
+           "the question came from. The World Wide Web tab asks them for this network's public address when OpenDNS gives "
+           "none, as the home of this machine on the globe; the name is asked as an absolute one (a trailing dot), and "
+           "the question names no other machine. Google documents no page for this name; its Public DNS pages, linked "
+           "here, cover its DNS service and its terms."),
+    kind="dns",
+    base=("nslookup -type=txt -timeout=3 -retry=1 o-o.myaddr.l.google.com. 216.239.32.10 (ns1.google.com; "
+          "2001:4860:4802:32::a over IPv6; BIND's nslookup)"),
+    version="Google's authoritative servers for google.com",
+    auth="none: a public DNS question",
+    limits="none published; asked only when OpenDNS gives no public address",
+    costs="",
+    links=(
+        Link("Google Public DNS", "https://developers.google.com/speed/public-dns", "docs"),
+        Link("Google Public DNS: frequently asked questions", "https://developers.google.com/speed/public-dns/faq", "guide"),
+        Link("Google Public DNS: DNS over HTTPS (JSON)", "https://developers.google.com/speed/public-dns/docs/doh/json", "reference"),
+        Link("Google Public DNS's terms", "https://developers.google.com/speed/public-dns/terms", "terms"),
+        Link("Google Public DNS's privacy", "https://developers.google.com/speed/public-dns/privacy", "terms"),
+        Link("nslookup(1)", NSLOOKUP, "tool"),
+    ),
+    areas=(
+        Area("The asker's own address", "o-o.myaddr.l.google.com's text record, asked of ns1.google.com directly",
+             covered="this network's public IPv4 and IPv6 address, when OpenDNS gives none: home on the globe"),
+        Area("Google Public DNS", "the public resolvers (8.8.8.8, 8.8.4.4)", "https://developers.google.com/speed/public-dns/docs/using"),
+        Area("DNS over HTTPS", "names resolved over HTTPS, as JSON too", "https://developers.google.com/speed/public-dns/docs/doh"),
+    ),
+    calls=(
+        # as the library asks them (dns.public_address), as OpenDNS's are
+        Call("nslookup -type=txt -timeout=3 -retry=1 o-o.myaddr.l.google.com. 216.239.32.10",
+             "the asker's address, in a text record", "The asker's own address",
+             used="this network's public IPv4 address, when OpenDNS gives none"),
+        Call("nslookup -type=txt -timeout=3 -retry=1 o-o.myaddr.l.google.com. 2001:4860:4802:32::a",
+             "the same, asked over IPv6", "The asker's own address",
+             used="this network's public IPv6 address, when no IPv4 one was given and OpenDNS gives none"),
+        Call("GET https://dns.google/resolve?name=<name>&type=<type>", "a name resolved over HTTPS, as JSON",
+             "DNS over HTTPS", docs="https://developers.google.com/speed/public-dns/docs/doh"),  # where its address is given
+    ),
+    verified=WORLD_VERIFIED,
+)
+
+FIREWALL = (NFTABLES, IPTABLES, EBTABLES, IPSET, FIREWALLD_API, UFW, CONNTRACK, BPF, IPROUTE2, SERVICES, SUDO)  # its read and changes
+WORLD = (CAPTURE, DBIP_LITE, OPENDNS, GOOGLE)  # the World Wide Web tab's (0.8.0)
+APIS = FIREWALL + WORLD
 
 
 def ago(when: float) -> str:
@@ -624,10 +958,11 @@ def ago(when: float) -> str:
 
 def facts(plugin) -> dict[str, dict[str, str]]:
     """What the last read found of its APIs, asking nothing (a read under way is not waited for): each tool's version
-    and what it holds, the connections tracked, the programs on the network's hooks, the machine read and when."""
+    and what it holds, the connections tracked, the programs on the network's hooks, the machine read and when; and what
+    the World Wide Web tab watched and placed (world_facts)."""
     kept = getattr(plugin, "_read", None)  # (when, Config): the last read, kept READ_S
     if not kept:
-        return {}
+        return world_facts(plugin)
     cfg = kept[1]
     out: dict[str, dict[str, str]] = {}
     tools = cfg.tools or {}
@@ -661,4 +996,43 @@ def facts(plugin) -> dict[str, dict[str, str]]:
     out[SERVICES.name] = {"Read": f"{sysm.name}, kernel {sysm.kernel or '?'}, {sysm.init_words}, {ago(cfg.at)}"}
     if cfg.problems:
         out[SERVICES.name]["Not read"] = "; ".join(cfg.problems)
+    out.update(world_facts(plugin))
+    return out
+
+
+def world_facts(plugin) -> dict[str, dict[str, str]]:
+    """What the World Wide Web tab watched and which GeoIP file it has open, asking nothing: nothing is started, opened
+    or made to say it (WorldView.describe). Nothing is said before the tab was first shown, nor on a machine the plugin
+    is not for: the tab's WorldView is the Firewall base's, made at its first ask and let go when the plugin is
+    detached, and it is read here through the base's world_view(make=False) (liminal-libs 1.55.0), which never makes
+    one. The GeoIP file is the one open, or the one last open once it was let go (watching stopped: "open" false)."""
+    world_view = getattr(plugin, "world_view", None)
+    try:
+        view = world_view(make=False) if callable(world_view) else None
+        d = view.describe() if view is not None else None
+    except Exception:  # noqa: BLE001 - what the tab watched is extra: the cards are drawn without it
+        return {}
+    if not isinstance(d, dict):
+        return {}
+    w = d.get("watching") or {}
+    if w.get("running"):
+        watching = "yes" + (f", at the adapter holding {d['address']}" if d.get("address") else "")
+    elif d.get("error") or w.get("error"):
+        watching = f"no: {d.get('error') or w.get('error')}"
+    else:
+        watching = f"not now: only while the World Wide Web tab is shown, and for {float(w.get('timeout') or 0):g} s after"
+    out = {CAPTURE.name: {"Watching": watching, "Packets read": f"{int(w.get('packets') or 0):,}"}}
+    g = d.get("geoip")
+    if g:
+        file = ", ".join(x for x in (g.get("file") or "", f"built {g['date']}" if g.get("date") else "") if x)
+        modes = {"mmap-ext": "memory-mapped (maxminddb's C extension)", "mmap": "memory-mapped (pure Python)"}
+        mode = modes.get(g.get("mode"), "memory-mapped")
+        if g.get("open", True):
+            out[DBIP_LITE.name] = {"File": file or "open", "Read": mode}
+        else:  # let go while nobody watches: nothing stays mapped, and the tab's next ask maps it again
+            out[DBIP_LITE.name] = {"File": file or "let go",
+                                   "Read": f"not now: let go while the tab is not watched, {mode} again at its next ask"}
+    else:
+        readable, why = geo.available()
+        out[DBIP_LITE.name] = {"File": "none open" + ("" if readable else f": {why}")}
     return out

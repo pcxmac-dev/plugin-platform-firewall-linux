@@ -1,8 +1,9 @@
 """The Linux firewall plugin over recorded machines (tests/machines.py: a stand-in for this machine's commands, nothing
 runs): its status and tables, its one read kept a minute and read again after each change, every change the page asks
 (a rule made, a rule removed, a default policy, on and off, saved), the second confirmation for a change that can cut
-SSH or open everything, the framework's own setup over the same read, and that it works only on a native Linux
-machine: on Windows, macOS or in a WSL distribution nothing runs at all."""
+SSH or open everything, the framework's own setup over the same read, and that it works only on the Linux the platform
+runs on (a WSL distribution it runs inside too, its page saying what WSL changes): on Windows or macOS nothing runs at
+all, nor for a distribution reached from Windows."""
 from __future__ import annotations
 
 import sys
@@ -373,18 +374,20 @@ def test_the_frameworks_setup_over_the_same_read():
     assert "an allow changes nothing" in out[2]["detail"] and "no switch" in out[0]["detail"]
 
 
-def test_only_a_native_linux_machine_has_its_firewall_driven():
-    """The user, 2026-11-08: "the scope of linux administration is only on native linux O/S"; "it's not for
-    administrating WSL instances"; "Yes, firewall too": on Windows, macOS or in a WSL distribution no command runs at
-    all, the status says why with applies False (the platform shows "Not for this machine", no setup), the setup and
-    every command are refused (liminal-libs 1.27.0)."""
+def test_only_the_linux_the_platform_runs_on_has_its_firewall_driven():
+    """The user, 2026-11-08: "the scope of linux administration is only on native linux O/S"; "Yes, firewall too"; and
+    2026-11-15: "wsl and firewall linux should always work under linux". On Windows or macOS no command runs at all, the
+    status says why with applies False (the platform shows "Not for this machine", no setup), the setup and every command
+    are refused (liminal-libs 1.27.0). A WSL distribution the platform runs inside is Linux like any other (the library's
+    check decides, test_inside_wsl_its_page_says_what_wsl_changes_after_its_own_tables), and one reached from Windows is
+    never driven."""
     windows = why_not_native("The Linux firewall", "win32", "10", {})
-    wsl = why_not_native("The Linux firewall", "linux", "6.18.54.1-microsoft-standard-WSL2", {"WSL_DISTRO_NAME": "Liminal-Ubuntu"})
-    assert windows.startswith("The Linux firewall is for a native Linux machine, and this one runs Windows")
-    assert wsl.endswith("this is WSL's Liminal-Ubuntu on Windows")
+    macos = why_not_native("The Linux firewall", "darwin", "24.1.0", {})
+    assert windows.startswith("The Linux firewall is for ") and "and this one runs Windows" in windows
+    assert macos.startswith("The Linux firewall is for ") and macos.endswith("and this one runs macOS")
     if sys.platform == "win32":
         assert MACHINE.not_for_here() == windows and not MACHINE.present()  # this PC: asked nothing
-    for note in (windows, wsl):
+    for note in (windows, macos):
         ran: list = []
         p = LinuxFirewallPlugin(shell=Shell("local", runner=lambda args, timeout: ran.append(args) or (0, b"", b"")), native=note)
         st = p.status()
@@ -395,12 +398,34 @@ def test_only_a_native_linux_machine_has_its_firewall_driven():
                     lambda: p.exposing([8765]), p.backend, p.state, p.refresh, lambda: p.make_rule("web", "in", "allow", "tcp", "1"),
                     lambda: p.remove_rule("x", "y"), lambda: p.set_policy("x", "y"), lambda: p.switch("ufw", "on"),
                     lambda: p.save_rules("nftables")):
-            with pytest.raises(FirewallError, match="native Linux machine"):
+            with pytest.raises(FirewallError, match="and this one runs"):
                 ask()
         assert ran == []  # nothing ran anywhere
-    in_wsl = LinuxFirewallPlugin(shell=Shell("wsl:Liminal-Ubuntu", runner=lambda args, timeout: (0, b"", b"")), native="")
-    with pytest.raises(FirewallError, match="never WSL's Liminal-Ubuntu"):
-        in_wsl.run("true")
+    from_windows = LinuxFirewallPlugin(shell=Shell("wsl:Liminal-Ubuntu", runner=lambda args, timeout: (0, b"", b"")), native="")
+    with pytest.raises(FirewallError, match="is for the Linux the platform runs on, never WSL's Liminal-Ubuntu"):
+        from_windows.run("true")
+
+
+def test_inside_wsl_its_page_says_what_wsl_changes_after_its_own_tables(monkeypatch):
+    """The user, 2026-11-15: "wsl and firewall linux should always work under linux, if wsl prevents or misses some
+    capability this should reflect in the plugin". Inside a WSL distribution (the library's linux.wsl_table gives a
+    table for a firewall: the packet filter WSL's kernel gives, WSL's network behind Windows) the status's tables end with
+    it; none on a machine of its own, nor with a library from before it, nor when the check cannot say."""
+    under = {"title": "Under WSL", "note": "What running inside a WSL distribution changes for this plugin.",
+             "columns": [{"title": "What"}, {"title": "Here"}, {"title": "What it means"}],
+             "rows": [["Network", "WSL's own, behind Windows", "Windows' firewall first"]]}
+    asked: list = []
+    monkeypatch.setattr(linux_mod, "wsl_table", lambda kind, *a, **k: asked.append(kind) or under, raising=False)
+    p = plugin(FakeLinux("ubuntu-24.04-ufw"))
+    st = p.status()
+    assert st["valid"] and st["tables"][-1] is under and asked == ["firewall"]
+    assert [t["title"] for t in st["tables"]].count("Under WSL") == 1
+    monkeypatch.setattr(linux_mod, "wsl_table", lambda kind, *a, **k: None, raising=False)  # a machine of its own
+    assert "Under WSL" not in [t["title"] for t in p.status()["tables"]]
+    monkeypatch.setattr(linux_mod, "wsl_table", lambda kind, *a, **k: 1 / 0, raising=False)  # a check that cannot say
+    assert "Under WSL" not in [t["title"] for t in p.status()["tables"]]
+    monkeypatch.delattr(linux_mod, "wsl_table", raising=False)  # a library from before
+    assert "Under WSL" not in [t["title"] for t in p.status()["tables"]]
 
 
 def test_ipv6s_own_messages_kept_unless_accepted():

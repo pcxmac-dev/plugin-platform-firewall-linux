@@ -15,7 +15,7 @@ from liminal_libs.machines.firewall import FirewallError, Rule
 from liminal_libs.machines.linux import Shell, why_not_native
 from liminal_libs.machines.plugin import CommandError
 
-from plugin_platform_firewall_linux import MACHINE, READ_S, LinuxFirewallPlugin
+from plugin_platform_firewall_linux import MACHINE, READ_S, LinuxFirewallPlugin, rights
 from plugin_platform_firewall_linux.changes import ACCEPT, Risky
 from plugin_platform_firewall_linux.read import SCRIPT
 
@@ -312,9 +312,15 @@ def test_what_the_firewall_needs_is_said_when_it_cannot_be_read_or_there_is_none
     firewall tool is installed). When the read is refused for want of root, or there is no firewall software, the page's
     tables say what the firewall needs here (root for the read, a firewall tool), each with what to do, and inside WSL
     what WSL changes after it. The tools are looked for by their files, without root: nothing runs but the read, through
-    sudo -n, which never asks for a password."""
+    sudo -n, which never asks for a password.
+
+    As 0.8.1 has it with a library from before the grant (liminal-libs 1.62.0), which is how 0.9.0 works there, its root
+    row saying what the switch needs; with the grant, the plugin is valid there instead, and offers Root access and
+    nftables' install (tests/test_rights.py)."""
     import types
 
+    for name in rights.NAMES:
+        monkeypatch.delattr(linux_mod, name, raising=False)
     monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 1000, raising=False)  # the platform is no root: sudo -n asks
     ran: list = []
 
@@ -328,6 +334,8 @@ def test_what_the_firewall_needs_is_said_when_it_cannot_be_read_or_there_is_none
     needs = st["tables"][0]
     assert needs["title"] == "What the firewall needs here" and [r[0] for r in needs["rows"]] == ["Root for the read", "A firewall tool"]
     assert needs["rows"][0][1] == "sudo asks for a password" and "sudo -n, which never asks" in needs["rows"][0][2]
+    assert needs["rows"][0][2].endswith(rights.old_words())
+    assert f"needs liminal-libs {rights.NEEDS_LIBS}" in needs["rows"][0][2]  # the number set at landing, one place
     assert needs["rows"][1][1].startswith("none installed") and "apt install nftables (Debian, Ubuntu)" in needs["rows"][1][2]
     assert [c["title"] for c in needs["columns"]] == ["What", "Here", "What to do"] and len(st["tables"]) == 1
     assert looked == ["nft", "iptables", "ufw", "firewall-cmd"] and ran and all(a[:2] == ["sudo", "-n"] for a in ran)

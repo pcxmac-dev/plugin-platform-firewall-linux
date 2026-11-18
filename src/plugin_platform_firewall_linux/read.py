@@ -6,7 +6,8 @@ ebtables' and arptables' variants, ipset's sets, firewalld's zones, policies and
 and rules, the connections tracked, the interfaces with their addresses and XDP programs, eBPF programs on the network
 hooks (read only), the firewall services under the init system and at boot, the files each distribution keeps its rules
 in, and the SSH server's ports. `parse` reads it into a `Config`; nothing in it is a guess when a part is missing: that
-part is said as missing."""
+part is said as missing. Its scratch folder is mktemp -d's alone: run as root (Root access's grant lets the group
+liminal run it so), it never writes into a folder whose name is known before; without one it stops and says so."""
 from __future__ import annotations
 
 import re
@@ -23,8 +24,8 @@ from .model import Entry, owner_by_interface, owner_by_name
 MARK = "== liminal-firewall 1"
 SECTION = re.compile(r"^@@ (\S+) (-?\d+)$")
 SCRIPT = r"""echo '== liminal-firewall 1'
-t=$(mktemp -d 2>/dev/null) || t=/tmp/liminal-firewall.$$
-mkdir -p "$t" 2>/dev/null
+t=$(mktemp -d 2>/dev/null) || {
+  echo 'liminal: mktemp -d made no folder to read into (is /tmp full or read-only?): nothing was read' >&2; exit 1; }
 have() { command -v "$1" >/dev/null 2>&1; }
 sec() { n=$1; shift; "$@" >"$t/o" 2>"$t/e"; rc=$?; printf '\n@@ %s %s\n' "$n" "$rc"; cat "$t/o"
   if [ -s "$t/e" ]; then printf '\n@@ %s.err 0\n' "$n"; cat "$t/e"; fi; }

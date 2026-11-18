@@ -194,7 +194,8 @@ def test_the_tab_its_hooks_and_its_setting_are_the_firewall_bases():
     # the platform hands a job (liminal-libs 1.55.0)
     assert hooks["world"].startswith("() ") and hooks["world_geoip"].startswith("(accept_licence=False, log=None) ")
     # the install runs as a job, its progress followed in the plugin's panel: the base's JOB_HOOKS, kept as they are
-    assert MACHINE.JOB_HOOKS == Firewall.JOB_HOOKS and "world_geoip" in MACHINE.JOB_HOOKS
+    # (0.9.0: and nftables' install after them)
+    assert MACHINE.JOB_HOOKS == (*Firewall.JOB_HOOKS, "install_nftables") and "world_geoip" in MACHINE.JOB_HOOKS
     assert {"make_rule", "remove_rule", "set_policy", "switch", "save_rules"} <= set(hooks)  # its own, as before
     [home] = MACHINE.keys  # the home on the globe: a setting on its page, kept through the platform's login
     assert (home.name, home.secret) == ("LIMINAL_HOME_PLACE", False) and home.hint.startswith("optional")

@@ -8,6 +8,9 @@ import json
 
 import pytest
 
+from liminal_libs.machines import linux as linux_mod
+from liminal_libs.machines.linux import Shell
+from plugin_platform_firewall_linux import LinuxFirewallPlugin
 from plugin_platform_firewall_linux import firewalld as fwd
 from plugin_platform_firewall_linux import nftables as nft
 from plugin_platform_firewall_linux import read, system, ufw, xtables
@@ -36,6 +39,29 @@ def test_the_script_and_its_sections():
     cfg = read.parse(answer({"os": (0, "ID=debian"), "nft": (1, ""), "nft.err": (0, "netlink: Error: Operation not permitted")}))
     assert cfg.nft is None and cfg.problems == ["nftables' ruleset could not be read: netlink: Error: Operation not permitted"]
     assert cfg.manager == "" and not cfg.readable
+
+
+def test_the_read_has_a_folder_of_its_own_or_stops_and_says_so(monkeypatch):
+    """The read runs as root, and Root access lets any member of the group liminal run it so: its scratch folder is
+    mktemp -d's, never one whose name is known before (a folder or a link planted there would be written through as
+    root). Without one the read stops, reading nothing, and the page says its words (the review, 2026-11-17)."""
+    lines = read.SCRIPT.splitlines()
+    assert lines[1] == "t=$(mktemp -d 2>/dev/null) || {"
+    words = lines[2].split("'")[1]
+    assert lines[2] == f"  echo '{words}' >&2; exit 1; }}" and words.startswith("liminal: mktemp -d made no folder")
+    assert "$$" not in read.SCRIPT and "/tmp/liminal" not in read.SCRIPT and 'mkdir -p "$t"' not in read.SCRIPT
+    # the plugin, as root, given the read's answer when it stops so: not read, in the read's own words
+    monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 0, raising=False)
+    ran = []
+
+    def runner(args, timeout):
+        ran.append(list(args))
+        if args[:2] == ["sh", "-c"] and args[2] == read.SCRIPT:
+            return 1, read.MARK + "\n", words + "\n"
+        return 0, "", ""
+
+    st = LinuxFirewallPlugin(shell=Shell("local", runner=runner), native="", clock=lambda: 1000.0).status()
+    assert st["valid"] is False and st["why"] == f"cannot be read: {words}" and ran == [["sh", "-c", read.SCRIPT]]
 
 
 def test_debian_nftables_of_its_own_and_dockers_rules_through_iptables_nft():

@@ -15,9 +15,11 @@ kernels, make sure its compatible with major distributions and gentoo linxu".
 
 ## What it reads
 
-One read of the whole configuration (`read.SCRIPT`), run as root through the library's `machines.linux.Shell`
-(`sudo -n` when the platform is not root; a password is never asked). The read is a POSIX shell script that BusyBox's
-sh runs too. It is kept for a minute, and read again after each change and on Refresh. It reads:
+One read of the whole configuration (`read.SCRIPT`), run as root through the library's `machines.linux.Shell`: as the
+platform's own root, or through `sudo -n` when the platform is not root, by a rule of yours or by Root access's
+installed copy of the read (below, Rights); the read itself never asks for a password. The read is a POSIX shell script
+that BusyBox's sh runs too. It is kept for a minute (a refused read too: sudo notes each refusal), and read again after
+each change and on Refresh. It reads:
 
 - **nftables**: `nft -j list ruleset` (libnftables' JSON). Tables, base chains with their hook, priority and policy,
   every rule written out again in nft's own syntax (counters left out of the words, kept apart), sets and maps.
@@ -286,18 +288,83 @@ still refuses a WSL kernel; with it, the plugin says so inside WSL and runs noth
 
 ## Rights
 
-Reading and changing the firewall need root. The plugin runs its commands through `sudo -n` when the platform is not
-root, and never asks for a password. Without the rights, its status says "cannot be read" with sudo's words: run the
-platform as root, or let sudo run `sh` and the firewall's tools without a password.
+The user's words, 2026-11-17, after the firewall could not be read inside their WSL Ubuntu, where sudo asks for a
+password: "the plugin needs to be able to handle permissions if required"; asked how the password is typed: "A field on
+its page"; then "(enable / disable)", "but only if required" (DECISIONS addenda 9 and 10).
 
-Then, and when there is no firewall software at all, its page has a table, **What the firewall needs here** (0.8.1):
-- root for the read, as above;
-- a firewall tool: which of nftables, iptables, ufw and firewalld is installed, found by their files without root and
-  running nothing. With none, it says how to install nftables on each distribution.
+Reading and changing the firewall need root. Where root is needed, the plugin says what for and offers it as a confirmed
+action on its own page, as the Windows plugins ask through UAC (`rights.py`, over liminal-libs 1.62.0's
+`machines.linux`: `Shell.run(password=...)`, `grant`, `revoke`, `granted`, `needs_password`, `PasswordRefused`).
 
-Inside WSL the "Under WSL" table follows it. Both are an administrator's to put right; the plugin installs and changes
-nothing for them. liminal-platform 0.29.0 draws a plugin's tables while it is not valid yet; an older platform shows the
-reason alone.
+**How it has its rights** is a fact on its page (`rootAccess`), found with each read:
+
+- the platform runs as root: everything runs as root, without sudo;
+- sudo runs the read without a password, by a rule of yours (`sudo -n sh -c <the read>` allowed);
+- Root access is on: the read runs as `sudo -n /usr/local/libexec/liminal/firewall-linux/read`, once the library has
+  checked that the file installed is this plugin's own read as the library installs it, word for word; one that
+  differs (an older plugin's, or one installed before its helpers set their own PATH) is not run, and the page says so;
+- Root access is off: the firewall's rules are not read.
+
+**Root access** (enable / disable) is a row on Main, shown only if required: never where the platform is root, nor where
+a rule of yours runs the read. Its row says its state ("off: the firewall's rules are not read", "on: a rule lets its
+read run as root, nothing else", on from the platform's next start, or an older plugin's read) and has one action:
+
+- **Turn on…** asks for your password for sudo once, in a password field of its form ("used for this once, never
+  kept"). Its words say exactly what is installed and where: the group `liminal` made where there is none
+  (`groupadd --system liminal`, or BusyBox's `addgroup -S liminal`) and you put in it (`usermod -a -G liminal`, or
+  `addgroup`), then, by one script checked before anything is put in place, the plugin's read as it runs it today at
+  `/usr/local/libexec/liminal/firewall-linux/read` and a take-back helper beside it (root's, in a folder open to the
+  group `liminal` alone, root:liminal 0750), and `/etc/sudoers.d/liminal-firewall-linux`, checked with `visudo -cf`
+  before it is put in place, letting the group `liminal` run exactly those two files as root without a password, with
+  no arguments, and nothing else. Never `NOPASSWD: ALL`. Anything running as you (or as another member of the group)
+  can then run that one read as root; it reads and changes nothing. Each helper sets its own PATH, `LC_ALL=C`,
+  `umask 077` and `cd /` and refuses any argument (the library's `helper_text`), since sudo hands a program the
+  caller's PATH where sudoers sets no secure_path; the rule is tagged `NOPASSWD:NOSETENV:EXEC:`, so a site's
+  `Defaults setenv` passes none of the caller's variables to them (NOPASSWD alone, and said, where the system's visudo
+  refuses the other two); and the script refuses a folder on the way that is not root's, a symlink, or one writable by
+  others or by a group other than root's (Debian's opt-in staff group, said in words).
+- A membership counts for programs started after it (sudo reads the groups a program was started with), so Root
+  access takes effect once the platform is started again, from a terminal opened after it was turned on (a shell
+  opened before does not have the group; `newgrp liminal` in it gives it one). Until then its row says so, and Turn
+  off… asks for the password too, since the take-back helper cannot run yet.
+- **Turn off…** runs the take-back helper through `sudo -n`, with no password: the rule and the folder are removed,
+  nothing else. The group `liminal` and its members stay: the Linux administration plugin manages them.
+
+**Every change** still asks for your password at its own click unless the platform is root or a rule of yours lets sudo
+run it: its form then ends with the password field, and its hook takes a last argument `password` (`make_rule`,
+`remove_rule`, `set_policy`, `switch`, `save_rules`, after `accept_risk`, so a second confirmation sends it again). The
+password is handed to `sudo -S -k -p '' --` on its standard input for that one command (the library's `Shell.run`),
+alone: nothing follows it, so a mistyped one is one try, and the grant's script is an argument of `sh -c` whose first
+line points its own standard input at /dev/null, so none of it reads a password sudo did not take. It is never kept,
+logged, written, shown, put in a command line or an environment, nor left in an error's words. A
+password sudo refuses is a refusal ("sudo did not accept the password: nothing was changed; type it again"), so the form
+is filled again. A change asked without the password it needs (the framework's setup, the command line) is refused in
+words before sudo is asked.
+
+**Installing nftables.** Where none of nftables, iptables, ufw and firewalld is installed and the distribution's APT is
+there (Debian, Ubuntu and their kin), the tool's row offers **Install nftables…**, a job: the distribution's own package
+and what it needs that is not installed yet, as APT installs them. What that takes is read first without root and
+changing nothing (`apt-get -s install nftables`, APT's simulation; `apt-cache show --no-all-versions` for each
+package's Size, Installed-Size and Origin) and said on the form, for the user's Ubuntu 24.04: "Ubuntu's own nftables
+package 1.0.9-1ubuntu0.1, with the 2 packages it needs that are not installed yet (libnftnl11, libnftables1): 494 kB to
+download, 1.5 MB once installed". Then `apt-get install -y nftables` runs as root with `DEBIAN_FRONTEND=noninteractive`
+(and `LC_ALL=C`, so APT's lock held by another program and a package not fetched are said in words), its last lines in
+the plugin's panel. Installing it filters nothing. Elsewhere the row says how to install nftables on each distribution.
+
+**Valid without root** (B-revisions S2). Where the firewall cannot be read for want of root, or there is no firewall
+tool, the plugin is valid with a `problem`: its page has **What the firewall needs here**, its Root access row and the
+tool's row, offering only what it can do (Turn on…, Install nftables…), no change it cannot make, and the platform asks
+its tabs. A read failing for its own reasons, with root given, is not valid, as before.
+
+**On a library from before 1.62.0** the plugin works as 0.8.1 did: everything through `sudo -n`, never a password; not
+valid where it cannot be read, and its root row says that its Root access switch needs liminal-libs 1.62.0.
+
+Inside WSL the "Under WSL" table follows, with a row for Root access where it is shown: Windows can enter a distribution
+as root with no password (`wsl -u root`), which the platform never does, nor reaches in from Windows, so root is asked
+of the distribution's own sudo, whose password is yours; Root access's rule and files are that distribution's alone, on
+its own disk, and stay across its restarts; the group is the platform's once it is started again from a terminal opened
+after, or after Windows has stopped the distribution and started it again. liminal-platform 0.29.0 draws a plugin's
+tables while it is not valid yet; an older platform shows the reason alone.
 
 The World Wide Web tab's capture needs less: root, or CAP_NET_RAW alone, for the platform alone (below). It never needs
 CAP_NET_ADMIN, which is the right to rewrite the firewall.
@@ -425,7 +492,19 @@ under "more of the API") and every call it makes, with the API's other notable c
   [bpftool-net(8)](https://manpages.debian.org/unstable/bpftool/bpftool-net.8.en.html) (read only).
 - **iproute2**: [ip-address(8)](https://man7.org/linux/man-pages/man8/ip-address.8.html),
   [ss(8)](https://man7.org/linux/man-pages/man8/ss.8.html).
-- **The firewall's services** under systemd, OpenRC or SysV scripts, and **sudo** (`sudo -n`, never a password).
+- **The firewall's services** under systemd, OpenRC or SysV scripts.
+- **sudo** (0.9.0): `sudo -n`, `sudo -S -k -p '' --` with the password on its standard input, Root access's files,
+  `visudo -cf` and `sudo -n -l`: [sudo(8)](https://www.sudo.ws/docs/man/sudo.man/),
+  [sudoers(5)](https://www.sudo.ws/docs/man/sudoers.man/), [visudo(8)](https://www.sudo.ws/docs/man/visudo.man/).
+- **Users and groups** (0.9.0): the group liminal made and the platform's user put in it:
+  [groupadd(8)](https://manpages.debian.org/unstable/passwd/groupadd.8.en.html),
+  [usermod(8)](https://manpages.debian.org/unstable/passwd/usermod.8.en.html),
+  [BusyBox's addgroup](https://busybox.net/downloads/BusyBox.html).
+- **APT** (0.9.0): nftables installed where no tool is:
+  [apt-get(8)](https://manpages.debian.org/unstable/apt/apt-get.8.en.html),
+  [apt-cache(8)](https://manpages.debian.org/unstable/apt/apt-cache.8.en.html),
+  [debconf(7)](https://manpages.debian.org/unstable/debconf-doc/debconf.7.en.html),
+  [nftables on Debian](https://wiki.debian.org/nftables).
 
 The World Wide Web tab's (0.8.0):
 
@@ -487,3 +566,17 @@ as a Linux machine's page says it, as root and not, on any machine; so is what a
 from it. The machine the tests run on never shows through (`tests/conftest.py`: not inside WSL, no init known), so the
 suite reads alike inside a WSL distribution, on a Linux of any init and on Windows; what WSL changes is tested with the
 library's tables stood in for.
+
+Root access and nftables' install (0.9.0) are tested over the recorded machines and a stand-in sudo (`tests/sudo.py`:
+it answers what liminal-libs 1.62.0's own `Shell.run`, `grant`, `revoke`, `granted` and `needs_password` run, as sudo
+would: its listing, `cat` of the installed files, `sudo -S` with the password; so these tests are skipped on a library
+from before them), in every state: not required as root or by a rule of yours, off, turned on (in force from the
+platform's next start), on, an installed read that is not this plugin's; the install offered only without a tool and
+with APT, its size from APT's own answers recorded on the user's Ubuntu (`tests/recorded/apt-ubuntu-24.04`: Ubuntu's
+package metadata alone); the password field only where it is required; the password handed to sudo on its standard
+input alone, never in an argument, an environment, a log, an answer, an error's words or the plugin's own attributes;
+each hook taking its form's fields in the platform's order, a second confirmation included; and a library from before
+the grant, by tests of their own that take its names away. No test starts
+a process, opens a connection or resolves a name: `tests/conftest.py`'s guard fails one that does (the one test that
+reaches the makers' pages on purpose, `LIMINAL_VENDOR_PAGES=1`, is marked `outside`). The machine's own grant, group
+and tools never show through either.

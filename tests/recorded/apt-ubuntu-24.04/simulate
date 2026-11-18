@@ -1,0 +1,20 @@
+NOTE: This is only a simulation!
+      apt-get needs root privileges for real execution.
+      Keep also in mind that locking is deactivated,
+      so don't depend on the relevance to the real current situation!
+Reading package lists...
+Building dependency tree...
+Reading state information...
+The following additional packages will be installed:
+  libnftables1 libnftnl11
+Suggested packages:
+  firewalld
+The following NEW packages will be installed:
+  libnftables1 libnftnl11 nftables
+0 upgraded, 3 newly installed, 0 to remove and 15 not upgraded.
+Inst libnftnl11 (1.2.6-2build1 Ubuntu:24.04/noble [amd64])
+Inst libnftables1 (1.0.9-1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])
+Inst nftables (1.0.9-1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])
+Conf libnftnl11 (1.2.6-2build1 Ubuntu:24.04/noble [amd64])
+Conf libnftables1 (1.0.9-1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])
+Conf nftables (1.0.9-1ubuntu0.1 Ubuntu:24.04/noble-updates [amd64])

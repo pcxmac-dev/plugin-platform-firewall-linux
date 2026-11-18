@@ -3,7 +3,9 @@ should reflect the the API its attached to, and present links that provide docum
 of what the API is about"): nftables, iptables and ip6tables, ebtables and arptables, ipset, firewalld, ufw, conntrack,
 eBPF through bpftool, iproute2's ip and ss, the init's firewall services, and sudo (how root's rights are had), each as
 its makers' pages describe it. Every address was read on 2026-11-11 (`VERIFIED`). `facts` says what the last read
-found of them (the tools' versions, what each holds), asking nothing.
+found of them (the tools' versions, what each holds), asking nothing. With Root access and nftables' install (0.9.0):
+sudo's card again (its password on standard input, its policy and visudo), the users and groups' tools that make
+the group liminal, and APT, which installs nftables; their addresses read on 2026-11-17 (`RIGHTS_VERIFIED`).
 
 And the World Wide Web tab's (0.8.0; the user, 2026-11-14: "so for the firewall's both are going to get a 'world wide
 web view' that shows the globe and the routes incoming all traffic, as well as monitoring port traffic stats"): libpcap,
@@ -25,6 +27,8 @@ import time
 
 from liminal_libs import geo
 from liminal_libs.sources.apis import Api, Area, Call, Link
+
+from .rights import Paths
 
 VERIFIED = "2026-11-11"
 WORLD_VERIFIED = "2026-11-15"  # the World Wide Web tab's cards (0.8.0): every address on them read on this day
@@ -627,39 +631,178 @@ SERVICES = Api(
     verified=VERIFIED,
 )
 
+RIGHTS_VERIFIED = "2026-11-17"  # Root access's and nftables' install's cards (0.9.0): every address on them read then
+SUDO_MAN = "https://www.sudo.ws/docs/man/sudo.man/"
+SUDOERS_MAN = "https://www.sudo.ws/docs/man/sudoers.man/"
+VISUDO_MAN = "https://www.sudo.ws/docs/man/visudo.man/"
+ROOT_READ, ROOT_TAKE_BACK = Paths.here().read, Paths.here().helper  # Root access's installed read and take-back
+APT_GET, APT_CACHE = DEBIAN + "apt/apt-get.8.en.html", DEBIAN + "apt/apt-cache.8.en.html"
+DEBCONF = DEBIAN + "debconf-doc/debconf.7.en.html"
+GROUPADD, USERMOD = DEBIAN + "passwd/groupadd.8.en.html", DEBIAN + "passwd/usermod.8.en.html"
+GROUPDEL = DEBIAN + "passwd/groupdel.8.en.html"
+BUSYBOX = "https://busybox.net/downloads/BusyBox.html"
+
 SUDO = Api(
     name="sudo",
     maker="the sudo project",
-    about=("sudo runs a command as root, as the sudoers policy allows. The firewall is read and changed as root: the "
-           "plugin runs its read and each change through sudo -n when the platform is not root, so where sudo would ask "
-           "for a password the command fails at once, and the page says the firewall cannot be read."),
+    about=("sudo runs a command as root, as the sudoers policy allows. The firewall is read and changed as root. Where "
+           "the platform is not root, the plugin runs its read through sudo -n, which never asks for a password: a "
+           "rule of the user's own may allow it, or Root access's (0.9.0), the plugin's read installed root-owned and "
+           "a rule letting the group liminal run exactly it, and its take-back helper, with no arguments and no "
+           "password, checked with visudo before it is put in place (the library's grant). Where sudo needs a "
+           "password for a change, its form on the page asks for it, and it is handed to sudo -S on its standard "
+           "input for that one command: never kept, logged, shown, nor put in an argument or the environment; -k so "
+           "no credential cached before stands in for it, -p '' so sudo prints no prompt of its own."),
     kind="command",
-    base="sudo -n <command>",
-    version="sudo 1.9 (its -n, --non-interactive)",
-    auth="the platform's user, as /etc/sudoers allows: no password, or nothing is read or changed",
+    base="sudo -n <command>; sudo -S -k -p '' -- <command>, the password on its standard input",
+    version="sudo 1.9 (its -n, -S, -k, -p and -l; visudo -c and -f)",
+    auth=("the platform's user, as /etc/sudoers allows: without a password where a rule allows it (Root access's for "
+          "the read alone), else the password typed on the change's form, for that one command"),
     limits="",
     costs="",
     links=(
-        Link("sudo(8)", "https://www.sudo.ws/docs/man/sudo.man/", "reference"),
-        Link("sudoers(5)", "https://www.sudo.ws/docs/man/sudoers.man/", "reference"),
+        Link("sudo(8)", SUDO_MAN, "reference"),
+        Link("sudoers(5)", SUDOERS_MAN, "reference"),
+        Link("visudo(8)", VISUDO_MAN, "reference"),
         Link("sudo", "https://www.sudo.ws/", "docs"),
         Link("sudo's changes", "https://www.sudo.ws/releases/changelog/", "changelog"),
     ),
     areas=(
-        Area("Running as root", "a command run as root, refused at once where a password would be asked",
-             "https://www.sudo.ws/docs/man/sudo.man/", covered="the read and every change, through sudo -n"),
-        Area("The policy", "who may run what as whom", "https://www.sudo.ws/docs/man/sudoers.man/",
-             covered="the plugin's rights come from it: no password, or no read"),
-        Area("Asking what is allowed", "the commands the user may run (sudo -l)", "https://www.sudo.ws/docs/man/sudo.man/"),
+        Area("Running as root", "a command run as root, refused at once where a password would be asked", SUDO_MAN,
+             covered="the read (by a rule of yours, or Root access's installed read) and each change sudo allows "
+                     "without a password, through sudo -n"),
+        Area("Running as root with a password", "the password read from standard input (-S), no prompt (-p ''), "
+             "credentials cached before ignored (-k)", SUDO_MAN,
+             covered="each change where sudo needs a password, Root access turned on, nftables installed"),
+        Area("The policy", "who may run what as whom", SUDOERS_MAN,
+             covered="Root access's rule: the group liminal may run exactly the plugin's read and its take-back "
+                     "helper, as root, with no arguments and no password"),
+        Area("Checking a policy", "a sudoers file checked before it is used (visudo -c -f)", VISUDO_MAN,
+             covered="Root access's rule, checked before it is put in place"),
+        Area("Asking what is allowed", "the commands the user may run (sudo -l), running nothing", SUDO_MAN,
+             covered="whether Root access's files run without a password, and, where a rule of yours runs the read, "
+                     "whether a change does"),
+        Area("Cached credentials", "a password given once, kept for a while (the timestamp)", SUDOERS_MAN),
     ),
     calls=(
         Call("sudo -n sh -c <script>", "a shell script as root, never asking a password", "Running as root",
-             used="the read (one script); a saved file written whole", docs="https://www.sudo.ws/docs/man/sudo.man/"),
-        Call("sudo -n <command>", "a command as root, never asking a password", "Running as root", used="each change",
-             docs="https://www.sudo.ws/docs/man/sudo.man/", writes=True),
-        Call("sudo -l", "what the user may run", "Asking what is allowed", docs="https://www.sudo.ws/docs/man/sudo.man/"),
+             used="the read (one script), where a rule of yours allows it; a saved file written whole", docs=SUDO_MAN),
+        Call("sudo -n <command>", "a command as root, never asking a password", "Running as root",
+             used="each change sudo allows without a password", docs=SUDO_MAN, writes=True),
+        Call(ROOT_READ, "the plugin's read, installed root-owned by Root access, run as root through sudo -n",
+             "Running as root", used="the read, where Root access is on, once it is checked to be the plugin's own",
+             docs=SUDO_MAN),
+        Call(ROOT_TAKE_BACK, "Root access's take-back helper, run as root through sudo -n: its rule and files removed",
+             "Running as root", used="Turn off…", docs=SUDO_MAN, writes=True),
+        Call("sudo -S -k -p '' -- <command>", "a command as root, the password read from standard input",
+             "Running as root with a password",
+             used="each change where sudo needs a password; Root access turned on; nftables installed",
+             docs=SUDO_MAN, writes=True),
+        Call("sh -c <script>", "a script as root, given as an argument (the password alone on sudo's standard input)",
+             "Running as root with a password",
+             used="Root access's grant (the library's), and its removal where the take-back helper cannot run yet",
+             docs=SUDO_MAN, writes=True),
+        Call("visudo -cf <file>", "a sudoers file checked, nothing changed", "Checking a policy",
+             used="Root access's rule, before it is put in place (inside the grant's script)", docs=VISUDO_MAN),
+        Call("sudo -n -l", "what the user may run here, listed without a password once a rule without one applies "
+             "(sudoers' listpw), running nothing", "Asking what is allowed",
+             used="whether Root access's files run without a password (the library's granted), and a change's "
+                  "(its needs_password, where a rule of yours runs the read): the rule that decides each, read from "
+                  "the listing", docs=SUDO_MAN),
+        Call("sudo -n -l -- <command>", "whether the user may run a command at all, a password asked or not, running "
+             "nothing", "Asking what is allowed", docs=SUDO_MAN),
+        Call("sudo -v", "the cached credentials renewed", "Cached credentials", docs=SUDO_MAN),
     ),
-    verified=VERIFIED,
+    verified=RIGHTS_VERIFIED,
+)
+
+GROUPS = Api(
+    name="Users and groups (groupadd, usermod, addgroup)",
+    maker="the shadow project (groupadd, usermod), BusyBox (addgroup)",
+    about=("The group liminal holds Liminal's rights on a Linux machine (DECISIONS addendum 10): Root access's rule "
+           "names it, never a person. Turning Root access on makes it where there is none, as a system group, and puts "
+           "the platform's user in it, as root with the password typed on the form; a membership counts for programs "
+           "started after it, so it takes effect once the platform is started again. What the system's database says "
+           "of the group is read without a command. The group and its members stay when Root access is turned off: "
+           "the Linux administration plugin manages them."),
+    kind="command",
+    base="groupadd and usermod (shadow), or BusyBox's addgroup",
+    version="shadow 4 (Debian, Ubuntu, Fedora, Arch, Gentoo); BusyBox (Alpine)",
+    auth="root (sudo with the password typed on the form)",
+    limits="",
+    costs="",
+    links=(
+        Link("groupadd(8)", GROUPADD, "reference"),
+        Link("usermod(8)", USERMOD, "reference"),
+        Link("BusyBox's commands", BUSYBOX, "reference"),
+    ),
+    areas=(
+        Area("A group made", "a system group added to the system's database", GROUPADD,
+             covered="the group liminal, where there is none"),
+        Area("A member added", "a user put in a supplementary group", USERMOD,
+             covered="the platform's user put in the group liminal"),
+        Area("A group removed", "a group taken out of the system's database", GROUPDEL),
+    ),
+    calls=(
+        Call("groupadd --system liminal", "the group liminal made, as a system group", "A group made",
+             used="Root access turned on, where the group is not there", docs=GROUPADD, writes=True),
+        Call("usermod -a -G liminal <user>", "the user put in the group, its other groups kept", "A member added",
+             used="Root access turned on, where the platform's user is not in it", docs=USERMOD, writes=True),
+        Call("addgroup -S liminal", "BusyBox: the group made, as a system group", "A group made",
+             used="Root access turned on, where there is no groupadd", docs=BUSYBOX, writes=True),
+        Call("addgroup <user> liminal", "BusyBox: the user put in the group", "A member added",
+             used="Root access turned on, where there is no usermod", docs=BUSYBOX, writes=True),
+        Call("groupdel liminal", "the group removed", "A group removed", docs=GROUPDEL, writes=True),
+    ),
+    verified=RIGHTS_VERIFIED,
+)
+
+APT = Api(
+    name="APT (apt-get, apt-cache)",
+    maker="the Debian project (APT); the distribution's archive (Ubuntu's, Debian's)",
+    about=("APT installs a distribution's own packages from its archive, with what they need. Where no firewall tool "
+           "is installed and APT is there (Debian, Ubuntu and their kin), the plugin offers to install nftables, the "
+           "distribution's own package (0.9.0): what that takes is read first without root and changing nothing "
+           "(apt-get -s, APT's simulation, says which packages it would install; apt-cache show, each one's Size, "
+           "Installed-Size and whose it is), said on the form, then installed as root with debconf asking nothing "
+           "(DEBIAN_FRONTEND=noninteractive), as a job. APT is asked in English (LC_ALL=C), so that its lock held by "
+           "another program and a package not fetched are said in words. Installing it filters nothing."),
+    kind="command",
+    base="apt-get and apt-cache",
+    version="APT 2 and 3 (Debian 12 and 13, Ubuntu 24.04)",
+    auth="none to read; root to install (sudo with the password typed on the form, or the platform's root)",
+    limits="",
+    costs="",
+    links=(
+        Link("apt-get(8)", APT_GET, "reference"),
+        Link("apt-cache(8)", APT_CACHE, "reference"),
+        Link("debconf(7)", DEBCONF, "reference"),
+        Link("nftables on Debian", "https://wiki.debian.org/nftables", "guide"),
+    ),
+    areas=(
+        Area("Simulating", "what an install would do, changing nothing, run without root", APT_GET,
+             covered="which packages installing nftables takes, said first"),
+        Area("A package's facts", "its version, size, installed size and origin", APT_CACHE,
+             covered="each package's Size and Installed-Size, and whose it is"),
+        Area("Installing a package", "a package and what it needs, from the distribution's archive", APT_GET,
+             covered="Install nftables…"),
+        Area("Asking nothing", "debconf's noninteractive front end: its questions take their defaults", DEBCONF,
+             covered="the install asks nothing"),
+        Area("The package lists", "brought up to date from the archive (apt-get update)", APT_GET),
+        Area("Removing a package", "a package removed, or purged with its configuration", APT_GET),
+    ),
+    calls=(
+        Call("apt-get -s install nftables", "what installing nftables would do, changing nothing", "Simulating",
+             used="what installing nftables takes, read without root", docs=APT_GET),
+        Call("apt-cache show --no-all-versions <package>", "the candidate version's fields", "A package's facts",
+             used="each package's size, read without root", docs=APT_CACHE),
+        Call("apt-get install -y nftables", "nftables installed with what it needs, nothing asked",
+             "Installing a package", used="Install nftables…, with DEBIAN_FRONTEND=noninteractive", docs=APT_GET,
+             writes=True),
+        Call("apt-get update", "the package lists brought up to date", "The package lists", docs=APT_GET, writes=True),
+        Call("apt-get remove <package>", "a package removed", "Removing a package", docs=APT_GET, writes=True),
+    ),
+    verified=RIGHTS_VERIFIED,
 )
 
 # -- the World Wide Web tab's (0.8.0) ------------------------------------------------------------------------------------
@@ -946,7 +1089,8 @@ GOOGLE = Api(
     verified=WORLD_VERIFIED,
 )
 
-FIREWALL = (NFTABLES, IPTABLES, EBTABLES, IPSET, FIREWALLD_API, UFW, CONNTRACK, BPF, IPROUTE2, SERVICES, SUDO)  # its read and changes
+FIREWALL = (NFTABLES, IPTABLES, EBTABLES, IPSET, FIREWALLD_API, UFW, CONNTRACK, BPF, IPROUTE2, SERVICES,  # its read
+            SUDO, GROUPS, APT)  # and its changes; Root access's and nftables' install's (0.9.0)
 WORLD = (CAPTURE, DBIP_LITE, OPENDNS, GOOGLE)  # the World Wide Web tab's (0.8.0)
 APIS = FIREWALL + WORLD
 
@@ -962,7 +1106,7 @@ def facts(plugin) -> dict[str, dict[str, str]]:
     the World Wide Web tab watched and placed (world_facts)."""
     kept = getattr(plugin, "_read", None)  # (when, Config): the last read, kept READ_S
     if not kept:
-        return world_facts(plugin)
+        return {**rights_facts(plugin), **world_facts(plugin)}
     cfg = kept[1]
     out: dict[str, dict[str, str]] = {}
     tools = cfg.tools or {}
@@ -996,7 +1140,23 @@ def facts(plugin) -> dict[str, dict[str, str]]:
     out[SERVICES.name] = {"Read": f"{sysm.name}, kernel {sysm.kernel or '?'}, {sysm.init_words}, {ago(cfg.at)}"}
     if cfg.problems:
         out[SERVICES.name]["Not read"] = "; ".join(cfg.problems)
+    out.update(rights_facts(plugin))
     out.update(world_facts(plugin))
+    return out
+
+
+def rights_facts(plugin) -> dict[str, dict[str, str]]:
+    """How the last read had its rights (0.9.0: Root access) and what installing nftables takes, as they were kept,
+    asking nothing."""
+    out: dict[str, dict[str, str]] = {}
+    kept = getattr(plugin, "_rights", None)  # (when, rights.Rights), with the read
+    fact = getattr(kept[1], "fact", "") if kept else ""
+    if fact:
+        out[SUDO.name] = {"Root access": fact}
+    facts = getattr(plugin, "_facts", None)  # (when, install.Facts), where the install is offered
+    words = getattr(facts[1], "words", "") if facts else ""
+    if words:
+        out[APT.name] = {"Installing nftables": words}
     return out
 
 

@@ -78,11 +78,14 @@ class FakeLinux:
 
     @property
     def changes(self) -> list[list[str]]:
-        """The commands run but the read, without sudo."""
+        """The commands run but the read, without sudo (sudo -n, or 0.9.0's sudo -S -k -p "" -- with a password)."""
         out = []
         for c in self.calls:
-            cmd = c[2:] if c[:2] == ["sudo", "-n"] else c
+            cmd = c[6:] if c[:6] == SUDO_S else c[2:] if c[:2] == ["sudo", "-n"] else c
             if cmd[:2] == ["sh", "-c"] and cmd[2] == SCRIPT:
                 continue
             out.append(cmd)
         return out
+
+
+SUDO_S = ["sudo", "-S", "-k", "-p", "", "--"]  # the library's sudo with a password on its standard input (1.62.0)

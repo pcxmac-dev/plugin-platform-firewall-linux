@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.8.2 (2026-11-18)
+
+Root access, asked for on the plugin's own page, and only if required. The user, 2026-11-17, of the firewall that
+could not be read inside WSL's Ubuntu: "the plugin needs to be able to handle permissions if required"; "A field on its
+page"; "(enable / disable)"; "but only if required"; and of Liminal's own user and group: "lets have a liminal user and
+group for the liminal-linux-administration that enables linux potholes" (the privileges the plugins need).
+
+- **Root access, a switch** (Turn on... / Turn off...) on Main, shown only where the platform is not root and sudo
+  cannot already run the plugin's read without a password. Turning it on asks for the sudo password once, in a field
+  of its form: it makes the group `liminal` if there is none, adds the platform's user to it, and installs the
+  plugin's read as a root-owned helper with one sudoers rule letting only that file run, for the group, with no
+  arguments. It takes effect once the platform is started again (a new group membership reaches new programs only).
+  Turning it off needs no password. A helper installed by an older plugin is not run: the page says so and offers
+  Turn on... again.
+- **Install nftables...** where no firewall tool is installed and APT is there: a job asking the password, saying
+  first what it downloads (nftables and the libraries that come with it) and that installing it filters nothing.
+- **Valid with a problem**: where the firewall cannot be read for want of root or of a tool, the plugin stays valid,
+  says why, and offers only what it can do, so the switch and the install can be reached.
+- **A change** gets a password field only if it needs one; a change asked without the password it needs is refused
+  in words before sudo is asked.
+- Needs liminal-libs 1.62.0 for all of it (`Shell.run(password=)`, the grant); on an older library it works as 0.8.1.
+
 ## 0.8.1 (2026-11-16)
 
 What the firewall needs here, said where it cannot be read. The user: "still need linux firewall". Inside WSL's Ubuntu

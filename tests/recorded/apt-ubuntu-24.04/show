@@ -1,0 +1,102 @@
+Package: libnftnl11
+Architecture: amd64
+Version: 1.2.6-2build1
+Multi-Arch: same
+Priority: standard
+Section: libs
+Source: libnftnl
+Origin: Ubuntu
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Original-Maintainer: Debian Netfilter Packaging Team <team+pkg-netfilter-team@tracker.debian.org>
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Installed-Size: 230
+Depends: libc6 (>= 2.34), libmnl0 (>= 1.0.3-4~)
+Filename: pool/main/libn/libnftnl/libnftnl11_1.2.6-2build1_amd64.deb
+Size: 65986
+MD5sum: dff43dd6eed83bf4a36ce2045c394eab
+SHA1: bad1417a75cac1f9d17949f8be05345e66f56894
+SHA256: e5bde5c9cbb95082700011f0b7ef2c0a41900b0a9fd7434f6e90448e2a7b4e50
+SHA512: 38cebe9b93a630adbe7f7230e726bc5ed04890269db27e7ae247a0b59112e7b95e5d0e9dd93a9311e3cb7f385615a0782e4f5d459bd5674f7b8bd9822ce7fc02
+Homepage: https://git.netfilter.org/libnftnl
+Description-en: Netfilter nftables userspace API library
+ libnftnl is the low-level library for Netfilter 4th generation
+ framework nftables.
+ .
+ Is the user-space library for low-level interaction with
+ nftables Netlink's API over libmnl.
+Description-md5: 9ee5410a83ce7cab960810f5332b35f0
+Task: standard
+
+Package: libnftables1
+Source: nftables
+Priority: standard
+Section: libs
+Installed-Size: 1015
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Version: 1.0.9-1ubuntu0.1
+Depends: libc6 (>= 2.38), libgmp10 (>= 2:6.3.0+dfsg), libjansson4 (>= 2.14), libmnl0 (>= 1.0.3-4~), libnftnl11 (>= 1.2.6), libxtables12 (>= 1.6.0+snapshot20161117)
+Filename: pool/main/n/nftables/libnftables1_1.0.9-1ubuntu0.1_amd64.deb
+Size: 358574
+MD5sum: b0545ee9a04d49cf334e419de8abd041
+SHA1: 57d557ce81d24f715d274340cf4d449fb521b61f
+SHA256: fcaee001747a6adaa0cd9337fef437b3aa7a7a6d5246b62fbd4784d3d6a5009e
+SHA512: a88f131cfae60da7ca823e09da726fd531444063ab31dc9af65a0ebe0a1d0cf1eebb33ad4660507397390fac7d59413643b1f4ecf999ea31e34111bec1e271ba
+Homepage: https://www.netfilter.org/
+Description-en: Netfilter nftables high level userspace API library
+ This library provides high level semantics to interact with the nftables
+ framework by Netfilter project.
+ .
+ nftables replaces the old popular iptables, ip6tables, arptables and ebtables.
+ .
+ Netfilter software and nftables in particular are used in applications such
+ as Internet connection sharing, firewalls, IP accounting, transparent
+ proxying, advanced routing and traffic control.
+ .
+ A Linux kernel >= 3.13 is required. However, >= 4.14 is recommended.
+ .
+ This package contains the libnftables library.
+Description-md5: a0142ceed355e6d73013884cbcfb0491
+Multi-Arch: same
+Original-Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
+Origin: Ubuntu
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Task: standard
+
+Package: nftables
+Priority: standard
+Section: net
+Installed-Size: 181
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>
+Architecture: amd64
+Version: 1.0.9-1ubuntu0.1
+Recommends: netbase
+Suggests: firewalld
+Depends: libnftables1 (= 1.0.9-1ubuntu0.1), libc6 (>= 2.34), libedit2 (>= 3.1-20130611-0)
+Filename: pool/main/n/nftables/nftables_1.0.9-1ubuntu0.1_amd64.deb
+Size: 69842
+MD5sum: 85e432ff11042d2cb5c1c36c3384cd7c
+SHA1: baf255b6562bee53fcf984aebbe686d77433c9e9
+SHA256: d648859fccde3c17b8b9b89993427564f91f394a39306db1f67bd5ea3ac42c6e
+SHA512: b487e4d1fc9b403e1e85fc935ffc87fa98b5e6a24594497b9a359b0a1a75e3fbb247c16201bc63c59a6bfc7066f14ae5c5f616d4aea1971f40878f682f95bf70
+Homepage: https://www.netfilter.org/
+Description-en: Program to control packet filtering rules by Netfilter project
+ This software provides an in-kernel packet classification framework that is
+ based on a network-specific Virtual Machine (VM) and the nft userspace
+ command line tool. The nftables framework reuses the existing Netfilter
+ subsystems such as the existing hook infrastructure, the connection tracking
+ system, NAT, userspace queueing and logging subsystem.
+ .
+ nftables replaces the old popular iptables, ip6tables, arptables and ebtables.
+ .
+ Netfilter software and nftables in particular are used in applications such
+ as Internet connection sharing, firewalls, IP accounting, transparent
+ proxying, advanced routing and traffic control.
+ .
+ A Linux kernel >= 3.13 is required. However, >= 4.14 is recommended.
+Description-md5: 24bc0867cd246ced705663120fd62b92
+Original-Maintainer: Debian Netfilter Packaging Team <pkg-netfilter-team@lists.alioth.debian.org>
+Origin: Ubuntu
+Bugs: https://bugs.launchpad.net/ubuntu/+filebug
+Task: standard
+

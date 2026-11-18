@@ -4,12 +4,15 @@ ufw, Fedora's firewalld, Alpine's iptables), and the commands its plans give eac
 Web tab's cards (0.8.0) name every libpcap call the library's capture makes, the download the tab asks for and the
 reader's calls the library makes, and each question the tab asks of a name server; its facts are what the last read
 found, asked without a command; and the cards' pages answer (LIMINAL_VENDOR_PAGES=1 only, the one test that reaches the
-network)."""
+network). 0.9.0: sudo's card names its password on standard input, Root access's files and visudo, the users and groups'
+card the group liminal's making, and APT's card nftables' install, each driven through a stand-in sudo
+(tests/sudo.py)."""
 from __future__ import annotations
 
 import inspect
 import os
 import re
+import shlex
 import subprocess
 from datetime import datetime, timezone
 
@@ -28,6 +31,7 @@ from plugin_platform_firewall_linux import ufw as ufw_mod
 from plugin_platform_firewall_linux.read import SCRIPT
 
 from machines import FakeLinux
+from sudo import LIB, PASSWORD, Sudo
 
 
 def plugin(fake) -> LinuxFirewallPlugin:
@@ -95,7 +99,28 @@ def drive(monkeypatch):
     monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 1000, raising=False)
     user = FakeLinux("debian-13-nftables")
     plugin(user).status()
-    return ran, user.calls
+    read_calls, fed = list(user.calls), []
+    if LIB is None:  # a library from before the grant: no Root access to drive (the test leaves its cards out)
+        return ran, read_calls, fed
+    # 0.9.0, through a stand-in sudo (tests/sudo.py): Root access turned on (the group made and the user put in it, the
+    # grant), then on (its read, a change with the password, turned off by its helper); turned off where the helper
+    # cannot run yet; nftables installed where there is no tool; and BusyBox's addgroup where there is no groupadd
+    off, on, pending = Sudo("debian-13-nftables"), Sudo("debian-13-nftables", state="on"), Sudo(state="pending")
+    bare, busybox = Sudo("ubuntu-24.04-ufw", tools="ip /usr/sbin/ip"), Sudo("debian-13-nftables")
+    off.install(monkeypatch).root_access("on", PASSWORD)
+    fw = on.install(monkeypatch)
+    fw.status()
+    fw.make_rule("web", "in", "allow", "tcp", "8443", None, None, False, PASSWORD)
+    fw.root_access("off")
+    pending.install(monkeypatch).root_access("off", PASSWORD)
+    bare.install(monkeypatch).install_nftables(PASSWORD)
+    busybox.install(monkeypatch, which=lambda tool: None if tool in ("groupadd", "usermod") else
+                    busybox.which(tool) or (f"/bin/{tool}" if tool == "addgroup" else None)).root_access("on", PASSWORD)
+    for machine in (off, on, pending, bare, busybox):
+        ran += machine.run_as_root
+        read_calls += machine.calls
+        fed += [f for f in machine.fed if f]
+    return ran, read_calls, fed
 
 
 def planned() -> list[str]:
@@ -141,10 +166,14 @@ def pattern(name: str):
 
 
 def canonical(cmd: list[str]) -> str | None:
-    """A change as the cards name it (None for a script: its commands are matched by pattern); its own words when no
-    card names it."""
+    """A change as the cards name it (None for a script: its commands are matched by pattern; `env` and the variables it
+    sets before a command left out); its own words when no card names it."""
     if cmd[:2] == ["sh", "-c"]:
         return None
+    if cmd[:1] == ["env"]:
+        cmd = list(cmd[1:])
+        while cmd and "=" in cmd[0]:
+            cmd = cmd[1:]
     line = " ".join(cmd)
     return next((c.name for api in MACHINE.apis for c in api.used
                  if cmd[0] in c.name.split()[0].split("|") and pattern(c.name).fullmatch(line)), line)
@@ -156,10 +185,15 @@ def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
         "nftables (nft)", "iptables and ip6tables", "ebtables and arptables", "ipset", "firewalld", "ufw",
         "Connection tracking (conntrack)", "eBPF on the network (bpftool)", "iproute2 (ip and ss)",
         "The firewall's services (systemd, OpenRC, SysV)", "sudo",
+        # Root access's and nftables' install's (0.9.0)
+        "Users and groups (groupadd, usermod, addgroup)", "APT (apt-get, apt-cache)",
         # the World Wide Web tab's (0.8.0)
         "libpcap (packet capture)", "DB-IP Lite City (GeoIP)", "OpenDNS (myip.opendns.com)",
         "Google's name servers (o-o.myaddr.l.google.com)"]
-    assert all(a.verified == "2026-11-11" for a in cards.FIREWALL) and all(a.verified == "2026-11-15" for a in cards.WORLD)
+    rights_cards = (cards.SUDO, cards.GROUPS, cards.APT)  # their addresses read again, or for the first time, in 0.9.0
+    assert all(a.verified == "2026-11-11" for a in cards.FIREWALL if a not in rights_cards)
+    assert all(a.verified == "2026-11-17" for a in rights_cards)
+    assert all(a.verified == "2026-11-15" for a in cards.WORLD)
     assert all(a.docs and a.used and a.covered for a in MACHINE.apis)
     assert all(len(a.areas) > len(a.covered) for a in MACHINE.apis)  # more of each API than the plugin uses
     assert cards.NFTABLES.link("spec").endswith("libnftables-json.5.en.html")
@@ -167,9 +201,11 @@ def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
 
 
 def test_the_cards_name_every_command_of_the_read_and_every_change(monkeypatch):
-    ran, read_calls = drive(monkeypatch)
-    pool = [SCRIPT.replace("$fc", "firewall-cmd"), *(" ".join(c) for c in (*ran, *read_calls)), *planned()]
-    never = [f"{api.name}: {call.name}" for api in cards.FIREWALL for call in api.used
+    ran, read_calls, fed = drive(monkeypatch)
+    pool = [SCRIPT.replace("$fc", "firewall-cmd"), *(" ".join(c) for c in (*ran, *read_calls)), *planned(),
+            *(shlex.join(c) for c in read_calls), *fed]  # 0.9.0: sudo -S -k -p '' as a shell writes it; the scripts fed
+    driven = [a for a in cards.FIREWALL if LIB is not None or a not in (cards.SUDO, cards.GROUPS, cards.APT)]
+    never = [f"{api.name}: {call.name}" for api in driven for call in api.used
              if not any(pattern(call.name).search(t) for t in pool)]
     assert never == []
     changes = {canonical(c) for c in ran} - {None}
@@ -266,6 +302,7 @@ def test_the_name_servers_cards_name_each_question_the_tab_asks(monkeypatch):
     assert all(cards.NSLOOKUP in {x.url for x in card.links} for card in (cards.OPENDNS, cards.GOOGLE))
 
 
+@pytest.mark.outside
 @pytest.mark.skipif(os.environ.get("LIMINAL_VENDOR_PAGES") != "1", reason="reaches the makers' pages: LIMINAL_VENDOR_PAGES=1")
 def test_the_cards_pages_answer():
     assert dead_links(MACHINE.apis) == []

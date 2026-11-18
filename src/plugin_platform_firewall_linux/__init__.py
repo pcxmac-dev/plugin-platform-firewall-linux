@@ -11,8 +11,9 @@ O/S"; "Yes, firewall too"; and 2026-11-15: "wsl and firewall linux should always
 misses some capability this should reflect in the plugin": inside WSL its page ends with what WSL changes, the library's
 machines.linux.wsl_table). On Windows and macOS it runs no command at all (the library's machines.linux.why_not_native),
 and a platform on Windows never reaches into a WSL distribution from outside. It reads the whole
-configuration in one read (read.SCRIPT, as root through the library's machines.linux.Shell: `sudo -n`, never a password
-asked), kept READ_S and read again after each change: nftables' ruleset, iptables and ip6tables (the nf_tables variant
+configuration in one read (read.SCRIPT, as root through the library's machines.linux.Shell: the platform's own root,
+`sudo -n` by a rule of the user's own, or Root access's installed read, below), kept READ_S and read again after each
+change: nftables' ruleset, iptables and ip6tables (the nf_tables variant
 and legacy x_tables), ebtables, arptables, ipset, firewalld's zones and policies, ufw, the connections tracked, the
 interfaces, eBPF and XDP programs (read only), the firewall services under systemd, OpenRC or SysV scripts, and where
 the distribution keeps its rules across a restart. The platform's page shows it as tables (status.tables): the firewall's
@@ -66,6 +67,25 @@ ATTRIBUTION, PUBLIC_DNS) and their cards. Inside a WSL distribution the tab ends
 library's world.under_wsl: the distribution's own adapter, nothing from the internet but through Windows, nothing at
 all under WSL 1). On Windows and macOS the tab says it is not for this machine, and nothing is watched or downloaded.
 
+Root access (0.9.0; the user, 2026-11-17, after the firewall could not be read inside their WSL Ubuntu, where sudo asks
+for a password: "the plugin needs to be able to handle permissions if required"; asked how the password is typed: "A
+field on its page"; then "(enable / disable)", "but only if required"). Where root is needed it says what for and offers
+it as a confirmed action on its own page, as the Windows plugins ask through UAC (rights.py). A switch, Root access, on
+Main, shown only if required: not where the platform is root, nor where sudo runs the read without a password by a rule
+of the user's own (a fact then says how it has its rights). Turning it on asks for the user's password for sudo once, in
+a password field of its form, handed to sudo on its standard input for that one action and never kept (the library's
+Shell.run(password=...), liminal-libs 1.62.0): the group liminal made where there is none and the platform's user put in
+it, the plugin's read installed root-owned and a sudoers rule letting the group run exactly it, and a take-back helper,
+with no arguments and nothing else (the library's grant, checked with visudo first; never NOPASSWD: ALL). The read then
+runs that installed file through sudo -n once it is checked to be the plugin's own read; one that differs (an older
+plugin's) is not run, and Turn on... again replaces it. Turning it off runs the take-back helper, with no password. A
+change's form gets the password field (its last) only where sudo cannot run it without one, and its hook a last argument
+`password`. Where the firewall cannot be read (no tool, or root not given) the plugin is valid with a `problem`: its
+page says what the firewall needs, offering only what it can do, and its tabs are asked. Where no firewall tool is
+installed and the distribution's apt is there, Install nftables... installs the distribution's own package (install.py),
+its size read without root and said first; installing it filters nothing. On a library from before the grant it works
+as 0.8.1.
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND
 """
@@ -85,8 +105,10 @@ from liminal_libs.machines.rulegroups import RuleGroups, Sorted
 from . import apis as cards
 from . import changes as ch
 from . import firewalld as fwd_mod
+from . import install as install_mod
 from . import nftables as nft_mod
 from . import read as read_mod
+from . import rights as rights_mod
 from .apis import APIS
 from .apis import facts as api_facts_of
 from .changes import ACCEPT, NotNeeded, Risky
@@ -94,8 +116,9 @@ from .groups import key as rule_key
 from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
+from .rights import PASSWORD_FIELD, Rights
 
-__version__ = "0.8.1"
+__version__ = "0.8.2"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -112,7 +135,25 @@ INSTALL = ("install nftables, the kernel's own: apt install nftables (Debian, Ub
            "an administrator's to do")
 ROOT_FOR_READ = ("run the platform as root, or let sudo run sh and the firewall's tools without a password for the user "
                  "the platform runs as (a sudoers rule): every read and change here runs through sudo -n, which never asks "
-                 "for one, so a password typed here is never what it waits for")
+                 "for one, so a password typed here is never what it waits for")  # a library before the grant (0.8.1)
+ROOT_HOOK, INSTALL_HOOK = "root_access", "install_nftables"
+NEEDS_PASSWORD = ("this change needs your password for sudo, and nothing here asks for it: make it from its form on "
+                  "the plugin's page, which asks for it at its click (Root access lets the firewall's read alone run "
+                  "without one)")  # a change asked without the password it needs (the setup's, a command line's)
+REFRESH = {"hook": "refresh", "args": [], "title": "Refresh", "note": "reads the whole configuration again now"}
+UNREAD = {"off": "Root access is off", "pending": "Root access is on from the platform's next start",
+          "stale": "Root access is to be turned on again"}  # the summary's words where root is not given (0.9.0)
+PROBLEM = {  # the problem's words where root is not given (0.9.0)
+    "off": ("The firewall's rules are not read: sudo asks for a password, and Root access is off (Turn on… below gives "
+            "the read alone root, with your password once)."),
+    "pending": ("Root access is on from the platform's next start: the firewall's rules are read once the platform is "
+                "started again, from a terminal opened after it was turned on.")}
+
+
+def find_tool(tool: str):
+    """A tool's file in the folders root's PATH holds (TOOL_PATH), found without running anything; None when it is not
+    there (a test stands it in, so the machine the tests run on never shows through)."""
+    return shutil.which(tool, path=TOOL_PATH)
 
 
 class LinuxFirewallPlugin(Firewall):
@@ -129,7 +170,9 @@ class LinuxFirewallPlugin(Firewall):
     ICON = "wallfire"  # a brick wall with a flame before it (liminal-libs 1.34.0; the user's picture: "use this icon for linux firewall")
     SECTION = "os"  # drawn under the platform's OS plugins (liminal-platform 0.26.0)
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
-             "save_rules")  # the base's world and world_geoip among them (the World Wide Web tab, 0.8.0)
+             "save_rules",  # the base's world and world_geoip among them (the World Wide Web tab, 0.8.0)
+             ROOT_HOOK, INSTALL_HOOK)  # 0.9.0: Root access turned on or off; nftables installed (a job)
+    JOB_HOOKS = (*Firewall.JOB_HOOKS, INSTALL_HOOK)  # run by the platform as jobs, their lines in the plugin's panel
     # The World Wide Web tab (0.8.0): the base's (its TABS, JOB_HOOKS, keys, world, world_geoip, detach; world with the XDP
     # programs the last read found at the adapter watched said beside it, xdp_unseen), watched by libpcap at this
     # machine's adapter and on the Linux the platform runs on only (not_for_here). What it downloads and asks is this plugin's to
@@ -147,6 +190,10 @@ class LinuxFirewallPlugin(Firewall):
         self._which = which  # a test's stand-in for finding a tool's file without root (tools_here)
         self._lock = threading.RLock()
         self._read: tuple[float, Config] | None = None
+        self._refused: tuple[float, str, bool] | None = None  # (when, words, denied): a read refused, kept as long
+        self._rights: tuple[float, Rights] | None = None  # how the last read had its rights (0.9.0)
+        self._needs: dict = {}  # whether a change, and the install, need the password: asked once per read
+        self._facts: tuple[float, install_mod.Facts] | None = None  # what installing nftables takes, kept FACTS_S
         self._preset = "in-allow"
         self._find = ""
 
@@ -176,23 +223,101 @@ class LinuxFirewallPlugin(Firewall):
 
     # -- the one read ---------------------------------------------------------------------------------------------------
     def config(self, fresh: bool = False) -> Config:
-        """The whole configuration, read at most every READ_S (now when `fresh`); CommandError when it cannot be read."""
+        """The whole configuration, read at most every READ_S (now when `fresh`); CommandError when it cannot be read.
+        A refused read is kept as long (0.9.0): sudo notes each refusal, so it is not asked again at every status."""
         sh = self.shell
         with self._lock:
             now = self._clock()
             if not fresh and self._read is not None and now - self._read[0] < READ_S:
                 return self._read[1]
-            text = sh.sh(SCRIPT, timeout=READ_TIMEOUT_S)
+            if not fresh and self._refused is not None and now - self._refused[0] < READ_S:
+                raise CommandError(self._refused[1], denied=self._refused[2])
+            self._needs = {}
             try:
-                cfg = read_mod.parse(text)
-            except ValueError as e:
-                raise CommandError(f"the firewall's read gave no answer of its own: {e}") from None
-            self._read = (now, cfg)
+                text = self._read_text(sh, now)
+                try:
+                    cfg = read_mod.parse(text)
+                except ValueError as e:
+                    raise CommandError(f"the firewall's read gave no answer of its own: {e}") from None
+            except CommandError as e:
+                self._read, self._refused = None, (now, str(e), bool(getattr(e, "denied", False)))
+                raise
+            self._read, self._refused = (now, cfg), None
             return cfg
+
+    def _read_text(self, sh: Shell, now: float) -> str:
+        """The read's answer, run with the rights there are, which are kept with it (0.9.0, rights.py): as root without
+        sudo; Root access's installed read through sudo -n, once the library's granted() says it is this plugin's own;
+        else sh -c through sudo -n, which a rule of the user's own may allow. Root access turned on but not in force yet
+        (pending) or not this plugin's (stale) runs nothing: CommandError (denied) in its words."""
+        def kept(rights: Rights) -> None:
+            self._rights = (now, rights)
+
+        if sh.root():
+            kept(Rights("root"))
+            return sh.sh(SCRIPT, timeout=READ_TIMEOUT_S)
+        lib = rights_mod.library()
+        if lib is None:  # a library from before the grant: 0.8.1's read, through sudo -n alone
+            kept(Rights("old"))
+            return sh.sh(SCRIPT, timeout=READ_TIMEOUT_S)
+        grant = rights_mod.grant_state(lib, sh)
+        if grant.kind == "on":
+            kept(Rights("on", grant))
+            try:
+                return sh.run(rights_mod.Paths.here().read, timeout=READ_TIMEOUT_S)
+            except CommandError as e:
+                if getattr(e, "denied", False):  # its rule changed since: said, and Turn on... offered again
+                    kept(Rights("stale", rights_mod.Grant(rule=True, missing=(f"sudo refused to run it ({e})",))))
+                raise
+        if grant.kind in ("pending", "stale"):
+            r = Rights(grant.kind, grant)
+            kept(r)
+            raise CommandError(f"Root access is {r.state}", denied=True)
+        try:
+            text = sh.sh(SCRIPT, timeout=READ_TIMEOUT_S)
+        except CommandError as e:
+            kept(Rights("off" if getattr(e, "denied", False) else "own", grant))
+            raise
+        kept(Rights("own", grant))
+        return text
+
+    def rights(self) -> Rights:
+        """How the plugin has its rights (rights.Rights), as the last read found them: read again when that is older
+        than READ_S, a refusal included."""
+        with self._lock:
+            kept = self._rights
+            current = kept is not None and self._clock() - kept[0] < READ_S
+        if not current:
+            try:
+                self.config()
+            except CommandError:
+                pass
+            with self._lock:
+                kept = self._rights
+        return kept[1] if kept is not None else Rights("off")
+
+    def password_needed(self, what: str, *command: str) -> bool:
+        """Whether `what` ("changes", "install") needs the password typed on its form, `command` the one it runs: asked
+        at most once per read (rights.changes_need: never as root nor with a library from before the field, always
+        where Root access is required, else as sudo's policy says)."""
+        with self._lock:
+            if what in self._needs:
+                return self._needs[what]
+        need = rights_mod.changes_need(self.shell, self.rights(), *command)
+        with self._lock:
+            self._needs[what] = need
+        return need
+
+    def _change_wants_password(self) -> bool:
+        """Whether a change needs the password typed (password_needed), by what is in charge in the read kept."""
+        with self._lock:
+            kept = self._read
+        return self.password_needed("changes", dict(TOOLS).get(kept[1].manager if kept else "", "nft"))
 
     def forget(self) -> None:
         with self._lock:
-            self._read = None
+            self._read = self._refused = self._rights = None
+            self._needs = {}
 
     def present(self) -> bool:
         """Firewall tools this plugin reads on the Linux the platform runs on: never on Windows or macOS."""
@@ -270,17 +395,21 @@ class LinuxFirewallPlugin(Firewall):
         """A command on this machine, as root, its output."""
         return self.shell.run(*command)
 
-    def _run(self, plan: ch.Plan) -> list[str]:
-        """A plan's commands one after another as root; the read forgotten after, whatever happened."""
+    def _run(self, plan: ch.Plan, password=None) -> list[str]:
+        """A plan's commands one after another as root, with the password typed on its form handed to sudo for each
+        (0.9.0: on its standard input, never kept; none, sudo -n); the read forgotten after, whatever happened. A
+        password sudo refuses is a WrongPassword before anything ran: the form is filled again. Asked without the
+        password a change needs (the setup's steps, the command line), it is refused in words before sudo is asked."""
         sh = self.shell
+        if not password and plan.steps and self._change_wants_password():
+            self.forget()
+            raise CommandError(NEEDS_PASSWORD, denied=True)
         ran: list[str] = []
         try:
-            for step in plan.steps:
-                sh.run(*step.args, stdin=step.stdin, check=step.check)
-                ran.append(step.words)
-        except CommandError as e:
-            done = f" (done before it: {'; '.join(ran)})" if ran else ""
-            raise CommandError(f"{e}{done}", denied=getattr(e, "denied", False)) from None
+            with rights_mod.refusals(ran):  # a failure says the steps done before it
+                for step in plan.steps:
+                    rights_mod.run(sh, *step.args, password=password, stdin=step.stdin, check=step.check)
+                    ran.append(step.words)
         finally:
             self.forget()
         return ran
@@ -310,101 +439,288 @@ class LinuxFirewallPlugin(Firewall):
             self._find = words
         return {"said": f"finding {words!r}" if words else "every rule of the choice shown"}
 
+    # Each change's last argument is the password typed on its form (0.9.0), there only where sudo cannot run the
+    # change without one (password_needed); the platform sends a form's fields in order, so it comes after accept_risk,
+    # and a second confirmation sends it again with accept_risk true. Risky is said before anything runs with it.
     def make_rule(self, name, direction="in", action="allow", protocol="tcp", ports=None, remote=None, interface=None,
-                  accept_risk=False) -> dict:
+                  accept_risk=False, password=None) -> dict:
         spec = ch.spec_of(name, direction, action, protocol, ports, remote, interface)
         cfg = self.config(fresh=True)
         plan = ch.plan_make(cfg, spec, framework_ports=sorted(set(app_ports().values())))
-        return self._apply(plan, accept_risk)
+        return self._apply(plan, accept_risk, password)
 
-    def remove_rule(self, where, rule, accept_risk=False) -> dict:
+    def remove_rule(self, where, rule, accept_risk=False, password=None) -> dict:
         cfg = self.config(fresh=True)
         e = cfg.entry(str(where or ""), str(rule or ""))
         if e is None:
             raise LookupError("that rule is no longer there as it was read: Refresh, then choose it again")
-        return self._apply(ch.plan_remove(cfg, e), accept_risk)
+        return self._apply(ch.plan_remove(cfg, e), accept_risk, password)
 
-    def set_policy(self, where, policy, accept_risk=False) -> dict:
+    def set_policy(self, where, policy, accept_risk=False, password=None) -> dict:
         cfg = self.config(fresh=True)
-        return self._apply(ch.plan_policy(cfg, str(where or ""), str(policy or "")), accept_risk)
+        return self._apply(ch.plan_policy(cfg, str(where or ""), str(policy or "")), accept_risk, password)
 
-    def switch(self, part, state, accept_risk=False) -> dict:
+    def switch(self, part, state, accept_risk=False, password=None) -> dict:
         if state not in ("on", "off"):
             raise ValueError("turned on or off")
         cfg = self.config(fresh=True)
-        return self._apply(ch.plan_switch(cfg, str(part or ""), state == "on"), accept_risk)
+        return self._apply(ch.plan_switch(cfg, str(part or ""), state == "on"), accept_risk, password)
 
-    def save_rules(self, kind) -> dict:
+    def save_rules(self, kind, password=None) -> dict:
         cfg = self.config(fresh=True)
-        return self._apply(ch.plan_save(cfg, str(kind or "")), True)
+        return self._apply(ch.plan_save(cfg, str(kind or "")), True, password)
 
-    def _apply(self, plan: ch.Plan, accept_risk) -> dict:
+    def _apply(self, plan: ch.Plan, accept_risk, password=None) -> dict:
         if plan.risk and accept_risk is not True:
             raise Risky(plan.risk)
-        ran = self._run(plan)
+        ran = self._run(plan, password)
         return {"said": plan.said, "lines": [*plan.lines, *(f"ran: {w}" for w in ran)]}
+
+    # -- Root access and nftables' install (0.9.0) ---------------------------------------------------------------------
+    def root_access(self, state, password=None) -> dict:
+        """Root access turned on or off (the user, 2026-11-17: "(enable / disable)", "but only if required"), from its
+        forms on Main. On, with the password typed, used for this once (rights.turn_on: the group liminal made where
+        there is none and the platform's user put in it, the plugin's read installed root-owned, its sudoers rule
+        checked with visudo first); off, by the grant's take-back helper, with no password unless it cannot run yet
+        (rights.turn_off). Refused where it is not required (the platform is root, or a rule of the user's own runs
+        the read) and with a library from before it."""
+        if state not in ("on", "off"):
+            raise ValueError("Root access is turned on or off")
+        sh = self.shell
+        if rights_mod.library() is None:
+            raise ValueError(f"not here: {rights_mod.old_words()}")
+        try:
+            self.config(fresh=True)  # the rights as they are now, not as the page last showed them
+        except CommandError:
+            pass
+        r = self.rights()
+        if state == "on":
+            if r.kind in ("root", "own"):
+                raise ValueError(f"Root access is not needed here: {r.fact}")
+            if r.kind in ("on", "pending"):
+                raise ValueError(f"Root access is {r.state}")
+            if not password:
+                raise ValueError("your password for sudo is needed to turn Root access on")
+            try:
+                lines = rights_mod.turn_on(sh, password, self._tool)
+            finally:
+                self.forget()
+            now = self.rights()
+            said = ("Root access is on: the firewall's read runs as root through its own installed file, nothing else"
+                    if now.kind == "on" else f"Root access is {now.state}: {root_todo(now)}"
+                    if now.kind == "pending" else f"Root access: {now.state or now.fact}")
+            return {"said": said, "lines": lines}
+        if not r.granted:
+            raise ValueError("Root access is off already: there is nothing to take back")
+        if r.off_password and not password:
+            raise ValueError("your password for sudo is needed: the take-back helper cannot run without one yet")
+        try:
+            lines = rights_mod.turn_off(sh, password if r.off_password else None)
+        finally:
+            self.forget()
+        return {"said": "Root access is off: the firewall's rules are not read until it is turned on again",
+                "lines": lines}
+
+    def _tool(self, tool: str):
+        """A tool's file found without root (tools_here's way), or None."""
+        try:
+            return (self._which or find_tool)(tool)
+        except (OSError, ValueError):
+            return None
+
+    def apt_here(self) -> bool:
+        """Whether the distribution's own apt is here (Debian, Ubuntu and their kin): what installs nftables."""
+        return all(self._tool(t) for t in install_mod.TOOLS)
+
+    def install_offered(self, tools) -> bool:
+        """Whether Install nftables... is offered: no firewall tool here, apt here, and a library with the password."""
+        return not tools and self._lib() is not None and self.apt_here()
+
+    def _lib(self):
+        """The library's rights (rights.library), None for a library from before them, and where the shell itself is
+        refused (a WSL distribution reached from Windows)."""
+        try:
+            self.shell  # noqa: B018 - refused anywhere but the Linux the platform runs on
+        except CommandError:
+            return None
+        return rights_mod.library()
+
+    def install_facts(self, fresh: bool = False) -> install_mod.Facts:
+        """What installing nftables takes here (install.read_facts: read without root), kept install.FACTS_S."""
+        with self._lock:
+            kept = self._facts
+            if not fresh and kept is not None and self._clock() - kept[0] < install_mod.FACTS_S:
+                return kept[1]
+        facts = install_mod.read_facts(self.shell)
+        with self._lock:
+            self._facts = (self._clock(), facts)
+        return facts
+
+    def install_nftables(self, password=None, log=None) -> dict:
+        """nftables installed where no firewall tool is (0.9.0; DECISIONS addendum 9): the distribution's own package,
+        with what it needs, by apt as root (install.COMMAND; the password typed on its form handed to sudo for this
+        one command, never kept), asked from its form alone and run by the platform as a job (JOB_HOOKS: `log` is its
+        panel). Installing it filters nothing. Refused where a firewall tool is installed already, or there is no apt;
+        apt's lock and a package not fetched are said in words."""
+        say = _sayer(log)
+        sh = self.shell
+        if rights_mod.library() is None and not sh.root():
+            raise ValueError(f"not from here: {rights_mod.old_words()}")
+        tools = self.tools_here()
+        if tools:
+            raise ValueError(f"{', '.join(tools)} is installed here already: nftables is not installed beside it")
+        if not self.apt_here():
+            raise ValueError(f"there is no apt here to install it with: {INSTALL}")
+        facts = self.install_facts(fresh=True)
+        if facts.main is None:
+            raise ValueError(f"nftables cannot be installed from here: {facts.problem}")
+        say(f"Installing {facts.words}.")
+        say("Installing it filters nothing: no rule is made, and what there is stays as it is.")
+        try:
+            out = rights_mod.run(sh, *install_mod.COMMAND, password=password, timeout=install_mod.TIMEOUT_S)
+        except CommandError as e:  # a refused password is a WrongPassword, no CommandError: it passes as it is
+            raise CommandError(install_mod.apt_words(e), denied=e.denied) from None
+        finally:
+            self.forget()
+            with self._lock:
+                self._facts = None
+        shown = [x for x in out.splitlines() if x.strip()][-install_mod.SHOWN_LINES:]
+        for line in shown:
+            say(line)
+        there = self.tools_here()
+        said = (f"nftables installed: {facts.words}. It filters nothing until rules are made"
+                if "nftables" in there else f"apt ended, but no nft is found here yet ({', '.join(there) or 'none'})")
+        return {"said": said, "lines": shown}
 
     # -- the status ---------------------------------------------------------------------------------------------------
     def status(self) -> dict:
         """Valid whenever the firewall can be read (the Windows firewall plugin's rule): the base's "no Liminal rules"
         and "off" are said in the summary and the tables, not as invalid. When it cannot be read, or there is no
         firewall software, its tables say what the firewall needs here (needs_table: root for the read, a firewall
-        tool) and, inside WSL, what WSL changes (0.8.1; the user: "still need linux firewall")."""
+        tool) and, inside WSL, what WSL changes (0.8.1; the user: "still need linux firewall").
+
+        0.9.0: valid too where the firewall cannot be read for want of a firewall tool or of root (B-revisions S2:
+        "valid wherever it can serve anything"), with a `problem` and what it needs, offering only what it can do (the
+        Root access switch, nftables' install) and its tabs asked; with a library from before the grant, as 0.8.1. How
+        it has its rights is a fact (`rootAccess`); the switch is a row of its tables only if required, and a change's
+        form has the password field only if required."""
         here = self.not_for_here()
         if here:  # not for this machine at all (on Windows or macOS): asked nothing, no setup offered
             return self.not_here_status(here, backend="", enabled=False, profiles={}, rules=[])
         try:
             cfg = self.config()
         except CommandError as e:
-            return {"present": True, "backend": "", "enabled": False, "profiles": {}, "problem": str(e),
-                    "summary": f"cannot be read: {e}", "valid": False, "why": f"cannot be read: {e}",
-                    "tables": [self.needs_table(e), *under_wsl()]}
+            return self.unread_status(e)
         if not cfg.manager:
-            return {"present": False, "backend": "", "enabled": False, "profiles": {}, "summary": "no firewall software here",
-                    "valid": False, "why": "no firewall software here: nftables, iptables, ufw or firewalld",
-                    "tables": [self.needs_table(None, tools=[]), *under_wsl()]}
+            return self.bare_status()
+        r = self.rights()
         with self._lock:
             preset, find = self._preset, self._find
         out = {"present": True, "backend": _named(cfg.manager, cfg), **cfg.state(), "summary": _summary(cfg), "valid": True,
                "why": "", "distribution": cfg.system.name, "kernel": cfg.system.kernel, "init": cfg.system.init_words,
                "readAt": time.strftime("%H:%M:%S", time.localtime(cfg.at))}
+        if r.kind != "old":
+            out["rootAccess"] = r.fact
         if cfg.problems:
             out["problems"] = list(cfg.problems)
-        out["tables"] = [*tables(cfg, preset, find, self.groups), *under_wsl()]
-        out["forms"] = forms(cfg)
-        out["actions"] = [{"hook": "refresh", "args": [], "title": "Refresh", "note": "reads the whole configuration again now"}]
+        out["tables"] = [*tables(cfg, preset, find, self.groups, root=parts_root_row(r)), *under_wsl(r)]
+        password = self.password_needed("changes", dict(TOOLS).get(cfg.manager, "nft"))
+        out["forms"] = forms(cfg, password=password) + root_forms(r)
+        out["actions"] = [dict(REFRESH)]
         return out
+
+    def unread_status(self, error: CommandError) -> dict:
+        """The status when the firewall cannot be read (0.9.0): valid with a `problem` where what is missing is root
+        (Root access off, on from the platform's next start, or not this plugin's) or a firewall tool, and the library
+        has the grant; else not valid, as 0.8.1 (a library from before it, or a read failing for its own reasons)."""
+        r = self.rights()
+        tools = self.tools_here()
+        if self._lib() is None or not (r.shown or not tools):
+            return self._not_read(r, error, tools, present=True, summary=f"cannot be read: {error}",
+                                  problem=str(error), why=f"cannot be read: {error}")
+        wants_root = r.kind in ("off", "pending", "stale")
+        problem = (PROBLEM[r.kind] if r.kind in PROBLEM
+                   else f"The firewall's rules are not read: Root access is {r.state}." if wants_root
+                   else f"The firewall's read failed: {error}." if r.kind == "on"
+                   else f"The firewall cannot be read here: {error}.")
+        if not tools:
+            problem += " No firewall tool is installed here (nftables, iptables, ufw, firewalld)."
+        summary = (f"not read: {UNREAD[r.kind]}" if wants_root else "not read: its read failed" if tools
+                   else "not read: no firewall tool here")
+        return self._not_read(r, error, tools, present=True, summary=summary, problem=problem)
+
+    def bare_status(self) -> dict:
+        """The status when the read ran and found no firewall software (0.9.0: valid with a `problem` and nftables'
+        install where it can be offered; with a library from before the grant, not valid, as 0.8.1)."""
+        r = self.rights()
+        if self._lib() is None:
+            return self._not_read(r, None, [], present=False, summary="no firewall software here",
+                                  why="no firewall software here: nftables, iptables, ufw or firewalld")
+        return self._not_read(r, None, [], present=False, summary="no firewall software here",
+                              problem="No firewall tool is installed here (nftables, iptables, ufw, firewalld): "
+                                      "nothing filters.")
+
+    def _not_read(self, r: Rights, error: CommandError | None, tools: list[str], *, present: bool, summary: str,
+                  problem: str | None = None, why: str | None = None) -> dict:
+        """A status where the firewall's rules are not read, its tables saying what the firewall needs here and,
+        inside WSL, what WSL changes: given `why`, not valid, as 0.8.1; else valid (B-revisions S2), with its
+        `problem`, how it has its rights, and only what it can do (the Root access switch, nftables' install,
+        Refresh). Whether the install is offered is asked once, for its row and its form."""
+        offered = why is None and self.install_offered(tools)
+        out = {"present": present, "backend": "", "enabled": False, "profiles": {},
+               **({"problem": problem} if problem is not None else {}), "summary": summary, "valid": why is None,
+               "why": why or "", "tables": [self.needs_table(error, tools, r, offered), *under_wsl(r)]}
+        if why is None:
+            out.update(rootAccess=r.fact, forms=root_forms(r) + self.install_forms(offered), actions=[dict(REFRESH)])
+        return out
+
+    def install_forms(self, offered: bool) -> list[dict]:
+        """Install nftables's form where it is `offered` (install_offered), its words saying what it installs and its
+        size first, and the password field where sudo cannot run apt without one."""
+        if not offered:
+            return []
+        return [install_form(self.install_facts(), self.password_needed("install", *install_mod.COMMAND))]
 
     # -- what the firewall needs here (0.8.1): said when it cannot be read, or there is none ---------------------------
     def tools_here(self) -> list[str]:
         """The firewall tools installed on this machine, found without root by their files (no command run, nothing
         asked of sudo), in the folders root's PATH holds (TOOL_PATH): nftables, iptables, ufw, firewalld."""
-        which = self._which or (lambda tool: shutil.which(tool, path=TOOL_PATH))
-        found = []
-        for name, tool in TOOLS:
-            try:
-                if which(tool):
-                    found.append(name)
-            except (OSError, ValueError):
-                continue
-        return found
+        return [name for name, tool in TOOLS if self._tool(tool)]
 
-    def needs_table(self, error: CommandError | None, tools: list[str] | None = None) -> dict:
+    def needs_table(self, error: CommandError | None, tools: list[str], r: Rights, offered: bool) -> dict:
         """What the firewall needs here, as a table for the page: root for its read when the read was refused for want
         of it (`error`, denied: sudo -n asked for a password), or the read's own words when it failed otherwise; and a
-        firewall tool, as installed (`tools`: what is known already; else tools_here), with what to do for each."""
+        firewall tool, as installed (`tools`, tools_here's), with what to do for each.
+
+        0.9.0, with the library's grant: the Root access row in place of root for the read (its state and its one
+        action, Turn on... or Turn off..., in a fourth column), and the tool's row offering Install nftables... where it
+        is `offered` (install_offered). With a library from before it, as 0.8.1, and the switch's library said."""
+        new = r.kind != "old" and self._lib() is not None
         rows = []
-        if error is not None:
-            if error.denied:
-                rows.append(["Root for the read", "sudo asks for a password", ROOT_FOR_READ])
-            else:
-                rows.append(["The read", f"failed: {error}", "the read is put right where it failed; Refresh reads again"])
-        tools = self.tools_here() if tools is None else list(tools)
-        rows.append(["A firewall tool", f"{', '.join(tools)} installed" if tools
-                     else "none installed: no nft, iptables, ufw or firewall-cmd here",
-                     "none needed" if tools else INSTALL])
+        if new and r.shown:
+            rows.append(["Root access", r.state, root_todo(r), root_button(r)])
+        elif error is not None and error.denied and not new:
+            rows.append(["Root for the read", "sudo asks for a password", f"{ROOT_FOR_READ}; {rights_mod.old_words()}"])
+        if error is not None and (not error.denied or (new and not r.shown)):
+            rows.append(["The read", f"failed: {error}", "the read is put right where it failed; Refresh reads again"])
+        here = (f"{', '.join(tools)} installed" if tools
+                else "none installed: no nft, iptables, ufw or firewall-cmd here")
+        if tools:
+            rows.append(["A firewall tool", here, "none needed"])
+        elif new and offered:
+            facts = self.install_facts()
+            rows.append(["A firewall tool", here,
+                         f"Install nftables… installs {facts.words}; installing it filters nothing",
+                         {"form": install_mod.FORM, "title": "Install nftables…", "values": {},
+                          "label": "Install nftables"}])
+        else:
+            rows.append(["A firewall tool", here, INSTALL])
+        columns = [{"title": "What"}, {"title": "Here"}, {"title": "What to do"}]
+        if new:
+            columns.append({"title": ""})
+            rows = [row + [""] * (4 - len(row)) for row in rows]
         return {"title": NEEDS_TITLE, "note": "What this plugin needs before it can read and change the firewall here.",
-                "columns": [{"title": "What"}, {"title": "Here"}, {"title": "What to do"}], "rows": rows}
+                "columns": columns, "rows": rows}
 
     # -- the World Wide Web tab (0.8.0): the base's, and what the last read found that its capture cannot see ----------
     def world(self) -> dict:
@@ -429,17 +745,147 @@ class LinuxFirewallPlugin(Firewall):
         return xdp_words(kept[1], address) if kept and address else ""
 
 
-def under_wsl() -> list[dict]:
+def under_wsl(rights: Rights | None = None) -> list[dict]:
     """Inside a WSL distribution: what WSL changes for a firewall, as the last of the page's tables (the user, 2026-11-15:
     "if wsl prevents or misses some capability this should reflect in the plugin"; the library's linux.wsl_table: the
     packet filter WSL's kernel gives, WSL's network behind Windows' firewall). Nothing on a machine of its own, nor with a
-    library from before the Linux plugins worked inside WSL (it refuses a WSL kernel, so the page says that instead)."""
+    library from before the Linux plugins worked inside WSL (it refuses a WSL kernel, so the page says that instead).
+    Where Root access is shown (0.9.0), a row more: what WSL lacks for it and what the switch does there."""
     table = getattr(linux_mod, "wsl_table", None)
     try:
         under = table("firewall") if callable(table) else None
     except Exception:  # noqa: BLE001 - a check that cannot say: nothing said
         return []
-    return [under] if under else []
+    if not under:
+        return []
+    if rights is not None and rights.shown and isinstance(under.get("rows"), list):
+        under = {**under, "rows": [*under["rows"], WSL_ROOT_ROW]}
+    return [under]
+
+
+WSL_ROOT_ROW = ["Root access", "sudo inside this distribution, as on any Linux",
+                "WSL lets Windows enter a distribution as root with no password (wsl -u root): the platform never "
+                "does, nor reaches in from Windows, so root here is asked of this distribution's sudo, whose password "
+                "is yours. Root access's rule and files are this distribution's alone, on its own disk, and stay "
+                f"across its restarts; the group {rights_mod.GROUP} they name is given to programs started after "
+                "it, so the platform has it once started again from a terminal opened after, or after Windows has "
+                "stopped the distribution and started it again"]
+
+
+def _sayer(log):
+    """Each line said to `log` (the platform's job panel): nothing when there is none; a log that fails is let be."""
+    if not callable(log):
+        return lambda line: None
+
+    def say(line: str) -> None:
+        try:
+            log(line)
+        except Exception:  # noqa: BLE001 - the job goes on without its panel
+            pass
+    return say
+
+
+# -- Root access on the page (0.9.0): its row, its button, its forms --------------------------------------------------
+def root_todo(r: Rights) -> str:
+    """What to do about Root access, in words (its row's)."""
+    p = rights_mod.Paths.here()
+    if r.kind == "off":
+        return ("Turn on… gives root to the firewall's read alone, asking for your password once: the read installed "
+                f"root-owned ({p.read}) and a sudoers rule ({p.rule}) letting it run without a password")
+    if r.kind == "pending":
+        return (f"start the platform again, from a terminal opened after it was turned on: a program started before, "
+                f"the shell the platform was started from too, is not in the group {rights_mod.GROUP} yet "
+                f"(newgrp {rights_mod.GROUP} in that shell gives it one); Turn off… takes it back")
+    if r.kind == "stale":
+        return "Turn on… again puts this plugin's read in its place; Turn off… takes it all back"
+    return "nothing: Turn off… takes it back, with no password"
+
+
+def root_button(r: Rights) -> dict | str:
+    """Root access's one action as a button: Turn on... where it is off or not this plugin's, else Turn off..."""
+    if r.kind in ("off", "stale"):
+        return {"form": ROOT_ON, "title": "Turn on…", "values": {"state": "on"}, "label": "Turn Root access on"}
+    if r.kind in ("on", "pending"):
+        return {"form": ROOT_OFF, "title": "Turn off…", "values": {"state": "off"}, "label": "Turn Root access off"}
+    return ""
+
+
+def parts_root_row(r: Rights) -> list | None:
+    """Root access as a row of the Firewall table where the firewall is read through it (on): its state, what it
+    installed, and Turn off..."""
+    if r.kind != "on":
+        return None
+    p = rights_mod.Paths.here()
+    return ["Root access", r.state, "", _cell(p.read, f"run as root by {p.rule}, for the group {rights_mod.GROUP}"),
+            root_button(r), ""]
+
+
+ROOT_ON, ROOT_OFF = "root-on", "root-off"
+
+
+def user_words() -> str:
+    """The platform's user, for the words of Root access's forms ("you" when it cannot be told)."""
+    who = rights_mod.user()
+    return f"you ({who})" if who else "you"
+
+
+def root_forms(r: Rights) -> list[dict]:
+    """Root access's forms, where the switch is shown (only if required): Turn on... (where it is off, or its read is
+    not this plugin's), its words saying exactly what is installed and where and that anything running as the
+    platform's user (user_words, read for this form alone) can then run that one read as root, and the password field;
+    Turn off... (where it is on), its password field only where the take-back helper cannot run without one yet."""
+    if not r.shown:
+        return []
+    p = rights_mod.Paths.here()
+    g = rights_mod.GROUP
+    state = {"name": "state", "label": "Root access", "type": "fixed"}
+    out = []
+    if r.kind in ("off", "stale"):
+        who = user_words()
+        out.append({
+            "id": ROOT_ON, "hook": ROOT_HOOK, "title": "Turn Root access on",
+            "note": (f"Your password is handed to sudo for this once and never kept. Installed as root, by one "
+                     f"script checked before anything is put in place: {p.read}, this plugin's read of the firewall as "
+                     f"it runs it, which reads the whole configuration and changes nothing; {p.helper}, which takes "
+                     f"all of this back; both root's, in {p.folder}, open to the group {g} alone; and {p.rule}, "
+                     f"checked with visudo before it is put in place, letting the group {g} run exactly those two "
+                     f"files as root without a password, with no arguments, and nothing else (never every command). "
+                     f"The group {g} is made where there is none, and {who} put in it."),
+            "fields": [state, PASSWORD_FIELD], "submit": "Review",
+            "confirm": {"title": "Turn Root access on?", "yes": "Turn it on",
+                        "words": (f"Anything running as {who}, or as another member of the group {g}, can then run "
+                                  "that one read as root. Every change still asks for your password at its own click. "
+                                  + ("It takes effect at once: the platform has the group already. " if r.grant.active
+                                     else "It takes effect once the platform is started again from a terminal opened "
+                                     "after this (the group is given to programs started after it). ")
+                                  + "Turn off… takes it back with no password.")}})
+    if r.kind in ("on", "pending", "stale"):
+        out.append({
+            "id": ROOT_OFF, "hook": ROOT_HOOK, "title": "Turn Root access off",
+            "note": "" if not r.off_password else ("The take-back helper cannot run without a password until the "
+                                                   "platform is started again: your password is handed to sudo for "
+                                                   "this once and never kept."),
+            "fields": [state, *([PASSWORD_FIELD] if r.off_password else [])], "submit": "Review",
+            "confirm": {"title": "Turn Root access off?", "yes": "Turn it off",
+                        "words": (f"{p.helper} removes {p.rule} and {p.folder}, and nothing else"
+                                  + ("" if r.off_password else ", run through sudo with no password, as the grant "
+                                     "allows") + f". The group {g} and its members stay (the Linux administration "
+                                  "plugin manages them). The firewall's rules are then not read until it is turned "
+                                  "on again.")}})
+    return out
+
+
+def install_form(facts: install_mod.Facts, password: bool) -> dict:
+    """Install nftables's form (a job): its words give the package, what it needs and their size first, read without
+    root; the password field only where sudo cannot run apt without one."""
+    return {"id": install_mod.FORM, "hook": INSTALL_HOOK, "title": "Install nftables", "job": True,
+            "note": (f"{facts.words[:1].upper()}{facts.words[1:]}, installed by apt (apt-get install -y nftables) as "
+                     "root." + (" Your password is handed to sudo for this once and never kept." if password else "")),
+            "fields": [PASSWORD_FIELD] if password else [], "submit": "Review",
+            "confirm": {"title": "Install nftables?", "yes": "Install it",
+                        "words": ("Installing it filters nothing: it adds the nft tool, the kernel's own firewall's, "
+                                  "and no rule is made; what this page makes later is asked at its own click. Its "
+                                  "progress shows in the panel below.")}}
 
 
 def xdp_words(cfg: Config, address: str) -> str:
@@ -506,7 +952,7 @@ def _when(ts: int) -> str:
     return time.strftime("%Y-%m-%d %H:%M", time.localtime(ts)) if ts else ""
 
 
-def parts_table(cfg: Config) -> dict:
+def parts_table(cfg: Config, root: list | None = None) -> dict:
     """The firewall's parts: what is there, its state and version, what it holds, how its rules last, its switch."""
     s = cfg.system
     rows = []
@@ -581,6 +1027,8 @@ def parts_table(cfg: Config) -> dict:
     xdp = [f"{i.name}: {i.xdp}" for i in s.interfaces if i.xdp]
     if xdp or s.bpf:
         rows.append(["eBPF and XDP", "read only", "", "; ".join(xdp + [b for b in s.bpf if not b.startswith("xdp")]) or "none attached", "", ""])
+    if root:  # 0.9.0: Root access, where the firewall is read through it
+        rows.append(list(root))
     note = f"{s.name} (kernel {s.kernel}), {s.init_words}" + (f"; read {time.strftime('%H:%M:%S', time.localtime(cfg.at))}" if cfg.at else "")
     if cfg.problems:
         note += "; not read: " + "; ".join(cfg.problems)
@@ -707,8 +1155,9 @@ def sets_table(cfg: Config) -> dict | None:
             "rows": rows}
 
 
-def tables(cfg: Config, preset: str = "in-allow", find: str = "", groups: RuleGroups | None = None) -> list[dict]:
-    out = [parts_table(cfg), interfaces_table(cfg)]
+def tables(cfg: Config, preset: str = "in-allow", find: str = "", groups: RuleGroups | None = None,
+           root: list | None = None) -> list[dict]:
+    out = [parts_table(cfg, root), interfaces_table(cfg)]
     z = zones_table(cfg)
     if z:
         out.append(z)
@@ -731,7 +1180,19 @@ def _choices(rows) -> list[dict]:
     return [{"value": v, "title": t, **({"note": n} if n else {})} for v, t, n in rows]
 
 
-def forms(cfg: Config) -> list[dict]:
+CHANGE_FORMS = ("make", "remove", "policy", "switch", "save")  # the forms that change the firewall, as root
+
+
+def forms(cfg: Config, password: bool = False) -> list[dict]:
+    """The page's forms. With `password` (0.9.0: sudo cannot run a change without one), each form that changes the
+    firewall ends with the password field, and its hook takes it as its last argument."""
+    out = _forms(cfg)
+    if password:
+        out = [{**f, "fields": [*f["fields"], PASSWORD_FIELD]} if f["id"] in CHANGE_FORMS else f for f in out]
+    return out + RuleGroups.forms()  # a label made, renamed or removed (0.5.0)
+
+
+def _forms(cfg: Config) -> list[dict]:
     manager = _named(cfg.manager, cfg)
     lasting = (" It lasts until the next restart unless saved (the Firewall table's Save)." if cfg.manager in ("nftables", "iptables")
                else f" {cfg.manager} keeps it itself." if cfg.manager in FRONTS else "")
@@ -795,7 +1256,7 @@ def forms(cfg: Config) -> list[dict]:
         out.append({"id": "save", "hook": "save_rules", "title": "Save the rules",
                     "fields": [{"name": "kind", "label": "Rules", "type": "fixed"}],
                     "confirm": {"title": "Save {kind}' rules for the next restart?", "words": words, "yes": "Save them"}})
-    return out + RuleGroups.forms()  # a label made, renamed or removed (0.5.0)
+    return out
 
 
 MACHINE = LinuxFirewallPlugin()

@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.9.1 (2026-11-19)
+
+Backbone networks on the globe, and a globe that zooms to 96x. The user, 2026-11-19: "i need to zoom in a few more
+times maybe 96x"; "also on the firewall theres no real ibone or major hub s drawn on the map, data centers in the world
+(dataset) and major network 'bones' need to be displayed on the map"; "also underwater lines". And, 2026-11-16: "the
+firewall globe should instead of exchanges, have all the backbones,ibones, major internet infrastructure, (as many as
+possible) datacenter locations." The globe is liminal-libs 1.65.1's: it now zooms to 96x (was 12x), with Natural
+Earth's 1:10m map past 12x and GSHHG's coasts and borders past 24x (LGPL-3.0, credited while drawn). This plugin names
+what the globe draws.
+
+- **A sixth data set: backbone networks, about 2010-2011** (`apis.py`, `topology-zoo`). The Internet Topology Zoo's
+  261 maps of networks (GÉANT, Internet2, ESnet, Sprint, NTT, Cogent and more): one archive of GML files on GitHub,
+  348,613 bytes, under CC BY 4.0. Of each network, its newest map is drawn: its points of presence, and the links
+  between them as great circles. They are logical links of about 2010-2011, placed at their cities, not today's fibre
+  routes. Its licence's words are shown whole before the download. Its credit is drawn wherever its networks are:
+  "Internet Topology Zoo (Knight, Nguyen, Falkner, Bowden, Roughan, IEEE JSAC 2011), Adelaide University, CC BY 4.0".
+- **Submarine cables** (`osm-cables`, ODbL 1.0, about 3 MB) are asked of all eight telecom categories, as before. The
+  Windows plugin now asks the same, so the two name the same six data sets in the same order, and both tests pin one
+  digest.
+- **Telecom lines on land, those on power poles left out** (`osm-lines`, ODbL 1.0): about 13,000 ways, about 15 MB
+  (was 20 MB; both estimates). Lines on power poles are local distribution, not backbones.
+- **Wikidata's data centres of every kind** (`wikidata`, CC0, about 0.2 MB): asked with their subclasses, so
+  colocation centres come too (211 items, not 168), about 340 places in all.
+- **A fifth card for the globe**, the Internet Topology Zoo, its pages read on 2026-11-19 (`GLOBE_VERIFIED`). Its
+  facts list the data set.
+- `pyproject.toml`: liminal-libs[geo]>=1.65.1, the release that reads the Topology Zoo's maps. On 1.65.0 that one
+  data set is left out, in words, and the others work.
+- Not here yet: Wikipedia's list of exchange points (CC BY-SA 4.0, placed only at their cities) and NOAA's cables in
+  US waters (CC0). Each needs more than one request, and a data set here is one.
+
+Tests: test_netstat.py (the six data sets with the gml card; the digest, the Windows plugin's; a stand-in NORDUnet map
+read into backbones and their points of presence); test_apis.py (the cards' order and the dates they were read).
+
 ## 0.9.0 (2026-11-18)
 
 The Netstat tab, the hosts database, and the globe's filters and internet infrastructure. The user, 2026-11-16: "the

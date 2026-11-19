@@ -24,12 +24,16 @@ exchanges globe, but the firewall globe should instead of exchanges, have all th
 infrastructure, (as many as possible) datacenter locations"): the kernel's socket tables in /proc/net, which the tab
 reads as files with no command and no root; and where the globe's layers come from, each asked once, on the user's
 click, after its licence is accepted: OpenStreetMap's data centres, exchange points, submarine cables, landing
-stations and lines on land through the Overpass API (ODbL), Wikidata's exchange points, ground stations and teleports
-through its query service (CC0), and EMODnet's telecom cable routes in European waters through its WFS (CC BY 4.0).
-They are named here as INFRASTRUCTURE, plain dicts the library's Firewall base reads (liminal-libs 1.65.0), and their
-addresses were read on 2026-11-18 (`NETSTAT_VERIFIED`). `netstat_facts` says what the tab last read, what the hosts
-database holds and which data sets are installed, asking nothing (the base's netstat_view(make=False)). PeeringDB,
-root-server sites and cloud regions are not among them: not free-licensed, or no licence stated.
+stations and lines on land through the Overpass API (ODbL), Wikidata's exchange points, data centres, ground stations
+and teleports through its query service (CC0), EMODnet's telecom cable routes in European waters through its WFS (CC
+BY 4.0), and the Internet Topology Zoo's maps of backbone networks, one archive in its repository on GitHub (CC BY 4.0;
+the user, 2026-11-19: "major network 'bones' need to be displayed on the map"). They are named here as INFRASTRUCTURE,
+plain dicts the library's Firewall base reads (liminal-libs 1.65.0; the Topology Zoo's since 0.9.1, read by 1.65.1's gml
+format), and their addresses were read on 2026-11-18 (`NETSTAT_VERIFIED`), the Topology Zoo's on 2026-11-19
+(`GLOBE_VERIFIED`). The Windows firewall plugin names the same data sets, and both plugins' tests pin their digest.
+`netstat_facts` says what the tab last read, what the hosts database holds and which data sets are installed, asking
+nothing (the base's netstat_view(make=False)). PeeringDB, root-server sites and cloud regions are not among them: not
+free-licensed, or no licence stated.
 
 The right to capture is CAP_NET_RAW alone, for the platform alone (the card's auth and its calls, as the library's
 world.capture_help words it since 1.55.0): AmbientCapabilities=CAP_NET_RAW in the platform's system unit, or setcap
@@ -1114,9 +1118,11 @@ GOOGLE = Api(
 # (PROCFS); what the globe's layers are downloaded from is this plugin's to name, since the library names no outside
 # host: the data sets of INFRASTRUCTURE, each a plain dict of the library's infrastructure.DataSet keys (read by the
 # base as Firewall.INFRASTRUCTURE: so an older library, which reads none, still loads this module), downloaded only on
-# your click once its licence is accepted, as a job; and the cards of where they come from. Every address on these four
-# cards was read on NETSTAT_VERIFIED.
+# your click once its licence is accepted, as a job; and the cards of where they come from. Every address on the first
+# four of these cards was read on NETSTAT_VERIFIED, the Topology Zoo's on GLOBE_VERIFIED (its repository, its licence
+# and its records: progress/globe-research.md, nothing downloaded).
 NETSTAT_VERIFIED = "2026-11-18"
+GLOBE_VERIFIED = "2026-11-19"
 KERNEL_DOCS = "https://docs.kernel.org/networking/proc_net_tcp.html"  # the kernel's own words on /proc/net/tcp
 WSL_NETWORKING = "https://learn.microsoft.com/en-us/windows/wsl/networking"  # WSL's localhost, NAT and mirrored modes
 OVERPASS = "https://overpass-api.de/api/interpreter"  # OpenStreetMap's data, through the public Overpass server
@@ -1127,10 +1133,18 @@ OVERPASS_DOC = "https://dev.overpass-api.de/overpass-doc/en/"  # the Overpass AP
 GEOSERVER_WFS = "https://docs.geoserver.org/latest/en/user/services/wfs/"  # the WFS EMODnet runs is GeoServer's
 WDQS_MANUAL = "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual"  # the query service's own
 EMODNET_RECORD = "https://emodnet.ec.europa.eu/geonetwork/srv/api/records/39ebe289-410b-4a5d-88a4-51bfcde538de"
+ZOO_REPO = "https://github.com/mroughan/InternetTopologyZoo"  # the Internet Topology Zoo's repository (CC BY 4.0)
+ZOO_RAW = "https://raw.githubusercontent.com/mroughan/InternetTopologyZoo/main/"  # its files, as they are
+ZOO_GML = ZOO_RAW + "gml.tar.gz"  # every network's map in GML, one gzipped tar: 348,613 bytes (2026-11-19)
+ZOO_RECORD = "https://researchdata.edu.au/internet-topology-zoo-data-set/4045587"  # Adelaide University's record
+ZOO_DOI = "https://doi.org/10.25909/30153949.v1"  # the data set's DOI (figshare)
+NETZSCHLEUDER = "https://networks.skewed.de/net/internet_top_pop"  # its points of presence, as Netzschleuder keeps them
 OSM_CREDIT = {"text": "© OpenStreetMap contributors", "url": "https://www.openstreetmap.org/copyright"}
 WIKIDATA_CREDIT = {"text": "Wikidata", "url": "https://www.wikidata.org/wiki/Wikidata:Licensing"}
 EMODNET_CREDIT = {"text": "EMODnet Human Activities; data originator Cogea Srl",
                   "url": "https://emodnet.ec.europa.eu/en/"}
+ZOO_CREDIT = {"text": "Internet Topology Zoo (Knight, Nguyen, Falkner, Bowden, Roughan, IEEE JSAC 2011), Adelaide "
+                      "University, CC BY 4.0", "url": ZOO_REPO}
 ODBL = ("OpenStreetMap's data is free under the Open Database License 1.0 (opendatacommons.org/licenses/odbl/1-0): it "
         "may be copied, used and adapted as long as OpenStreetMap and its contributors are credited, and a "
         "changed copy passed on to others stays under the same licence. So wherever these features are drawn the "
@@ -1150,6 +1164,17 @@ EMODNET_LICENCE = (
     "degrees). They are the actual routes as six national sources gave them (Germany's BSH, Spain's CICA, France's "
     "SHOM and SIGCables, Malta's IOI-MOC, the United Kingdom's OGA); Dutch cables are withheld by their source for "
     "security, and the data comes as it is.")
+ZOO_LICENCE = (
+    "The Internet Topology Zoo's maps are free under the Creative Commons Attribution 4.0 International licence "
+    "(creativecommons.org/licenses/by/4.0), as its repository's LICENSE and Adelaide University's record of it say: "
+    "they may be copied, shared and adapted for any purpose, commercial uses included, as long as they are credited, "
+    "the licence is linked and changes are said. So wherever its networks are drawn the page says \"Internet Topology "
+    "Zoo (Knight, Nguyen, Falkner, Bowden, Roughan, IEEE JSAC 2011), Adelaide University, CC BY 4.0\", linked to its "
+    "repository, and each network is named with the year of its map. What is changed: of each network only its newest "
+    "map is drawn, from 2000 on, and of it only its own points of presence that have a place and the links between "
+    "them, each drawn as the great circle between its two ends. These are logical links as the operators' public maps "
+    "showed them about 2010 and 2011, placed at their cities: not the networks of today, nor the routes their fibre "
+    "takes. The data comes as it is.")
 OSM = {"format": "overpass", "url": OVERPASS, "source": "OpenStreetMap, through the Overpass API",
        "licence_name": "ODbL 1.0", "licence": ODBL, "credit": OSM_CREDIT}
 # EMODnet's six telecom cable layers (its WFS's capabilities, read 2026-11-17: the power cables' three left out)
@@ -1159,9 +1184,13 @@ EMODNET_LAYERS = ("emodnet:bshcontiscables", "emodnet:cicacables", "emodnet:shom
 # licence's words (shown before the download and accepted in so many words) and its credit (beside every feature
 # drawn), and `wait`, the seconds each socket operation of its download waits at most: the query's own time limit and a
 # margin, for a server may be silent while a query runs (Overpass' [timeout:180] and [timeout:300]; the Wikidata Query
-# Service's deadline of 60 s). The data sets are the same as the Windows firewall plugin's. The Overpass
-# queries ask for tags alone (out tags), a point for each feature that is no line (center) and a line's geometry
-# (geom): nothing about this machine or its traffic.
+# Service's deadline of 60 s). The data sets are the same as the Windows firewall plugin's, in the same order (their
+# digest pinned in both plugins' tests). The Overpass queries ask for tags alone (out tags), a point for each feature
+# that is no line (center) and a line's geometry (geom): nothing about this machine or its traffic. A line on land on
+# power poles (power=minor_line, local distribution: 6,394 of communication=line's 15,775, taginfo 2026-11-18) is left
+# out, which leaves the lines most like backbones. Wikidata's data centres are asked with their kinds (P279*: colocation
+# centres among them, 211 items against 168, a count of 2026-11-19). The Topology Zoo's archive is the file alone, its
+# size as GitHub gave it (2026-11-19).
 INFRASTRUCTURE = (
     {**OSM, "id": "osm-datacentres", "title": "Data centres", "size": 2_000_000, "wait": 210,
      "about": "about 5,000 sites, and its few exchange points",
@@ -1178,24 +1207,30 @@ INFRASTRUCTURE = (
               'communication|telephone/fibre_optic)$"];'
               'way["communication"="line"]["location"="underwater"];way["communication"="line"]["submarine"="yes"];);'
               'out tags geom qt;nwr["telecom"="cable_landing_station"];out tags center qt;'},
-    {**OSM, "id": "osm-lines", "title": "Telecom lines on land (partial)", "size": 20_000_000, "wait": 330,
-     "about": "about 19,000 ways; no country is complete",
-     "query": '[out:json][timeout:300];(way["communication"="line"]["location"!="underwater"]["submarine"!="yes"];'
-              'way["telecom"="line"];way["telecom"="cable"];);out tags geom qt;'},
+    {**OSM, "id": "osm-lines", "title": "Telecom lines on land (partial)", "size": 15_000_000, "wait": 330,
+     "about": "about 13,000 ways, none on power poles; no country is complete",
+     "query": '[out:json][timeout:300];(way["communication"="line"]["location"!="underwater"]["submarine"!="yes"]'
+              '[!"power"];way["telecom"="line"];way["telecom"="cable"];);out tags geom qt;'},
     {"id": "wikidata", "title": "Exchange points, ground stations and teleports", "format": "sparql", "url": WDQS,
      "source": "Wikidata", "licence_name": "CC0", "licence": CC0, "credit": WIKIDATA_CREDIT, "size": 200_000,
-     "wait": 90, "about": "about 300 places, some data centres among them",
-     "query": 'SELECT ?item ?itemLabel ?kind ?coord ?operatorLabel WHERE { VALUES ?kind { wd:Q1433061 wd:Q671224 '
-              'wd:Q1349167 wd:Q10379228 } ?item wdt:P31 ?kind . OPTIONAL { ?item wdt:P625 ?own } OPTIONAL { ?item '
-              'wdt:P159/wdt:P625 ?seat } OPTIONAL { ?item wdt:P131/wdt:P625 ?place } BIND(COALESCE(?own, ?seat, '
-              '?place) AS ?coord) FILTER(BOUND(?coord)) OPTIONAL { ?item wdt:P137 ?operator } SERVICE '
-              'wikibase:label { bd:serviceParam wikibase:language "en" } }'},
+     "wait": 90, "about": "about 340 places, some data centres among them",
+     "query": 'SELECT DISTINCT ?item ?itemLabel ?kind ?coord ?operatorLabel WHERE { { VALUES ?kind { wd:Q1433061 '
+              'wd:Q1349167 wd:Q10379228 } ?item wdt:P31 ?kind . } UNION { VALUES ?kind { wd:Q671224 } ?item '
+              'wdt:P31/wdt:P279* ?kind . } OPTIONAL { ?item wdt:P625 ?own } OPTIONAL { ?item wdt:P159/wdt:P625 ?seat '
+              '} OPTIONAL { ?item wdt:P131/wdt:P625 ?place } BIND(COALESCE(?own, ?seat, ?place) AS ?coord) '
+              'FILTER(BOUND(?coord)) OPTIONAL { ?item wdt:P137 ?operator } SERVICE wikibase:label { '
+              'bd:serviceParam wikibase:language "en" } }'},
     {"id": "emodnet-cables", "title": "Telecom cable routes in European waters", "format": "geojson",
      "url": EMODNET_WFS, "source": "EMODnet Human Activities, through its WFS", "licence_name": "CC BY 4.0",
      "licence": EMODNET_LICENCE, "credit": EMODNET_CREDIT, "size": 4_000_000, "wait": 120,
      "about": "actual routes in European waters, and French cables beyond, from six national sources",
      "query": "service=WFS&version=1.1.0&request=GetFeature&typeName=" + ",".join(EMODNET_LAYERS)
               + "&outputFormat=application/json&srsName=EPSG:4326"},
+    {"id": "topology-zoo", "title": "Backbone networks, about 2010-2011", "format": "gml", "url": ZOO_GML,
+     "source": "the Internet Topology Zoo (Adelaide University), through GitHub", "licence_name": "CC BY 4.0",
+     "licence": ZOO_LICENCE, "credit": ZOO_CREDIT, "size": 348_613, "wait": 60,
+     "about": ("261 maps of backbone networks (GÉANT, Internet2, ESnet, Sprint, NTT, Cogent and more), each network's "
+               "newest drawn: logical links, not fibre")},
 )
 
 PROCFS = Api(
@@ -1297,7 +1332,8 @@ OVERPASS_API = Api(
     about=("Overpass answers queries of OpenStreetMap's data: every feature with the tags asked, with its point or its "
            "line. The globe's internet infrastructure asks it once a data set, on your click, after you accept "
            "OpenStreetMap's licence (ODbL 1.0): its data centres and exchange points, its submarine cables and their "
-           "landing stations, its telecom lines on land. Each query asks for tags and places alone and says nothing "
+           "landing stations, its telecom lines on land (those on power poles left out). Each query asks for tags and "
+           "places alone and says nothing "
            "about this machine or its traffic; the request carries the plugin's name and version as its User-Agent, "
            "nothing of yours. The answer is read on this machine, its points and lines kept in the data folder's "
            "infrastructure/ in place of an older copy, and the download itself is not kept. Its public servers are "
@@ -1333,7 +1369,8 @@ OVERPASS_API = Api(
                       "building=data_center) and exchange points (telecom=internet_exchange); submarine cables "
                       "(seamark:type=cable_submarine of the telecom categories: optical, fibre_optic and fiber_optic, "
                       "telephone, telegraph and their kin; communication=line under water) and landing stations "
-                      "(telecom=cable_landing_station); telecom lines on land")),
+                      "(telecom=cable_landing_station); telecom lines on land, those on power poles (power=*) left "
+                      "out")),
         Area("JSON output", "[out:json]: each element with its tags, a centre point or a line's geometry",
              OSM_WIKI + "Overpass_API/Overpass_QL",
              covered="read on this machine: the points and lines kept, thinned and bounded, in the data folder"),
@@ -1361,8 +1398,9 @@ WIKIDATA = Api(
     name="Wikidata Query Service",
     maker="the Wikimedia Foundation",
     about=("Wikidata's SPARQL endpoint answers queries of its structured data. The globe asks it once, on your click: "
-           "the internet exchange points, data centres, ground stations and teleports Wikidata places (by their own "
-           "coordinates, else their seat's or their place's), with their names and operators in English. Its data is "
+           "the internet exchange points, data centres (of every kind: colocation centres among them), ground stations "
+           "and teleports Wikidata places (by their own coordinates, else their seat's or their place's), with their "
+           "names and operators in English. Its data is "
            "in the public domain (CC0): no credit is required, and the globe names Wikidata all the same. The query "
            "says nothing about this machine; the request's User-Agent is the plugin's name and version alone, and a "
            "refusal for want of a contact in it is said in words (none is sent from here)."),
@@ -1388,8 +1426,8 @@ WIKIDATA = Api(
         Area("SPARQL queries", "Wikidata's items and statements asked with SPARQL, answered as JSON",
              "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual",
              covered=("one query, on your click: items that are internet exchange points (Q1433061), data centres "
-                      "(Q671224), ground stations (Q1349167) or teleports (Q10379228), each with its coordinates, its "
-                      "label and its operator's")),
+                      "(Q671224, and its subclasses through P279*), ground stations (Q1349167) or teleports "
+                      "(Q10379228), each with its coordinates, its label and its operator's")),
         Area("Labels", "the label service: an item's name in the languages asked",
              "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual", covered="names in English"),
         Area("The entity data", "an item's whole record as JSON, by its id",
@@ -1465,10 +1503,59 @@ EMODNET = Api(
     verified=NETSTAT_VERIFIED,
 )
 
+TOPOLOGY_ZOO = Api(
+    name="Internet Topology Zoo",
+    maker="Adelaide University (S. Knight, H. Nguyen, N. Falkner, R. Bowden, M. Roughan), its repository on GitHub",
+    about=("261 maps of networks' backbones (some networks mapped in several years), transcribed from the operators' "
+           "own public maps of about 2010 and 2011: "
+           "research and education networks (GÉANT, Internet2, ESnet, RENATER, NORDUnet and more) and carriers "
+           "(Sprint, UUNET, Cogent, NTT, Hurricane Electric and more), each with its points of presence, their places "
+           "(at their cities) and the links between them, kept as a long-term store and not updated. The globe asks "
+           "for its archive of GML maps once, on your click, after you accept its licence (CC BY 4.0), unpacks it in "
+           "memory alone (nothing of it is written out but what is drawn), and draws each network's newest map as "
+           "backbones and their points of presence: logical links between cities, not the routes of fibre, and not "
+           "today's networks. The request names the file alone and nothing about this machine."),
+    kind="feed",
+    base=ZOO_GML,
+    version=("its repository's main branch as read on 2026-11-19: gml.tar.gz, 348,613 bytes, one GML file a map "
+             "(the maps' own dates about 2010 and 2011, older ones of some networks beside them)"),
+    auth="none: no account and no key",
+    limits="none named for one file; asked once on your click, waited for 60 s",
+    costs="",
+    links=(
+        Link("The Internet Topology Zoo's repository", ZOO_REPO, "docs"),
+        Link("Its licence: CC BY 4.0", ZOO_RAW + "LICENSE", "terms"),
+        Link("Adelaide University's record (Research Data Australia)", ZOO_RECORD, "reference"),
+        Link("The data set's DOI", ZOO_DOI, "reference"),
+        Link("Its points of presence, as Netzschleuder keeps them", NETZSCHLEUDER, "reference"),
+        Link("Creative Commons Attribution 4.0 International", "https://creativecommons.org/licenses/by/4.0/", "terms"),
+    ),
+    areas=(
+        Area("The maps in GML", "every network's map in GML, one gzipped tar archive", ZOO_REPO,
+             covered=("the archive, asked once on your click and unpacked in memory alone: of each network its newest "
+                      "map, from 2000 on, its own points of presence with a place and the links between them")),
+        Area("The maps in GraphML", "the same maps in GraphML (XML), in an archive of their own", ZOO_REPO),
+        Area("One network's file", "a network's map alone, by its name, in GML or GraphML", ZOO_REPO),
+        Area("The records", "the data set's record at Research Data Australia and its DOI at figshare", ZOO_RECORD),
+    ),
+    calls=(
+        Call(f"GET {ZOO_GML}", "every network's map in GML, one gzipped tar archive", "The maps in GML",
+             used=("Download… on the World Wide Web tab's Internet infrastructure table, once, on your word once its "
+                   "licence is accepted, as a job the page may cancel; https on every hop, to this host alone"),
+             docs=ZOO_REPO),
+        Call(f"GET {ZOO_RAW}graphml.tar.gz", "every network's map in GraphML, one gzipped tar archive",
+             "The maps in GraphML", docs=ZOO_REPO),
+        Call(f"GET {ZOO_RAW}graphml/<network>.graphml", "one network's map in GraphML", "One network's file",
+             docs=ZOO_REPO),
+    ),
+    verified=GLOBE_VERIFIED,
+)
+
 FIREWALL = (NFTABLES, IPTABLES, EBTABLES, IPSET, FIREWALLD_API, UFW, CONNTRACK, BPF, IPROUTE2, SERVICES,  # its read
             SUDO, GROUPS, APT)  # and its changes; Root access's and nftables' install's (0.9.0)
 WORLD = (CAPTURE, DBIP_LITE, OPENDNS, GOOGLE)  # the World Wide Web tab's (0.8.0)
-NETSTAT = (PROCFS, OVERPASS_API, WIKIDATA, EMODNET)  # the Netstat tab's and the globe's infrastructure (0.9.0)
+# the Netstat tab's and the globe's infrastructure (0.9.0; the Topology Zoo's, 0.9.1)
+NETSTAT = (PROCFS, OVERPASS_API, WIKIDATA, EMODNET, TOPOLOGY_ZOO)
 APIS = FIREWALL + WORLD + NETSTAT
 
 
@@ -1625,7 +1712,7 @@ def netstat_facts(plugin) -> dict[str, dict[str, str]]:
     if d.get("error"):
         tables["Problem"] = str(d["error"])
     out: dict[str, dict[str, str]] = {PROCFS.name: tables}
-    sources = {"overpass": OVERPASS_API, "sparql": WIKIDATA, "geojson": EMODNET}
+    sources = {"overpass": OVERPASS_API, "sparql": WIKIDATA, "geojson": EMODNET, "gml": TOPOLOGY_ZOO}
     for s in d.get("sets") or ():
         card = sources.get(str(s.get("format") or "")) if isinstance(s, dict) else None
         if card is not None:

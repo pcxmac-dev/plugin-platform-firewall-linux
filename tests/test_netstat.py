@@ -6,8 +6,10 @@ talking to all hosts"; "have all the backbones,ibones, major internet infrastruc
 locations").
 
 The tab, its hooks, its job and its setting are the base's. This plugin names the data sets the globe's layers come
-from (OpenStreetMap's through the Overpass API, Wikidata's, EMODnet's): each one the library reads, asked at its card's
-address in the one request its card names, with its licence, its credit and its wait. Its card of the kernel's socket
+from (OpenStreetMap's through the Overpass API, Wikidata's, EMODnet's, the Internet Topology Zoo's maps of backbone
+networks: the user, 2026-11-19, "major network 'bones' need to be displayed on the map"): each one the library reads,
+asked at its card's address in the one request its card names, with its licence, its credit and its wait, the same as
+the Windows firewall plugin's (their digest pinned in both). Its card of the kernel's socket
 tables names every file the library's reader reads. A listener another user holds is named from the firewall's read
 kept, running no command. The plugin is valid and present wherever the socket table can be read, its table of what
 the firewall needs saying what the tab needs; inside WSL 2 the tab's Under WSL table ends with what was seen in the
@@ -19,11 +21,14 @@ the layers' folder are in tmp_path (the same guard), the GeoIP folder is tmp_pat
 server asked (refused here), and the machine's commands are a stand-in that keeps every one."""
 from __future__ import annotations
 
+import gzip
 import hashlib
 import inspect
+import io
 import json
 import os
 import re
+import tarfile
 import threading
 import time
 import types
@@ -65,8 +70,27 @@ UNDER = {"title": "Under WSL", "note": "What running inside a WSL distribution c
          "columns": [{"title": "What"}, {"title": "Here"}, {"title": "What it means"}],
          "rows": [["This Linux", "WSL 2: Ubuntu", "a WSL distribution on Windows: the sockets listed are its own"]]}
 # the data sets' digest (sha256 of apis.INFRASTRUCTURE as canonical JSON: sorted keys, no spaces, UTF-8): the Windows
-# firewall plugin names the same data sets, so its tests are to pin the same digest, and a data set changed changes both
-INFRASTRUCTURE_SHA256 = "33df1ff677a9eadc9097ae3e92ba189aa9c3a88cccc03e980cd9ba9ed2c180df"
+# firewall plugin names the same data sets, and its tests pin the same digest: a data set changed changes both
+INFRASTRUCTURE_SHA256 = "bc0cabeff54b95c7589ce35653bc1ef8d31c1ca9bdc3f26fef2157be06fd2b4f"
+# a map of the Topology Zoo's as its toolset wrote them (a network's values, its points with their places, its links),
+# in its archive's shape (gml.tar.gz: gzipped tar of GML files); none of it recorded
+NORDU = ('graph [\n  Network "NORDUnet"\n  DateYear "2010"\n  node [\n    id 0\n    label "Stockholm"\n'
+         '    Longitude 18.0649\n    Internal 1\n    Latitude 59.33258\n  ]\n  node [\n    id 1\n    label "Oslo"\n'
+         '    Longitude 10.74609\n    Internal 1\n    Latitude 59.91273\n  ]\n  node [\n    id 2\n    label "GEANT"\n'
+         '    Internal 0\n    Longitude 4.9\n    Latitude 52.4\n  ]\n  edge [\n    source 0\n    target 1\n  ]\n'
+         '  edge [\n    source 0\n    target 2\n  ]\n]\n')
+
+
+def zoo_archive(maps: dict) -> bytes:
+    """Maps in a gzipped tar, as the Topology Zoo's gml.tar.gz holds them."""
+    out = io.BytesIO()
+    with tarfile.open(fileobj=out, mode="w") as tar:
+        for name, text in maps.items():
+            data = text.encode("utf-8")
+            info = tarfile.TarInfo(name)
+            info.size = len(data)
+            tar.addfile(info, io.BytesIO(data))
+    return gzip.compress(out.getvalue(), mtime=0)
 
 
 def sock(proto="tcp", local=LAN, local_port=41000, remote="", remote_port=0, *, state="established", pid=2000,
@@ -188,17 +212,22 @@ def test_the_tab_its_hooks_its_job_and_its_setting_are_the_firewall_bases():
 def test_every_data_set_is_one_the_library_reads_asked_in_the_one_request_its_card_names():
     assert MACHINE.INFRASTRUCTURE is cards.INFRASTRUCTURE
     sets = [DataSet.of(d) for d in MACHINE.INFRASTRUCTURE]  # each reads, as the base's make_netstat_view reads it
-    assert [d.id for d in sets] == ["osm-datacentres", "osm-cables", "osm-lines", "wikidata", "emodnet-cables"]
-    card_of = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET}
-    assert [d.format for d in sets] == ["overpass", "overpass", "overpass", "sparql", "geojson"]
-    for d in sets:
+    assert [d.id for d in sets] == ["osm-datacentres", "osm-cables", "osm-lines", "wikidata", "emodnet-cables",
+                                    "topology-zoo"]
+    card_of = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET,
+               "gml": cards.TOPOLOGY_ZOO}
+    assert [d.format for d in sets] == ["overpass", "overpass", "overpass", "sparql", "geojson", "gml"]
+    for d, said in zip(sets, MACHINE.INFRASTRUCTURE):
         card = card_of[d.format]
         address = d.address()
-        assert address.startswith(card.base + "?") and d.url == card.base and d.host == card.base.split("/")[2]
+        assert d.url == card.base and d.host == card.base.split("/")[2]
+        assert address.startswith(card.base + "?") if d.query else address == card.base  # a file: its address alone
         [get] = [c for c in card.used if c.name.startswith("GET ")]  # the one request each download makes
         assert pattern(get.name).search(address), (d.id, get.name)
         assert d.wait <= infrastructure.INSTALL_S
-    assert {d.host for d in sets} == {"overpass-api.de", "query.wikidata.org", "ows.emodnet-humanactivities.eu"}
+        assert d.about == said["about"] and d.title == said["title"]  # said whole: none cut to fit
+    assert {d.host for d in sets} == {"overpass-api.de", "query.wikidata.org", "ows.emodnet-humanactivities.eu",
+                                      "raw.githubusercontent.com"}
     # (critique M7) Overpass prints tags and a point or a line alone, never every way's nodes; each data set waits on
     # its socket as long as its query may run, and a margin
     for d in sets[:3]:
@@ -222,10 +251,22 @@ def test_every_data_set_is_one_the_library_reads_asked_in_the_one_request_its_ca
     assert sets[4].licence == cards.EMODNET_LICENCE and sets[4].licence_name == "CC BY 4.0"
     assert "This data was downloaded from the EMODnet Portal" in cards.EMODNET_LICENCE
     assert cards.EMODNET_CREDIT["text"] == "EMODnet Human Activities; data originator Cogea Srl"
+    # the Topology Zoo's maps: its archive alone (348,613 bytes as GitHub gave it), CC BY 4.0, credited as asked, and
+    # said for what they are: logical links of about 2010 and 2011, not today's networks nor their fibre
+    zoo = sets[5]
+    assert (zoo.url, zoo.query, zoo.size, zoo.licence_name) == (cards.ZOO_GML, "", 348_613, "CC BY 4.0")
+    assert zoo.licence == cards.ZOO_LICENCE and zoo.credit == cards.ZOO_CREDIT and zoo.credit["text"] in zoo.licence
+    assert zoo.credit["text"].startswith("Internet Topology Zoo (Knight, Nguyen, Falkner, Bowden, Roughan, IEEE JSAC")
+    for words in ("Creative Commons Attribution 4.0", "logical links", "not the networks of today", "newest map"):
+        assert words in cards.ZOO_LICENCE, words
+    # the lines on land most like backbones: none on power poles; Wikidata's data centres of every kind
+    assert '["submarine"!="yes"][!"power"];' in sets[2].query and "none on power poles" in sets[2].about
+    assert "{ VALUES ?kind { wd:Q671224 } ?item wdt:P31/wdt:P279* ?kind . }" in sets[3].query
+    assert all(f"wd:{k}" in sets[3].query for k in infrastructure.KINDS)
     licences = {x.url for c in cards.NETSTAT for x in c.links if x.kind == "terms"}
     assert {"https://opendatacommons.org/licenses/odbl/1-0/", "https://www.openstreetmap.org/copyright",
-            "https://www.wikidata.org/wiki/Wikidata:Licensing",
-            "https://creativecommons.org/licenses/by/4.0/"} <= licences
+            "https://www.wikidata.org/wiki/Wikidata:Licensing", "https://creativecommons.org/licenses/by/4.0/",
+            cards.ZOO_RAW + "LICENSE"} <= licences
     # nothing names PeeringDB, root-server sites or a cloud's regions: not free-licensed, or no licence stated
     said = json.dumps(cards.INFRASTRUCTURE).lower()
     assert "peeringdb" not in said and "root-servers" not in said
@@ -250,11 +291,27 @@ def test_the_submarine_cables_are_asked_of_every_telecom_category_the_map_uses()
 
 
 def test_the_data_sets_are_pinned_as_the_windows_firewall_plugin_names_them():
-    """The Windows firewall plugin names the same data sets (apis.INFRASTRUCTURE there, compared key by key when this
-    0.9.0 was built). Kept alike by hand, the two could drift unseen (the review's finding 12), so their digest is
-    pinned: a change to them is a change made on purpose, to both plugins and to both pins."""
+    """The Windows firewall plugin names the same data sets, in the same order (apis.INFRASTRUCTURE there, compared key
+    by key on 2026-11-19), and its tests pin the same digest. Kept alike by hand, the two drifted once unseen (the
+    review's finding 12: there osm-cables asked two of the eight telecom categories), so a change to them is a change
+    made on purpose, to both plugins and to both pins."""
     said = json.dumps(cards.INFRASTRUCTURE, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     assert hashlib.sha256(said.encode("utf-8")).hexdigest() == INFRASTRUCTURE_SHA256
+
+
+def test_the_topology_zoos_maps_are_read_into_backbones_and_their_points_of_presence():
+    """A map in the shape the Topology Zoo's archive holds it, read by the library as the plugin names it: its own
+    points with a place, the link between two of them, the point of another network's and the link to it left out."""
+    zoo = next(d for d in cards.INFRASTRUCTURE if d["id"] == "topology-zoo")
+    found = infrastructure.parse(zoo, zoo_archive({"gml/Nordu2010.gml": NORDU}))
+    assert found["layers"]["pops"]["points"] == [(18.0649, 59.33258, "Stockholm (NORDUnet)", "NORDUnet, 2010"),
+                                                 (10.74609, 59.91273, "Oslo (NORDUnet)", "NORDUnet, 2010")]
+    assert found["layers"]["backbones"]["lines"] == [([(10.74609, 59.91273), (18.0649, 59.33258)],
+                                                      "NORDUnet, 2010: Oslo to Stockholm")]
+    assert found["dropped"] == {"outside its network": 1, "between points not drawn": 1}
+    layers = {x[0]: x for x in infrastructure.LAYERS}
+    assert layers["backbones"][1:] == ("Backbones, about 2010-2011", "lines", "line", 7, True, 4.0)
+    assert layers["pops"][1:3] == ("Backbones' points of presence, about 2010-2011", "points")
 
 
 def test_the_plugins_view_offers_each_data_set_as_a_job_its_licence_first(tmp_path):
@@ -279,7 +336,7 @@ def test_the_plugins_view_offers_each_data_set_as_a_job_its_licence_first(tmp_pa
 
 # -- the cards ---------------------------------------------------------------------------------------------------------
 def test_the_socket_tables_card_names_every_file_the_librarys_reader_reads():
-    assert problems(cards.NETSTAT) == [] and cards.APIS[-4:] == cards.NETSTAT
+    assert problems(cards.NETSTAT) == [] and cards.APIS[-5:] == cards.NETSTAT
     files = {re.search(r"/proc/(\S+)", c.name).group(1) for c in cards.PROCFS.used}
     assert {f.replace("/<fd>", "") for f in files} == set(sockets.LINUX_FILES)  # those, and no other
     assert all(c.name.split()[0] in ("read", "readlink") for c in cards.PROCFS.used)  # files alone: no command
@@ -568,7 +625,8 @@ def test_the_netstat_facts_are_what_the_tab_read_and_asking_them_reads_nothing(m
     assert re.fullmatch(r"\d+ rows? \(\d+ hosts?, \d+ programs?\), .+, in .+hosts\.db(, recorded since .+)?",
                         facts["Hosts database"]), facts
     for d in cards.INFRASTRUCTURE:  # each data set under its source's card, none downloaded
-        card = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET}[d["format"]]
+        card = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET,
+                "gml": cards.TOPOLOGY_ZOO}[d["format"]]
         assert fw.api_facts()[card.name][d["title"]].startswith("not downloaded: the World Wide Web tab's")
     fw.detach()
     assert cards.PROCFS.name not in fw.api_facts()  # detached: the view let go, nothing said

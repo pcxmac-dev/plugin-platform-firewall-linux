@@ -101,9 +101,11 @@ ports, when they were seen and how long they were connected, recorded only while
 is shown unless the user chooses always. The globe shows the traffic watched or the hosts recorded, filtered by program,
 port, direction and when they were last seen, and draws the internet's infrastructure from the data sets this plugin
 names (apis.INFRASTRUCTURE: OpenStreetMap's data centres, exchange points, submarine cables and lines on land through
-the Overpass API, Wikidata's exchange points, ground stations and teleports, EMODnet's cable routes in European
-waters), each downloaded only on the user's click once its licence is accepted. None of it needs root, so the plugin is
-valid wherever the socket table can be read, the firewall's own read refused or failed (B-revisions S2), and present
+the Overpass API, Wikidata's exchange points, data centres, ground stations and teleports, EMODnet's cable routes in
+European waters, the Internet Topology Zoo's backbone networks; the user, 2026-11-19: "major network 'bones' need to be
+displayed on the map", "also underwater lines"), each downloaded only on the user's click once its licence is
+accepted. None of it needs root, so the plugin is valid wherever the socket table can be read, the firewall's own
+read refused or failed (B-revisions S2), and present
 there too; what the firewall needs then says what Netstat needs (netstat.needs_row). Inside WSL the tab ends with what
 WSL changes for it (the library's table, and the row seen in the user's Ubuntu: netstat.WSL_ROWS). On a library from
 before it the plugin works as 0.8.2 did, its table of what the firewall needs saying what the tab would need.
@@ -141,7 +143,7 @@ from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 from .rights import PASSWORD_FIELD, Rights
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -213,8 +215,8 @@ class LinuxFirewallPlugin(Firewall):
     # The Netstat tab, the hosts database and the globe's filters and layers (0.9.0): the base's too (its TABS, HOOKS,
     # JOB_HOOKS, CANCEL_HOOKS and keys, from liminal-libs 1.65.0; an older base reads none of it). The data sets the
     # globe's layers are downloaded from are this plugin's to name (apis.py): OpenStreetMap's through the Overpass API,
-    # Wikidata's and EMODnet's; the listeners another user holds are named from the firewall's own read
-    # (netstat_listeners).
+    # Wikidata's, EMODnet's and the Internet Topology Zoo's; the listeners another user holds are named from the
+    # firewall's own read (netstat_listeners).
     INFRASTRUCTURE = cards.INFRASTRUCTURE
 
     def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None, clock=time.monotonic,

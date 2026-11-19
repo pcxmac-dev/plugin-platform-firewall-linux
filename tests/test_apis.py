@@ -25,6 +25,7 @@ from liminal_libs.machines.linux import Shell
 from liminal_libs.sources.apis import dead_links, problems
 from plugin_platform_firewall_linux import MACHINE, LinuxFirewallPlugin
 from plugin_platform_firewall_linux import apis as cards
+from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux import nftables as nft_mod
 from plugin_platform_firewall_linux import system as sys_mod
 from plugin_platform_firewall_linux import ufw as ufw_mod
@@ -180,8 +181,10 @@ def canonical(cmd: list[str]) -> str | None:
 
 
 def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
-    assert problems(MACHINE.apis) == [] and MACHINE.apis == cards.APIS == cards.FIREWALL + cards.WORLD
-    assert [a.name for a in MACHINE.apis] == [
+    assert problems(cards.APIS) == [] and cards.APIS == cards.FIREWALL + cards.WORLD + cards.NETSTAT
+    # 0.9.0: the Netstat tab's cards with a library that has it, else left out (the plugin reaches none of them there)
+    assert MACHINE.apis == (cards.APIS if netstat_mod.library() else cards.FIREWALL + cards.WORLD)
+    assert [a.name for a in cards.APIS] == [
         "nftables (nft)", "iptables and ip6tables", "ebtables and arptables", "ipset", "firewalld", "ufw",
         "Connection tracking (conntrack)", "eBPF on the network (bpftool)", "iproute2 (ip and ss)",
         "The firewall's services (systemd, OpenRC, SysV)", "sudo",
@@ -189,13 +192,17 @@ def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
         "Users and groups (groupadd, usermod, addgroup)", "APT (apt-get, apt-cache)",
         # the World Wide Web tab's (0.8.0)
         "libpcap (packet capture)", "DB-IP Lite City (GeoIP)", "OpenDNS (myip.opendns.com)",
-        "Google's name servers (o-o.myaddr.l.google.com)"]
+        "Google's name servers (o-o.myaddr.l.google.com)",
+        # the Netstat tab's and the globe's internet infrastructure (0.9.0)
+        "The kernel's socket tables (procfs)", "Overpass API", "Wikidata Query Service",
+        "EMODnet Human Activities (WFS)"]
     rights_cards = (cards.SUDO, cards.GROUPS, cards.APT)  # their addresses read again, or for the first time, in 0.9.0
     assert all(a.verified == "2026-11-11" for a in cards.FIREWALL if a not in rights_cards)
     assert all(a.verified == "2026-11-17" for a in rights_cards)
     assert all(a.verified == "2026-11-15" for a in cards.WORLD)
-    assert all(a.docs and a.used and a.covered for a in MACHINE.apis)
-    assert all(len(a.areas) > len(a.covered) for a in MACHINE.apis)  # more of each API than the plugin uses
+    assert all(a.verified == cards.NETSTAT_VERIFIED == "2026-11-18" for a in cards.NETSTAT)
+    assert all(a.docs and a.used and a.covered for a in cards.APIS)
+    assert all(len(a.areas) > len(a.covered) for a in cards.APIS)  # more of each API than the plugin uses
     assert cards.NFTABLES.link("spec").endswith("libnftables-json.5.en.html")
     assert not any(c.costs for a in MACHINE.apis for c in a.calls)  # nothing here costs money
 

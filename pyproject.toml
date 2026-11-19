@@ -4,13 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plugin-platform-firewall-linux"
-version = "0.8.2"  # the plugin's own release (CHANGELOG.md); the app shows it on the Plugins view
-description = "Linux firewall for Liminal: the native Linux machine's whole firewall read and changed from the platform's page (nftables, iptables nf_tables and legacy, ebtables, arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP read only), under systemd, OpenRC or SysV scripts, on the major distributions and Gentoo; and its World Wide Web tab, the places its traffic comes from and goes to on a globe and its ports' traffic, watched while the tab is shown."
+version = "0.9.0"  # the plugin's own release (CHANGELOG.md); the app shows it on the Plugins view
+description = """\
+  Linux firewall for Liminal: the native Linux machine's whole firewall read and changed from the platform's page \
+  (nftables, iptables nf_tables and legacy, ebtables, arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP read \
+  only), under systemd, OpenRC or SysV scripts, on the major distributions and Gentoo; its World Wide Web tab, the \
+  places its traffic comes from and goes to on a globe and its ports' traffic, watched while the tab is shown; and \
+  its Netstat tab: the listening ports and the connections with their programs, the hosts each program talks with \
+  recorded on this machine, and the globe filtered by them over the internet's infrastructure."""
 readme = "README.md"
 requires-python = ">=3.10"
 # the library it plugs into (the machine kind: liminal_libs.machines, plugin API 2.2: what it attaches to, 1.49.0; the
-# Firewall base's World Wide Web tab, 1.55.0), with its geo extra: maxminddb, which reads the GeoIP file the tab places with
-dependencies = ["liminal-libs[geo]>=1.55.0"]
+# Firewall base's World Wide Web tab, 1.55.0; root access, 1.62.0; its Netstat tab, hosts database and globe layers,
+# 1.65.0), with its geo extra: maxminddb, which reads the GeoIP file the tabs place with. On an older library the
+# plugin still loads, and works as the release before what it lacks (each is found by name: netstat.library,
+# rights.library)
+dependencies = ["liminal-libs[geo]>=1.65.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "maxminddb>=3.2"]  # maxminddb: the World Wide Web tab's tests read a GeoIP file they write

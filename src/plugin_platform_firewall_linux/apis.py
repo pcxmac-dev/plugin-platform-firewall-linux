@@ -17,6 +17,20 @@ the download), ATTRIBUTION (DB-IP's credit, beside the places) and PUBLIC_DNS (t
 tab watched and which GeoIP file it has open (or last had open, once it was let go), asking nothing either: it reads
 the tab through the base's world_view(make=False), which never makes one.
 
+And the Netstat tab's and the globe's internet infrastructure (0.9.0; the user, 2026-11-16: "the firewall app should
+have a 'netstat' like interface for looking at active ports and what apps they are attached to, and the hosts that
+they connect to across the lan or wan"; "The globe should have the same kind of geography associated with the
+exchanges globe, but the firewall globe should instead of exchanges, have all the backbones,ibones, major internet
+infrastructure, (as many as possible) datacenter locations"): the kernel's socket tables in /proc/net, which the tab
+reads as files with no command and no root; and where the globe's layers come from, each asked once, on the user's
+click, after its licence is accepted: OpenStreetMap's data centres, exchange points, submarine cables, landing
+stations and lines on land through the Overpass API (ODbL), Wikidata's exchange points, ground stations and teleports
+through its query service (CC0), and EMODnet's telecom cable routes in European waters through its WFS (CC BY 4.0).
+They are named here as INFRASTRUCTURE, plain dicts the library's Firewall base reads (liminal-libs 1.65.0), and their
+addresses were read on 2026-11-18 (`NETSTAT_VERIFIED`). `netstat_facts` says what the tab last read, what the hosts
+database holds and which data sets are installed, asking nothing (the base's netstat_view(make=False)). PeeringDB,
+root-server sites and cloud regions are not among them: not free-licensed, or no licence stated.
+
 The right to capture is CAP_NET_RAW alone, for the platform alone (the card's auth and its calls, as the library's
 world.capture_help words it since 1.55.0): AmbientCapabilities=CAP_NET_RAW in the platform's system unit, or setcap
 cap_net_raw=ep on a copy of Python that is the platform's own. Never on the system's Python, which every program and
@@ -537,7 +551,8 @@ IPROUTE2 = Api(
         Area("Interfaces and addresses", "each interface, its state, its addresses, its bridge or bond, its XDP program",
              MAN7 + "man8/ip-address.8.html", covered="read for the Interfaces table and firewalld's zones"),
         Area("Sockets", "what listens on which port, and the connections", MAN7 + "man8/ss.8.html",
-             covered="the TCP and UDP listeners (a rule's program), SSH's port and sessions (what a change must not cut)"),
+             covered=("the TCP and UDP listeners (a rule's program; 0.9.0: the Netstat tab's listeners another user "
+                      "holds), SSH's port and sessions (what a change must not cut)")),
         Area("Routes", "the routing tables and rules", MAN7 + "man8/ip.8.html"),
         Area("Links", "interfaces made, changed, brought up and down", MAN7 + "man8/ip.8.html"),
     ),
@@ -546,8 +561,12 @@ IPROUTE2 = Api(
              docs=MAN7 + "man8/ip-address.8.html"),
         Call("ip addr show", "the same, in words", "Interfaces and addresses", used="the read, where ip has no JSON (BusyBox)",
              docs=MAN7 + "man8/ip-address.8.html"),
-        Call("ss -ltnpH", "the TCP listeners and their programs", "Sockets", used="the read", docs=MAN7 + "man8/ss.8.html"),
-        Call("ss -lunpH", "the UDP listeners and their programs", "Sockets", used="the read", docs=MAN7 + "man8/ss.8.html"),
+        Call("ss -ltnpH", "the TCP listeners and their programs", "Sockets",
+             used="the read: a rule's program, and the Netstat tab's listeners another user holds (0.9.0)",
+             docs=MAN7 + "man8/ss.8.html"),
+        Call("ss -lunpH", "the UDP listeners and their programs", "Sockets",
+             used="the read: a rule's program, and the Netstat tab's listeners another user holds (0.9.0)",
+             docs=MAN7 + "man8/ss.8.html"),
         Call("ss -tnH state established", "the established TCP connections", "Sockets", used="the read: SSH's sessions",
              docs=MAN7 + "man8/ss.8.html"),
         Call("netstat -ltnp", "the TCP listeners (net-tools)", "Sockets", used="the read, where ss is not there",
@@ -1089,10 +1108,368 @@ GOOGLE = Api(
     verified=WORLD_VERIFIED,
 )
 
+# -- the Netstat tab, the hosts database and the globe's internet infrastructure (0.9.0) -------------------------------
+# The tab, the database and the globe's filters and layers are the library's Firewall base's (liminal-libs 1.65.0:
+# sockets.py, hostbook.py, machines/netstat.py, machines/infrastructure.py). The tab reads the kernel's socket tables
+# (PROCFS); what the globe's layers are downloaded from is this plugin's to name, since the library names no outside
+# host: the data sets of INFRASTRUCTURE, each a plain dict of the library's infrastructure.DataSet keys (read by the
+# base as Firewall.INFRASTRUCTURE: so an older library, which reads none, still loads this module), downloaded only on
+# your click once its licence is accepted, as a job; and the cards of where they come from. Every address on these four
+# cards was read on NETSTAT_VERIFIED.
+NETSTAT_VERIFIED = "2026-11-18"
+KERNEL_DOCS = "https://docs.kernel.org/networking/proc_net_tcp.html"  # the kernel's own words on /proc/net/tcp
+WSL_NETWORKING = "https://learn.microsoft.com/en-us/windows/wsl/networking"  # WSL's localhost, NAT and mirrored modes
+OVERPASS = "https://overpass-api.de/api/interpreter"  # OpenStreetMap's data, through the public Overpass server
+WDQS = "https://query.wikidata.org/sparql"  # Wikidata's query service
+EMODNET_WFS = "https://ows.emodnet-humanactivities.eu/geoserver/emodnet/wfs"  # EMODnet Human Activities' WFS
+OSM_WIKI = "https://wiki.openstreetmap.org/wiki/"
+OVERPASS_DOC = "https://dev.overpass-api.de/overpass-doc/en/"  # the Overpass API's own manual, by its author
+GEOSERVER_WFS = "https://docs.geoserver.org/latest/en/user/services/wfs/"  # the WFS EMODnet runs is GeoServer's
+WDQS_MANUAL = "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual"  # the query service's own
+EMODNET_RECORD = "https://emodnet.ec.europa.eu/geonetwork/srv/api/records/39ebe289-410b-4a5d-88a4-51bfcde538de"
+OSM_CREDIT = {"text": "© OpenStreetMap contributors", "url": "https://www.openstreetmap.org/copyright"}
+WIKIDATA_CREDIT = {"text": "Wikidata", "url": "https://www.wikidata.org/wiki/Wikidata:Licensing"}
+EMODNET_CREDIT = {"text": "EMODnet Human Activities; data originator Cogea Srl",
+                  "url": "https://emodnet.ec.europa.eu/en/"}
+ODBL = ("OpenStreetMap's data is free under the Open Database License 1.0 (opendatacommons.org/licenses/odbl/1-0): it "
+        "may be copied, used and adapted as long as OpenStreetMap and its contributors are credited, and a "
+        "changed copy passed on to others stays under the same licence. So wherever these features are drawn the "
+        "page says \"© OpenStreetMap contributors\", linked to openstreetmap.org/copyright. It is what volunteers "
+        "have mapped: incomplete in places, and it comes as it is.")
+CC0 = ("Wikidata's structured data is in the public domain (Creative Commons Zero, "
+       "creativecommons.org/publicdomain/zero/1.0): it may be used for anything and no credit is required; the page "
+       "names Wikidata all the same. A place with no coordinates of its own is put where its seat or its town is, and "
+       "it comes as it is.")
+EMODNET_LICENCE = (
+    "EMODnet's telecom cable routes are free under the Creative Commons Attribution 4.0 International licence "
+    "(creativecommons.org/licenses/by/4.0): they may be copied, shared and adapted for any purpose, commercial uses "
+    "included, as long as they are credited, the licence is linked and changes are said. Their record asks for these "
+    "words: \"This data was downloaded from the EMODnet Portal (https://emodnet.ec.europa.eu/en/). The data originator "
+    "is Cogea Srl.\" So wherever these routes are drawn the page says \"EMODnet Human Activities; data originator "
+    "Cogea Srl\", linked to emodnet.ec.europa.eu, and the globe draws them thinned (no two vertices nearer than 0.02 "
+    "degrees). They are the actual routes as six national sources gave them (Germany's BSH, Spain's CICA, France's "
+    "SHOM and SIGCables, Malta's IOI-MOC, the United Kingdom's OGA); Dutch cables are withheld by their source for "
+    "security, and the data comes as it is.")
+OSM = {"format": "overpass", "url": OVERPASS, "source": "OpenStreetMap, through the Overpass API",
+       "licence_name": "ODbL 1.0", "licence": ODBL, "credit": OSM_CREDIT}
+# EMODnet's six telecom cable layers (its WFS's capabilities, read 2026-11-17: the power cables' three left out)
+EMODNET_LAYERS = ("emodnet:bshcontiscables", "emodnet:cicacables", "emodnet:shomcables", "emodnet:sigcables",
+                  "emodnet:maltacables", "emodnet:ukfibrecables")
+# Each data set as the library reads it: its address and query, its download's size (an estimate, said as one), its
+# licence's words (shown before the download and accepted in so many words) and its credit (beside every feature
+# drawn), and `wait`, the seconds each socket operation of its download waits at most: the query's own time limit and a
+# margin, for a server may be silent while a query runs (Overpass' [timeout:180] and [timeout:300]; the Wikidata Query
+# Service's deadline of 60 s). The data sets are the same as the Windows firewall plugin's. The Overpass
+# queries ask for tags alone (out tags), a point for each feature that is no line (center) and a line's geometry
+# (geom): nothing about this machine or its traffic.
+INFRASTRUCTURE = (
+    {**OSM, "id": "osm-datacentres", "title": "Data centres", "size": 2_000_000, "wait": 210,
+     "about": "about 5,000 sites, and its few exchange points",
+     "query": '[out:json][timeout:180];(nwr["telecom"="data_center"];nwr["building"="data_center"];'
+              'nwr["telecom"="internet_exchange"];);out tags center qt;'},
+    # a submarine cable's telecom categories: the OSM wiki's own word for fibre (optical), the spellings mapped beside
+    # it (taginfo, 2026-11-18: telephone 749, fibre_optic 366, fiber_optic 64, optical 5, telefon 2, telegraph,
+    # communication and telephone/fibre_optic 1 each), telephone's and telegraph's; power, mooring, ferry, sensor and
+    # the like are left out
+    {**OSM, "id": "osm-cables", "title": "Submarine cables and landing stations", "size": 3_000_000, "wait": 210,
+     "about": "about 1,200 cable ways and 60 landing stations",
+     "query": '[out:json][timeout:180];(way["seamark:type"="cable_submarine"]'
+              '["seamark:cable_submarine:category"~"^(fibre_optic|fiber_optic|optical|telephone|telegraph|telefon|'
+              'communication|telephone/fibre_optic)$"];'
+              'way["communication"="line"]["location"="underwater"];way["communication"="line"]["submarine"="yes"];);'
+              'out tags geom qt;nwr["telecom"="cable_landing_station"];out tags center qt;'},
+    {**OSM, "id": "osm-lines", "title": "Telecom lines on land (partial)", "size": 20_000_000, "wait": 330,
+     "about": "about 19,000 ways; no country is complete",
+     "query": '[out:json][timeout:300];(way["communication"="line"]["location"!="underwater"]["submarine"!="yes"];'
+              'way["telecom"="line"];way["telecom"="cable"];);out tags geom qt;'},
+    {"id": "wikidata", "title": "Exchange points, ground stations and teleports", "format": "sparql", "url": WDQS,
+     "source": "Wikidata", "licence_name": "CC0", "licence": CC0, "credit": WIKIDATA_CREDIT, "size": 200_000,
+     "wait": 90, "about": "about 300 places, some data centres among them",
+     "query": 'SELECT ?item ?itemLabel ?kind ?coord ?operatorLabel WHERE { VALUES ?kind { wd:Q1433061 wd:Q671224 '
+              'wd:Q1349167 wd:Q10379228 } ?item wdt:P31 ?kind . OPTIONAL { ?item wdt:P625 ?own } OPTIONAL { ?item '
+              'wdt:P159/wdt:P625 ?seat } OPTIONAL { ?item wdt:P131/wdt:P625 ?place } BIND(COALESCE(?own, ?seat, '
+              '?place) AS ?coord) FILTER(BOUND(?coord)) OPTIONAL { ?item wdt:P137 ?operator } SERVICE '
+              'wikibase:label { bd:serviceParam wikibase:language "en" } }'},
+    {"id": "emodnet-cables", "title": "Telecom cable routes in European waters", "format": "geojson",
+     "url": EMODNET_WFS, "source": "EMODnet Human Activities, through its WFS", "licence_name": "CC BY 4.0",
+     "licence": EMODNET_LICENCE, "credit": EMODNET_CREDIT, "size": 4_000_000, "wait": 120,
+     "about": "actual routes in European waters, and French cables beyond, from six national sources",
+     "query": "service=WFS&version=1.1.0&request=GetFeature&typeName=" + ",".join(EMODNET_LAYERS)
+              + "&outputFormat=application/json&srsName=EPSG:4326"},
+)
+
+PROCFS = Api(
+    name="The kernel's socket tables (procfs)",
+    maker="the Linux kernel",
+    about=("Linux lists every socket of this machine's network in four files of /proc/net (tcp, tcp6, udp, udp6), "
+           "which every account may read: each socket's two ends, its state, its user and its inode. The program "
+           "behind a socket is found through /proc/<pid>/fd, which an account may read for its own processes alone "
+           "(root, for all): there a socket's descriptor reads socket:[<inode>]; then the program's name, where it "
+           "is on disk, the service it runs in and when it started are read from /proc/<pid>/comm, exe, cgroup and "
+           "stat. The Netstat "
+           "tab reads them as files, as the platform's user, with no command, no capture and no root (the library's "
+           "sockets.py), every 3 s while it is shown; the hosts database is fed from the same readings. Another user's "
+           "socket is listed without its program, unless the firewall's own read (as root, through ss) named the "
+           "program listening on its port. Linux does not say when a socket began: Since is when a reading first "
+           "listed it. Inside a WSL distribution the tables are its own network's; on Windows and macOS nothing is "
+           "read."),
+    kind="kernel",
+    base=("/proc/net/tcp, tcp6, udp and udp6; /proc/<pid>/fd, comm, exe, cgroup and stat; /proc/stat, read as files "
+          "(the library's sockets.py)"),
+    version=("the same columns in all four tables on every Linux since 2.6 (WSL 2's kernel alike); a UDP socket "
+             "connected to a peer says it (its st 01)"),
+    auth=("none: the four tables are every account's to read; another user's /proc/<pid>/fd is root's alone, and "
+          "root is never asked for the tab: their sockets are listed without their program"),
+    limits=("20,000 sockets a reading at most (the rest left out, and said); the processes walked once a reading, and "
+            "only for a socket not seen before or whose holder has ended"),
+    costs="",
+    links=(
+        Link("proc_net_tcp: /proc/net/tcp and tcp6", KERNEL_DOCS, "reference"),
+        Link("proc(5)", MAN7 + "man5/proc.5.html", "docs"),
+        Link("proc_pid_net(5): /proc/net", MAN7 + "man5/proc_pid_net.5.html", "reference"),
+        Link("proc_pid_fd(5)", MAN7 + "man5/proc_pid_fd.5.html", "reference"),
+        Link("proc_pid_comm(5)", MAN7 + "man5/proc_pid_comm.5.html", "reference"),
+        Link("proc_pid_exe(5)", MAN7 + "man5/proc_pid_exe.5.html", "reference"),
+        Link("proc_pid_cgroup(5)", MAN7 + "man5/proc_pid_cgroup.5.html", "reference"),
+        Link("proc_pid_stat(5)", MAN7 + "man5/proc_pid_stat.5.html", "reference"),
+        Link("proc_stat(5)", MAN7 + "man5/proc_stat.5.html", "reference"),
+        Link("tcp(7)", MAN7 + "man7/tcp.7.html", "reference"),
+        Link("udp(7)", MAN7 + "man7/udp.7.html", "reference"),
+        Link("sock_diag(7)", MAN7 + "man7/sock_diag.7.html", "reference"),
+        Link("ss(8)", MAN7 + "man8/ss.8.html", "tool"),
+        Link("WSL's networking: localhost, NAT and mirrored", WSL_NETWORKING, "guide"),
+    ),
+    areas=(
+        Area("The TCP tables", "/proc/net/tcp and tcp6: every TCP socket, its two ends, its state, its timer, its user "
+             "and its inode", KERNEL_DOCS,
+             covered=("every TCP socket, listening, connected or closing: the Netstat tab's connections and listening "
+                      "ports, and the hosts database's connections")),
+        Area("The UDP tables", "/proc/net/udp and udp6: every UDP socket, bound, or connected with its peer",
+             MAN7 + "man5/proc_pid_net.5.html",
+             covered="every UDP socket: bound ones as listening ports, connected ones with their peers as connections"),
+        Area("A process's descriptors", "/proc/<pid>/fd: each descriptor a link, socket:[<inode>] for a socket",
+             MAN7 + "man5/proc_pid_fd.5.html",
+             covered="the platform's user's own processes walked for the sockets of their own, once a reading"),
+        Area("A process's facts", "/proc/<pid>/comm, exe, cgroup and stat: its name, its file, its service, its start",
+             MAN7 + "man5/proc_pid_stat.5.html",
+             covered="the program behind each socket of one's own, where it is on disk, its systemd unit, its start"),
+        Area("The system's start", "/proc/stat's btime: when this Linux started", MAN7 + "man5/proc_stat.5.html",
+             covered="a process's start in seconds since 1970 (stat's field 22 is in ticks after it)"),
+        Area("Socket diagnostics (sock_diag)", ("the netlink interface ss speaks: every socket with its uid, inode, "
+             "bytes each way and, from about Linux 5.8, its cgroup"), MAN7 + "man7/sock_diag.7.html"),
+        Area("Connection tracking's times", "conntrack's timestamps: when a connection began (root, and a sysctl)",
+             MAN7 + "man5/proc_pid_net.5.html"),
+        Area("Other socket tables", "/proc/net's raw, unix, packet and netlink tables",
+             MAN7 + "man5/proc_pid_net.5.html"),
+    ),
+    calls=(
+        Call("read /proc/net/tcp", "every IPv4 TCP socket", "The TCP tables", used="each reading", docs=KERNEL_DOCS),
+        Call("read /proc/net/tcp6", "every IPv6 TCP socket (an IPv4 peer of a dual-stack socket among them)",
+             "The TCP tables", used="each reading", docs=KERNEL_DOCS),
+        Call("read /proc/net/udp", "every IPv4 UDP socket", "The UDP tables", used="each reading",
+             docs=MAN7 + "man5/proc_pid_net.5.html"),
+        Call("read /proc/net/udp6", "every IPv6 UDP socket", "The UDP tables", used="each reading",
+             docs=MAN7 + "man5/proc_pid_net.5.html"),
+        Call("readlink /proc/<pid>/fd/<fd>", "what a descriptor is: socket:[<inode>] for a socket",
+             "A process's descriptors", used="one walk a reading, only while a socket of one's own is not known yet",
+             docs=MAN7 + "man5/proc_pid_fd.5.html"),
+        Call("read /proc/<pid>/comm", "a process's program name", "A process's facts", used="each holder found, once",
+             docs=MAN7 + "man5/proc_pid_comm.5.html"),
+        Call("readlink /proc/<pid>/exe", "where a process's program is on disk", "A process's facts",
+             used="each holder found, once", docs=MAN7 + "man5/proc_pid_exe.5.html"),
+        Call("read /proc/<pid>/cgroup", "the control group a process runs in (its systemd unit)", "A process's facts",
+             used="each holder found, once: the service behind a socket", docs=MAN7 + "man5/proc_pid_cgroup.5.html"),
+        Call("read /proc/<pid>/stat", "a process's state; field 22 its start", "A process's facts",
+             used="each holder found, once: when its program started", docs=MAN7 + "man5/proc_pid_stat.5.html"),
+        Call("read /proc/stat", "the system's counters; btime its start", "The system's start",
+             used="once a walk that found a holder", docs=MAN7 + "man5/proc_stat.5.html"),
+        Call("socket(AF_NETLINK, SOCK_DGRAM, NETLINK_SOCK_DIAG)", "the socket diagnostics' netlink socket",
+             "Socket diagnostics (sock_diag)", docs=MAN7 + "man7/sock_diag.7.html"),
+        Call("ss -tunap", "every TCP and UDP socket with its programs, through sock_diag",
+             "Socket diagnostics (sock_diag)", docs=MAN7 + "man8/ss.8.html"),
+    ),
+    verified=NETSTAT_VERIFIED,
+)
+
+OVERPASS_API = Api(
+    name="Overpass API",
+    maker="the Overpass API's makers (Roland Olbricht), its public server run for OpenStreetMap's community",
+    about=("Overpass answers queries of OpenStreetMap's data: every feature with the tags asked, with its point or its "
+           "line. The globe's internet infrastructure asks it once a data set, on your click, after you accept "
+           "OpenStreetMap's licence (ODbL 1.0): its data centres and exchange points, its submarine cables and their "
+           "landing stations, its telecom lines on land. Each query asks for tags and places alone and says nothing "
+           "about this machine or its traffic; the request carries the plugin's name and version as its User-Agent, "
+           "nothing of yours. The answer is read on this machine, its points and lines kept in the data folder's "
+           "infrastructure/ in place of an older copy, and the download itself is not kept. Its public servers are "
+           "volunteers', busy at times (a 429 or a 504 is asked once more a minute later, then said), and their rules "
+           "frown on apps leaning on them: nothing is asked by itself, and a data set is asked again only on your "
+           "click. What volunteers mapped is incomplete in places."),
+    kind="query",
+    base=OVERPASS,
+    version="Overpass API 0.7, its query language Overpass QL, answering in JSON",
+    auth="none: no account and no key",
+    limits=("about 10,000 requests and 1 GB of downloads a day for one user, by the public server's own rules; each "
+            "query's own time limit ([timeout:180], [timeout:300]); busy at times"),
+    costs="",
+    links=(
+        Link("Overpass API", OSM_WIKI + "Overpass_API", "docs"),
+        Link("Overpass QL", OSM_WIKI + "Overpass_API/Overpass_QL", "reference"),
+        Link("The Overpass API's manual", OVERPASS_DOC, "guide"),
+        Link("Commons: the public servers' rules", OVERPASS_DOC + "preface/commons.html", "limits"),
+        Link("The public server's own page", "https://overpass-api.de/", "docs"),
+        Link("Tag: telecom=data_center", OSM_WIKI + "Tag:telecom%3Ddata_center", "reference"),
+        Link("Tag: seamark:type=cable_submarine", OSM_WIKI + "Tag:seamark:type%3Dcable_submarine", "reference"),
+        Link("Tag: telecom=cable_landing_station", OSM_WIKI + "Tag:telecom%3Dcable_landing_station", "reference"),
+        Link("Key: communication", OSM_WIKI + "Key:communication", "reference"),
+        Link("Telecoms", OSM_WIKI + "Telecoms", "guide"),
+        Link("OpenStreetMap's copyright and licence", "https://www.openstreetmap.org/copyright", "terms"),
+        Link("The Open Database License 1.0", "https://opendatacommons.org/licenses/odbl/1-0/", "terms"),
+        Link("Attribution guidelines", "https://osmfoundation.org/wiki/Licence/Attribution_Guidelines", "terms"),
+    ),
+    areas=(
+        Area("Queries", "the interpreter: Overpass QL's queries of OpenStreetMap's features by their tags",
+             OSM_WIKI + "Overpass_API/Overpass_QL",
+             covered=("three queries of tags, one a data set, asked on your click: data centres (telecom=data_center, "
+                      "building=data_center) and exchange points (telecom=internet_exchange); submarine cables "
+                      "(seamark:type=cable_submarine of the telecom categories: optical, fibre_optic and fiber_optic, "
+                      "telephone, telegraph and their kin; communication=line under water) and landing stations "
+                      "(telecom=cable_landing_station); telecom lines on land")),
+        Area("JSON output", "[out:json]: each element with its tags, a centre point or a line's geometry",
+             OSM_WIKI + "Overpass_API/Overpass_QL",
+             covered="read on this machine: the points and lines kept, thinned and bounded, in the data folder"),
+        Area("The server's status", "/api/status: the slots a client has now and when the next one frees",
+             OVERPASS_DOC + "preface/commons.html"),
+        Area("Other outputs", "XML, CSV and the counts of what a query finds", OSM_WIKI + "Overpass_API/Overpass_QL"),
+        Area("Changes over time", "a query of the data as it was at a date, or of what changed between two",
+             OSM_WIKI + "Overpass_API/Overpass_QL"),
+    ),
+    calls=(
+        Call("GET /api/interpreter?data=<query>", "the features a query asks for", "Queries",
+             used=("Download… on the World Wide Web tab's Internet infrastructure table, once a data set, on your "
+                   "word once its licence is accepted, as a job the page may cancel; https on every hop, to this host "
+                   "alone"),
+             docs=OSM_WIKI + "Overpass_API"),
+        Call("POST /api/interpreter", "the same query in the request's body", "Queries",
+             docs=OSM_WIKI + "Overpass_API"),
+        Call("GET /api/status", "this client's slots now", "The server's status",
+             docs=OVERPASS_DOC + "preface/commons.html"),
+    ),
+    verified=NETSTAT_VERIFIED,
+)
+
+WIKIDATA = Api(
+    name="Wikidata Query Service",
+    maker="the Wikimedia Foundation",
+    about=("Wikidata's SPARQL endpoint answers queries of its structured data. The globe asks it once, on your click: "
+           "the internet exchange points, data centres, ground stations and teleports Wikidata places (by their own "
+           "coordinates, else their seat's or their place's), with their names and operators in English. Its data is "
+           "in the public domain (CC0): no credit is required, and the globe names Wikidata all the same. The query "
+           "says nothing about this machine; the request's User-Agent is the plugin's name and version alone, and a "
+           "refusal for want of a contact in it is said in words (none is sent from here)."),
+    kind="query",
+    base=WDQS,
+    version="SPARQL 1.1, its results as JSON (format=json)",
+    auth="none: no account and no key",
+    limits=("a hard deadline of 60 s a query; one client (its User-Agent and address) 60 s of processing time a "
+            "minute and 30 queries in error a minute; a client without a good User-Agent may be blocked"),
+    costs="",
+    links=(
+        Link("Wikidata Query Service: the user manual", WDQS_MANUAL, "docs"),
+        Link("Wikidata's SPARQL query service", "https://www.wikidata.org/wiki/Wikidata:SPARQL_query_service", "guide"),
+        Link("Query limits", "https://www.wikidata.org/wiki/Wikidata:SPARQL_query_service/query_limits", "limits"),
+        Link("Wikidata's licensing", "https://www.wikidata.org/wiki/Wikidata:Licensing", "terms"),
+        Link("The User-Agent policy",
+             "https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy", "terms"),
+        Link("SPARQL 1.1 Query Language", "https://www.w3.org/TR/sparql11-query/", "spec"),
+        Link("The query service", "https://query.wikidata.org/", "console"),
+        Link("Creative Commons Zero", "https://creativecommons.org/publicdomain/zero/1.0/", "terms"),
+    ),
+    areas=(
+        Area("SPARQL queries", "Wikidata's items and statements asked with SPARQL, answered as JSON",
+             "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual",
+             covered=("one query, on your click: items that are internet exchange points (Q1433061), data centres "
+                      "(Q671224), ground stations (Q1349167) or teleports (Q10379228), each with its coordinates, its "
+                      "label and its operator's")),
+        Area("Labels", "the label service: an item's name in the languages asked",
+             "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual", covered="names in English"),
+        Area("The entity data", "an item's whole record as JSON, by its id",
+             "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual"),
+        Area("Federated queries", "SERVICE clauses asking other SPARQL endpoints",
+             "https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual"),
+    ),
+    calls=(
+        Call("GET /sparql?format=json&query=<query>", "a query's results as JSON", "SPARQL queries",
+             used=("Download… on the World Wide Web tab's Internet infrastructure table, once, on your word once its "
+                   "licence is accepted, as a job the page may cancel; https on every hop, to this host alone"),
+             docs="https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual"),
+        Call("POST /sparql", "the same query in the request's body", "SPARQL queries",
+             docs="https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual"),
+        Call("GET https://www.wikidata.org/wiki/Special:EntityData/<id>.json", "one item's whole record",
+             "The entity data", docs="https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual"),
+    ),
+    verified=NETSTAT_VERIFIED,
+)
+
+EMODNET = Api(
+    name="EMODnet Human Activities (WFS)",
+    maker="EMODnet, the European Commission's marine data network (its data originator Cogea Srl)",
+    about=("EMODnet Human Activities serves its layers through a GeoServer WFS. The globe asks it once, on your click, "
+           "after you accept its licence (CC BY 4.0): the telecom cables' actual routes in European waters, and "
+           "French cables beyond, from six national sources (Germany's BSH, Spain's CICA, France's SHOM and SIGCables, "
+           "Malta's IOI-MOC, the United Kingdom's OGA), as GeoJSON, longitude first. The request names its six "
+           "layers and nothing about this machine; the answer is read here, its lines kept thinned in the data "
+           "folder's infrastructure/, and credited as its record asks wherever they are drawn. Its power cables are "
+           "not asked for."),
+    kind="query",
+    base=EMODNET_WFS,
+    version="WFS 1.1.0 (its server offers 1.0.0 to 2.0.0), GetFeature answered as GeoJSON (application/json)",
+    auth="none: no account and no key",
+    limits="none named (its capabilities: Fees NONE, AccessConstraints NONE); served through Cloudflare",
+    costs="",
+    links=(
+        Link("The cables' record (Cables, Telecommunication, Actual Routes)", EMODNET_RECORD, "docs"),
+        Link("The WFS's capabilities", EMODNET_WFS + "?service=WFS&request=GetCapabilities", "reference"),
+        Link("EMODnet Human Activities", "https://emodnet.ec.europa.eu/en/human-activities", "guide"),
+        Link("The EMODnet portal", "https://emodnet.ec.europa.eu/en/", "docs"),
+        Link("GeoServer's WFS", GEOSERVER_WFS, "reference"),
+        Link("GeoServer's WFS: axis order", GEOSERVER_WFS + "axis_order/", "reference"),
+        Link("GeoServer's WFS: output formats", GEOSERVER_WFS + "outputformats/", "reference"),
+        Link("GeoServer's WFS reference", GEOSERVER_WFS + "reference/", "reference"),
+        Link("Creative Commons Attribution 4.0 International", "https://creativecommons.org/licenses/by/4.0/", "terms"),
+    ),
+    areas=(
+        Area("Features (GetFeature)", "a layer's features, in the output format and the axis order asked",
+             GEOSERVER_WFS + "reference/",
+             covered=("the six telecom cable layers in one request, as GeoJSON with srsName=EPSG:4326 (longitude "
+                      "first), on your click: their LineString and MultiLineString parts drawn as cables")),
+        Area("Capabilities", "what the service offers: its layers, their coordinates, its output formats",
+             EMODNET_WFS + "?service=WFS&request=GetCapabilities"),
+        Area("A layer's schema (DescribeFeatureType)", "a layer's properties and their types",
+             GEOSERVER_WFS + "reference/"),
+        Area("The maps (WMS)", "the same layers drawn as images", "https://emodnet.ec.europa.eu/en/human-activities"),
+        Area("The record's files", "the routes as a shapefile and a geodatabase in one zip", EMODNET_RECORD),
+        Area("The power cables", "the three power cable layers beside the telecom ones", EMODNET_RECORD),
+    ),
+    calls=(
+        Call("GET /geoserver/emodnet/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=<layers>"
+             "&outputFormat=application/json&srsName=EPSG:4326", "the layers' features as GeoJSON, longitude first",
+             "Features (GetFeature)",
+             used=("Download… on the World Wide Web tab's Internet infrastructure table, once, on your word once its "
+                   "licence is accepted, as a job the page may cancel; https on every hop, to this host alone"),
+             docs=GEOSERVER_WFS + "reference/"),
+        Call("GET /geoserver/emodnet/wfs?service=WFS&request=GetCapabilities", "the service's capabilities",
+             "Capabilities", docs=GEOSERVER_WFS + "reference/"),
+        Call("GET /geoserver/emodnet/wfs?service=WFS&request=DescribeFeatureType&typeName=<layer>",
+             "a layer's schema", "A layer's schema (DescribeFeatureType)", docs=GEOSERVER_WFS + "reference/"),
+    ),
+    verified=NETSTAT_VERIFIED,
+)
+
 FIREWALL = (NFTABLES, IPTABLES, EBTABLES, IPSET, FIREWALLD_API, UFW, CONNTRACK, BPF, IPROUTE2, SERVICES,  # its read
             SUDO, GROUPS, APT)  # and its changes; Root access's and nftables' install's (0.9.0)
 WORLD = (CAPTURE, DBIP_LITE, OPENDNS, GOOGLE)  # the World Wide Web tab's (0.8.0)
-APIS = FIREWALL + WORLD
+NETSTAT = (PROCFS, OVERPASS_API, WIKIDATA, EMODNET)  # the Netstat tab's and the globe's infrastructure (0.9.0)
+APIS = FIREWALL + WORLD + NETSTAT
 
 
 def ago(when: float) -> str:
@@ -1106,7 +1483,7 @@ def facts(plugin) -> dict[str, dict[str, str]]:
     the World Wide Web tab watched and placed (world_facts)."""
     kept = getattr(plugin, "_read", None)  # (when, Config): the last read, kept READ_S
     if not kept:
-        return {**rights_facts(plugin), **world_facts(plugin)}
+        return {**rights_facts(plugin), **world_facts(plugin), **netstat_facts(plugin)}
     cfg = kept[1]
     out: dict[str, dict[str, str]] = {}
     tools = cfg.tools or {}
@@ -1142,6 +1519,7 @@ def facts(plugin) -> dict[str, dict[str, str]]:
         out[SERVICES.name]["Not read"] = "; ".join(cfg.problems)
     out.update(rights_facts(plugin))
     out.update(world_facts(plugin))
+    out.update(netstat_facts(plugin))
     return out
 
 
@@ -1196,3 +1574,82 @@ def world_facts(plugin) -> dict[str, dict[str, str]]:
         readable, why = geo.available()
         out[DBIP_LITE.name] = {"File": "none open" + ("" if readable else f": {why}")}
     return out
+
+
+def netstat_facts(plugin) -> dict[str, dict[str, str]]:
+    """What the Netstat tab, the hosts database and the globe's layers know of what they reach (0.9.0), asking nothing
+    and starting nothing (NetstatView.describe: no socket table read, no login asked, nothing sent): under the socket
+    tables' card the last reading (how many sockets, how long it took, when), how the hosts are recorded and what the
+    hosts database holds; each data set of the globe, downloaded or not, under its source's card. The tab's view is the
+    Firewall base's (liminal-libs 1.65.0), made at the plugin's attach on a machine it is for, or at the first ask of
+    one of the two tabs, and let go at its detach; it is read here through the base's netstat_view(make=False), which
+    never makes one: nothing is said before, on a machine the plugin is not for, nor with a library from before it.
+    The Windows firewall plugin's cards say the same of its own."""
+    netstat_view = getattr(plugin, "netstat_view", None)
+    try:
+        view = netstat_view(make=False) if callable(netstat_view) else None
+        d = view.describe() if view is not None else None
+    except Exception:  # noqa: BLE001 - what the tab read is extra: the cards are drawn without it
+        return {}
+    if not isinstance(d, dict):
+        return {}
+    from liminal_libs import hostbook  # there wherever there is a view (liminal-libs 1.65.0)
+    from liminal_libs.machines import netstat
+    from liminal_libs.machines.world import size_words
+
+    reading = d.get("reading") or None
+    if reading:
+        took = max(0.0, float(reading.get("took") or 0.0)) * 1000
+        last = f"{int(reading.get('rows') or 0):,} sockets in {took:,.0f} ms, {ago(float(reading.get('at') or 0))}"
+    else:
+        last = "none yet: the socket tables are read while the Netstat or World Wide Web tab is shown"
+    mode = d.get("mode") if d.get("mode") in netstat.MODE_WORDS else "shown"
+    recording = netstat.MODE_WORDS[mode]
+    if mode == "always":
+        recording += (f": recording now, a reading every {hostbook.ALWAYS_S:g} s" if d.get("recording")
+                      else ", but not recording now")
+    book = d.get("book")
+    if not isinstance(book, dict):
+        kept = "not opened yet: it is read and written while one of the two tabs is shown, or as recording says"
+    elif book.get("elsewhere"):
+        kept = f"not kept from here: {book['elsewhere']}"
+    else:
+        kept = (f"{int(book.get('rows') or 0):,} rows ({plural(int(book.get('hosts') or 0), 'host')}, "
+                f"{plural(int(book.get('programs') or 0), 'program')}), {size_words(int(book.get('bytes') or 0))}, "
+                f"in {book.get('path') or 'the data folder'}"
+                + (f", recorded since {time.strftime('%Y-%m-%d %H:%M', time.localtime(book['since']))}"
+                   if book.get("since") else ""))
+        if book.get("problem"):
+            kept += f"; {book['problem']}"
+    tables = {"Last reading": last, "Recording": recording, "Hosts database": kept}
+    if d.get("error"):
+        tables["Problem"] = str(d["error"])
+    out: dict[str, dict[str, str]] = {PROCFS.name: tables}
+    sources = {"overpass": OVERPASS_API, "sparql": WIKIDATA, "geojson": EMODNET}
+    for s in d.get("sets") or ():
+        card = sources.get(str(s.get("format") or "")) if isinstance(s, dict) else None
+        if card is not None:
+            out.setdefault(card.name, {})[str(s.get("title") or s.get("id") or "a data set")] = data_set_words(s)
+    return out
+
+
+def data_set_words(s: dict) -> str:
+    """A data set of the globe as its card's fact says it (Index.sets' entry): being downloaded, its file that does not
+    read, what is installed of it, or that it is not downloaded yet."""
+    if s.get("downloading"):
+        return "being downloaded now (its progress is in the plugin's panel)"
+    if s.get("problem"):
+        return str(s["problem"])
+    if s.get("installed"):
+        from liminal_libs.machines.world import size_words
+
+        dropped = int(s.get("dropped") or 0)
+        return (f"{plural(int(s.get('features') or 0), 'feature')}, fetched {str(s.get('fetched') or '')[:10]} "
+                f"({size_words(int(s.get('bytes') or 0))})" + (f"; {dropped:,} left out" if dropped else ""))
+    return ("not downloaded: the World Wide Web tab's Internet infrastructure table offers it, its size and licence "
+            "said first")
+
+
+def plural(n: int, word: str) -> str:
+    """A count and its word: 1 host, 2 hosts."""
+    return f"{n:,} {word}" + ("" if n == 1 else "s")

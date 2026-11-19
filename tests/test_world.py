@@ -45,11 +45,17 @@ from liminal_libs.traffic import TrafficBook
 
 from plugin_platform_firewall_linux import MACHINE, LinuxFirewallPlugin, xdp_words
 from plugin_platform_firewall_linux import apis as cards
+from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux.read import Config
 from plugin_platform_firewall_linux.system import Interface, System
 
 from machines import FakeLinux
 from mmdb_file import NOVEMBER, OCTOBER, city, mmdb
+
+try:  # the Netstat tab's view (liminal-libs 1.65.0), which the tab's every ask now reads for the hosts database
+    from liminal_libs.machines.netstat import NetstatView
+except ImportError:  # a library from before it: the tab reads no socket table
+    NetstatView = None
 
 # CI installs maxminddb (the library's geo extra): there these run, and fail rather than skip without it
 needs_reader = pytest.mark.skipif(not geo.available()[0] and not os.environ.get("CI"),
@@ -116,19 +122,38 @@ class Downloads:
         return io.BytesIO(got)
 
 
+def socket_table(*rows, at: float = NOW) -> dict:
+    """The kernel's socket tables as the library's sockets.read answers them on Linux, of the rows given (none by
+    default): a stand-in, so the tab's every ask, which also reads them for the hosts database (liminal-libs 1.65.0),
+    reads nothing real."""
+    return {"system": "linux", "at": at, "awake": 100.0, "took": 0.004, "root": False, "starts": False,
+            "read": ("tcp4", "tcp6", "udp4", "udp6"), "cut": False, "rows": list(rows), "notes": []}
+
+
 class Watched(LinuxFirewallPlugin):
     """The plugin on a native Linux machine (or on one it is not for: `native` says why), its commands kept by a
-    stand-in, its World Wide Web tab watching through the test's stand-ins (make_world_view, as the library's tests do)."""
+    stand-in, its World Wide Web tab watching through the test's stand-ins (make_world_view, as the library's tests do),
+    and (0.9.0) its Netstat view reading a stand-in socket table, with none of the plugin's data sets
+    (make_netstat_view: the suite's guard refuses the real table, and keeps the hosts database in the test's own
+    folder)."""
 
     def __init__(self, native: str = "", **view):
         self.commands = FakeLinux("debian-13-nftables")
         super().__init__(shell=Shell("local", runner=self.commands), native=native)
         view.setdefault("resolve", lambda version, servers: (None, "no name server answers in a test"))
-        self.view_args, self.views = view, 0
+        self.view_args, self.views, self.readings = view, 0, 0
 
     def make_world_view(self) -> WorldView:
         self.views += 1
         return WorldView(self.name, timeout=self.WORLD_TIMEOUT, **self.view_args)
+
+    def make_netstat_view(self):
+        def reader() -> dict:
+            self.readings += 1
+            return socket_table()
+        return NetstatView(self.name, reader=reader, names={}, login_of=lambda: getattr(self, "login", None),
+                           listeners=self.netstat_listeners, clock=self.view_args.get("clock", time.monotonic),
+                           wall=self.view_args.get("wall", time.time))
 
 
 def wait_for(condition, seconds: float = 3.0) -> bool:
@@ -187,7 +212,8 @@ def traffic_of(book: TrafficBook) -> None:
 
 # -- the tab: the base's, this plugin naming its download, its licence, its credit and its name servers ---------------------
 def test_the_tab_its_hooks_and_its_setting_are_the_firewall_bases():
-    assert MACHINE.TABS == Firewall.TABS == (Tab("world", "World Wide Web", "world", 2.0),)  # after Main and API, every 2 s
+    # after Main and API, every 2 s (0.9.0, liminal-libs 1.65.0: the Netstat tab after it, the base's too)
+    assert MACHINE.TABS == Firewall.TABS and MACHINE.TABS[0] == Tab("world", "World Wide Web", "world", 2.0)
     assert MACHINE.HOOKS[:len(Firewall.HOOKS)] == Firewall.HOOKS and {"world", "world_geoip"} <= set(Firewall.HOOKS)
     hooks = MACHINE.interface()["hooks"]
     # asked by name (Plugin.ask): the tab's page with no arguments, the install with the one its form sets and the log
@@ -197,10 +223,15 @@ def test_the_tab_its_hooks_and_its_setting_are_the_firewall_bases():
     # (0.9.0: and nftables' install after them)
     assert MACHINE.JOB_HOOKS == (*Firewall.JOB_HOOKS, "install_nftables") and "world_geoip" in MACHINE.JOB_HOOKS
     assert {"make_rule", "remove_rule", "set_policy", "switch", "save_rules"} <= set(hooks)  # its own, as before
-    [home] = MACHINE.keys  # the home on the globe: a setting on its page, kept through the platform's login
+    home, *more = MACHINE.keys  # the home on the globe: a setting on its page, kept through the platform's login
     assert (home.name, home.secret) == ("LIMINAL_HOME_PLACE", False) and home.hint.startswith("optional")
+    assert MACHINE.keys == Firewall.keys  # 0.9.0: and when the hosts are recorded (the base's, liminal-libs 1.65.0)
     assert problems(MACHINE) == []
     assert "World Wide Web tab" in MACHINE.about
+    # 0.9.0: the Netstat tab's words only with a library that has the tab (liminal-libs 1.65.0), and none before it
+    # (this test runs on both)
+    assert ("Netstat tab" in MACHINE.about) == netstat_mod.library()
+    assert ("hosts database" in MACHINE.about) == netstat_mod.library()
 
 
 def test_its_geoip_file_is_db_ips_lite_city_and_its_places_are_credited_to_db_ip():
@@ -472,8 +503,8 @@ def test_db_ips_file_is_downloaded_from_its_own_address_only_once_its_licence_is
         "Changchun", "unanswered", 2)
     assert page["globe"]["local"]["places"] == 1  # the router: the local network's, never placed
     assert page["globe"]["attribution"] == MARK
-    places = page["tables"][1]
-    assert places["title"] == "Places" and "Places: IP Geolocation by DB-IP, https://db-ip.com." in places["note"]
+    places = next(t for t in page["tables"] if t["title"] == "Places")  # (0.9.0: the globe's choice is the first)
+    assert "Places: IP Geolocation by DB-IP, https://db-ip.com." in places["note"]
     assert "forms" not in page and "actions" not in page
     facts = fw.api_facts()[cards.DBIP_LITE.name]
     assert facts["File"] == "dbip-city-lite-2026-11.mmdb, built 2026-11-01" and facts["Read"].startswith("memory-mapped")

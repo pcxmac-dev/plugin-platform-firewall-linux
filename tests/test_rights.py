@@ -22,6 +22,7 @@ from liminal_libs.machines.linux import Shell
 from liminal_libs.machines.plugin import CommandError
 from plugin_platform_firewall_linux import (CHANGE_FORMS, INSTALL, REFRESH, ROOT_FOR_READ, WSL_ROOT_ROW,
                                             LinuxFirewallPlugin)
+from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux import rights
 from plugin_platform_firewall_linux.changes import ACCEPT, Risky
 from plugin_platform_firewall_linux.read import SCRIPT
@@ -31,6 +32,8 @@ from machines import SUDO_S, FakeLinux, answer
 from sudo import LISTING, NEEDS_PASSWORD, PASSWORD, WRONG, Sudo, installed_read
 
 NEEDS = "What the firewall needs here"
+# what the table says of the Netstat tab (0.9.0): no rights needed, with a library that has it
+SERVED = "need no rights" if netstat_mod.library() else "not in this library"
 BARE_TOOLS = "ip /usr/sbin/ip\nss /usr/bin/ss"  # the user's Ubuntu in WSL: no nft, iptables, ufw or firewall-cmd
 FIXED = {"name": "state", "label": "Root access", "type": "fixed"}
 
@@ -101,12 +104,14 @@ def test_off_the_rules_are_not_read_and_turn_on_is_offered_with_its_words(monkey
     assert st["rootAccess"] == rights.OFF == "off: the firewall's rules are not read"
     needs = table(st, NEEDS)
     assert [c["title"] for c in needs["columns"]] == ["What", "Here", "What to do", ""]
-    root, tool = needs["rows"]
+    root, tool, netstat = needs["rows"]
     assert root[:2] == ["Root access", "off: the firewall's rules are not read"]
     assert root[2].startswith("Turn on… gives")
     assert root[3] == {"form": "root-on", "title": "Turn on…", "values": {"state": "on"},
                        "label": "Turn Root access on"}
     assert tool == ["A firewall tool", "nftables, iptables installed", "none needed", ""]
+    # 0.9.0: the Netstat tab and the hosts database need no rights, and are served meanwhile (B-revisions S2)
+    assert netstat[:2] == ["Netstat and the hosts database", SERVED] and netstat[3] == ""
     assert ids(st) == ["root-on"] and st["actions"] == [REFRESH]  # no change it cannot make
     on = form(st, "root-on")
     assert on["hook"] == "root_access" and on["fields"] == [FIXED, PASSWORD_FIELD]
@@ -262,7 +267,8 @@ def test_install_nftables_is_offered_only_without_a_firewall_tool_its_size_said_
     st = fw.status()
     assert st["valid"]
     assert st["problem"].endswith("No firewall tool is installed here (nftables, iptables, ufw, firewalld).")
-    root, tool = table(st, NEEDS)["rows"]
+    root, tool, netstat = table(st, NEEDS)["rows"]
+    assert netstat[:2] == ["Netstat and the hosts database", SERVED]  # 0.9.0: served without a tool
     words = ("Ubuntu's own nftables package 1.0.9-1ubuntu0.1, with the 2 packages it needs that are not installed yet "
              "(libnftnl11, libnftables1): 494 kB to download, 1.5 MB once installed")
     assert tool == ["A firewall tool", "none installed: no nft, iptables, ufw or firewall-cmd here",
@@ -455,6 +461,7 @@ def test_a_distribution_reached_from_windows_is_refused_as_before_and_its_status
 def test_with_a_library_from_before_the_grant_it_works_as_0_8_1_and_says_the_switch_needs_1_62_0(monkeypatch):
     for name in rights.NAMES:
         monkeypatch.delattr(linux_mod, name, raising=False)
+    monkeypatch.setattr(netstat_mod, "library", lambda: False)  # nor the Netstat tab (liminal-libs 1.65.0), later still
     monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 1000, raising=False)
     ran: list = []
 
@@ -473,6 +480,8 @@ def test_with_a_library_from_before_the_grant_it_works_as_0_8_1_and_says_the_swi
                                           f"once, needs liminal-libs {rights.NEEDS_LIBS} (this one is ")
     assert needs["rows"][1] == ["A firewall tool", "none installed: no nft, iptables, ufw or firewall-cmd here",
                                 INSTALL]
+    assert needs["rows"][2][:2] == ["Netstat and the hosts database", "not in this library"]  # what 0.9.0 would add
+    assert needs["rows"][2][2].startswith(f"they need liminal-libs {netstat_mod.NETSTAT_LIBS} (this one is ")
     assert ran == [["sudo", "-n", "sh", "-c", SCRIPT]]  # 0.8.1's one read, sudo -n
     for ask in (lambda: fw.root_access("on", PASSWORD), lambda: fw.install_nftables(PASSWORD)):
         with pytest.raises(ValueError, match=re.escape(f"needs liminal-libs {rights.NEEDS_LIBS}")):

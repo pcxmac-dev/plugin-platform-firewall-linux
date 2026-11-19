@@ -3,7 +3,10 @@
 Linux firewall for Liminal: the whole firewall of the Linux the platform runs on (a machine of its own, or a WSL
 distribution the platform runs inside), read and changed from the platform's page. nftables, iptables (nf_tables and
 legacy), ebtables, arptables, ipset, firewalld, ufw, conntrack, and eBPF/XDP (read only), under systemd, OpenRC or SysV
-scripts, on the major distributions and Gentoo.
+scripts, on the major distributions and Gentoo. Its World Wide Web tab draws this machine's traffic on a globe, and its
+Netstat tab lists the listening ports and the open connections with the program behind each; the hosts database keeps
+each program's remote hosts and how long they were connected, and the globe shows them, filtered, with the internet's
+exchange points, data centres and cables.
 
 The user's words. 2026-11-07: "the platform is the interface for the software/hardware which facilitates the liminal
 framework"; "i also need a windows and linux firewall plugin for the platform". 2026-11-08, on the Windows one: "i need
@@ -70,7 +73,10 @@ The plugin's status holds tables for the platform's page (liminal-platform 0.6.0
 - **Sets**: nftables' sets and ipset's.
 
 Valid whenever the firewall can be read, as the Windows firewall plugin is: off, or without Liminal's rules, is said in
-the summary and the tables, not as invalid.
+the summary and the tables, not as invalid. Since 0.9.0 it is valid too wherever the kernel's socket tables can be read
+and the firewall cannot (the Netstat tab, below, needs no rights), its Main page saying what the firewall needs.
+
+After Main and the API tabs come the World Wide Web tab (0.8.0) and the Netstat tab (0.9.0), below.
 
 ## The rules in groups
 
@@ -276,7 +282,7 @@ The plugin works on the Linux the platform runs on, and only there: a machine of
 platform runs inside. Inside WSL it reads and changes that distribution's firewall like any other's. Its page then ends
 with an "Under WSL" table (the library's `machines.linux.wsl_table`): the packet filter WSL's kernel gives (none under
 WSL 1), and WSL's network behind Windows, whose own firewall decides first what reaches the distribution from outside
-the PC. The World Wide Web tab says what WSL changes for it too (below).
+the PC. The World Wide Web and Netstat tabs say what WSL changes for them too (below).
 
 On Windows and on macOS it runs no command at all, and a platform on Windows never reaches into a WSL distribution from
 outside (the WSL plugins are for those). There its status says why and that it does not apply (`applies` False). The
@@ -462,6 +468,100 @@ What the plugin names itself is in `apis.py`: `GEOIP_URL` (the download,
 `https://download.db-ip.com/free/dbip-city-lite-{year}-{month}.mmdb.gz`), `GEOIP_LICENCE` (the licence's words),
 `ATTRIBUTION` and `PUBLIC_DNS`. The library names no outside host.
 
+## The Netstat tab
+
+The user's words (2026-11-16): "the firewall app should have a 'netstat' like interface for looking at active ports
+and what apps they are attached to, and the hosts that they connect to across the lan or wan. the firewall app should
+also have a globe that can be zoomed and rotated and geoip'd hosts are databased for the apps they talk to, the time
+they are connected to *this *computer". The tab is the library's Firewall base's (liminal-libs 1.65.0:
+`sockets.py`, `machines/netstat.py`), after the World Wide Web tab, asked every 3 s while it is shown.
+
+**What it shows.**
+
+- The open connections, each with the program that holds it (its name and pid, and the systemd unit it runs in), the
+  remote host and port, whether that host is this machine, the local network or the internet, its GeoIP place when it
+  is on the internet, its name where `/etc/hosts` gives one, its state, and since when it was first seen here. Linux
+  does not say when a connection began, so "Since" is when a reading first listed it. The page filters them by
+  direction, by where the host is and by words, without asking again.
+- The listening ports: each protocol, port and program, reached from every address or this machine only, with the
+  four Liminal apps' pages named.
+- The hosts database and its two forms, Recording and Forget (below).
+
+**No rights needed.** The kernel's socket tables (`/proc/net/tcp`, `tcp6`, `udp`, `udp6`) list every socket of this
+machine's network to any account, so the tab reads them as files, as the platform's user: no command, no capture, no
+root, no window, and no name looked up. Only root may read which program holds another user's socket
+(`/proc/<pid>/fd`), so such a socket is listed without its program, in words. A listening port another user holds is
+named all the same where the firewall's own read (as root: `ss -ltnp`, `ss -lunp`) named its program: from the read
+kept, with no command run for it (`netstat_listeners`). A UDP socket connected to a peer shows that peer, which
+Windows cannot show. A connection shorter than the gap between two readings can be missed.
+
+**Valid wherever the socket table can be read.** None of this needs root, so the plugin is valid, and in the tray,
+wherever the kernel's socket tables can be read, whether or not the firewall itself can be: no firewall tool, sudo
+asking for a password with Root access off, or a read that fails for its own reasons. Its Main page then says what is
+missing and offers only what it can do, and its table of what the firewall needs ends with a row for the Netstat tab
+and the hosts database: they need no rights. Where no socket table can be read, or with a library from before 1.65.0,
+the plugin is as 0.8.2 was, and the row says why.
+
+**Under WSL.** Inside a WSL distribution the tab ends with what WSL changes for it (the library's
+`sockets.under_wsl`): the sockets listed are the distribution's own; what Windows' own programs listen on and connect
+to is the Windows firewall plugin's Netstat to list; a platform that is not root reads as you. This plugin adds the
+one thing more that was seen in the user's own Ubuntu (WSL 2, NAT networking, 2026-11-18): Windows' own programs reach
+a TCP port listening there at 127.0.0.1 at Windows' 127.0.0.1 too. Windows' table listed `wslrelay.exe` at 127.0.0.1 on
+exactly the TCP ports Linux programs listened on at 127.0.0.1, on none listening at another address (127.0.0.53,
+10.255.255.254), and on no UDP port at all: chronyd's 127.0.0.1:323/udp there was not forwarded. So for TCP, "this
+machine only" takes in Windows' programs there; for UDP it does not. How a connection from Windows looks from inside
+(its peer, its owner), another distribution's sockets and WSL's mirrored networking were not seen: no connection was
+open, none was opened to see one, no other distribution ran, and the networking was WSL's default NAT. The tab says
+none of them.
+
+## The hosts database
+
+One small SQLite file on this machine's own disk (the data folder's `hosts/hosts.db`, made 0600 in a folder made
+0700), the library's `hostbook.py`. For each program and remote host it keeps the ports, the first and the last time
+seen, the total time connected to this machine, how many connections, and the host's GeoIP place (an internet host's
+only: the local network's are never placed). It is fed from the same readings as the tab, rows capped at 50,000 (about
+13 MB with ordinary values), the hosts longest unseen pruned first.
+
+- **Recording** (a setting kept through the platform's login, `LIMINAL_HOSTS_RECORDING`): only while this plugin's
+  Netstat or World Wide Web tab is shown (the default), or all the time the platform runs, a reading every 5 s on a
+  thread of its own. Off Windows today the login keeps a setting only until the platform restarts, and the page says
+  so.
+- **Forget...** removes every row, asked twice.
+- Linux gives no start for a connection, so its time connected is what was seen: a gap of more than 30 s between two
+  readings adds nothing.
+
+## Internet infrastructure on the globe
+
+The user's words (2026-11-16): "the globe-firewall should allow filtering, so i can view apps connected to hosts all
+across the globe, or ports talking to all hosts. The globe should have the same kind of geography associated with the
+exchanges globe, but the firewall globe should instead of exchanges, have all the backbones,ibones, major internet
+infrastructure, (as many as possible) datacenter locations."
+
+The World Wide Web tab's globe shows the traffic watched now or the hosts recorded, filtered by program (its hosts
+across the globe), by port (every host on it), by direction and by when they were last seen; the eight programs and
+the eight ports with the most hosts are offered right under the globe. It draws the internet's infrastructure where the
+exchanges globe draws exchanges, from free-licensed data sets this plugin names (`apis.INFRASTRUCTURE`), each
+downloaded only when you ask on the tab's Internet infrastructure table, as a job, its size (an estimate) and its
+licence said first and accepted in so many words, and kept in the data folder's `infrastructure/`:
+
+- **Data centres** (OpenStreetMap, through the public Overpass server; about 5,000 sites and its few exchange points;
+  about 2 MB).
+- **Submarine cables and landing stations** (OpenStreetMap; about 1,200 cable ways of every telecom category, fibre
+  optic, telephone and telegraph, and 60 landing stations; about 3 MB).
+- **Telecom lines on land** (OpenStreetMap; about 19,000 ways, no country complete; about 20 MB): "ibones" is read as
+  the internet's backbones, drawn from these and the submarine cables.
+- **Exchange points, ground stations and teleports** (Wikidata, through its query service; about 300 places; about
+  0.2 MB).
+- **Telecom cable routes in European waters** (EMODnet Human Activities, through its WFS: the actual routes from six
+  national sources, as GeoJSON; about 4 MB).
+
+OpenStreetMap's are under the ODbL 1.0 (credited "© OpenStreetMap contributors"), Wikidata's in the public domain
+(CC0), EMODnet's under CC BY 4.0 (credited "EMODnet Human Activities; data originator Cogea Srl"); each credit is shown
+wherever its features are drawn. Each request names what it asks for and nothing about this machine or its traffic,
+with the plugin's name and version as its User-Agent. A busy server is asked once more a minute later, then said; a
+download stops by itself after 10 minutes, and Cancel stops it sooner. PeeringDB, root-server sites and cloud regions
+are not among them: not free-licensed, or no licence stated.
+
 ## Its API
 
 The user's words (2026-11-11): "each plugin should reflect the the API its attached to, and present links that provide
@@ -524,13 +624,36 @@ The World Wide Web tab's (0.8.0):
   [Google Public DNS](https://developers.google.com/speed/public-dns),
   [nslookup(1)](https://manpages.debian.org/unstable/bind9-dnsutils/nslookup.1.en.html).
 
+The Netstat tab's and the globe's infrastructure (0.9.0, with liminal-libs 1.65.0; with an older library the plugin
+reaches none of them, and their cards are left out):
+
+- **The kernel's socket tables (procfs)**: [proc_net_tcp](https://docs.kernel.org/networking/proc_net_tcp.html),
+  [proc(5)](https://man7.org/linux/man-pages/man5/proc.5.html),
+  [proc_pid_fd(5)](https://man7.org/linux/man-pages/man5/proc_pid_fd.5.html),
+  [WSL's networking](https://learn.microsoft.com/en-us/windows/wsl/networking). Read as files; sock_diag and `ss` are
+  on its card, not used by the tab.
+- **Overpass API** (OpenStreetMap's data centres, exchange points, cables and lines):
+  [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API),
+  [Overpass QL](https://wiki.openstreetmap.org/wiki/Overpass_API/Overpass_QL),
+  [the public servers' rules](https://dev.overpass-api.de/overpass-doc/en/preface/commons.html),
+  [OpenStreetMap's copyright](https://www.openstreetmap.org/copyright).
+- **Wikidata Query Service**: [its user manual](https://www.mediawiki.org/wiki/Wikidata_Query_Service/User_Manual),
+  [Wikidata's licensing](https://www.wikidata.org/wiki/Wikidata:Licensing).
+- **EMODnet Human Activities (WFS)**:
+  [the cables' record](https://emodnet.ec.europa.eu/geonetwork/srv/api/records/39ebe289-410b-4a5d-88a4-51bfcde538de),
+  [GeoServer's WFS](https://docs.geoserver.org/latest/en/user/services/wfs/),
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
 `api_facts()` says what the last read found, asking nothing: each tool's version and variant, the tables, the sets,
 firewalld's state, backend and default zone, ufw on or off, the connections tracked, the programs on the network's
 hooks, the machine (its distribution, kernel and init) and when it was read. Once the World Wide Web tab has been shown,
 it also says what the tab watched (where, and the packets read, or why it cannot) and which GeoIP file it has open, or
 last had open once watching stopped. It reads the tab through the library's `Firewall.world_view(make=False)`, which
-never makes one.
-Every address on the firewall's cards was read on 2026-11-11, and on the World Wide Web tab's on 2026-11-15. The test
+never makes one. Once the Netstat or the World Wide Web tab has been asked (0.9.0), it also says the socket tables'
+last reading, how the hosts are recorded and what the hosts database holds, and each data set of the globe,
+downloaded or not, under its source's card, through `Firewall.netstat_view(make=False)`, which never makes one either.
+Every address on the firewall's cards was read on 2026-11-11, on the World Wide Web tab's on 2026-11-15, and on the
+Netstat tab's and the data sets' on 2026-11-18. The test
 `test_the_cards_pages_answer` asks each of them again when `LIMINAL_VENDOR_PAGES=1` is set (it is skipped otherwise).
 
 ## From the command line
@@ -580,3 +703,18 @@ the grant, by tests of their own that take its names away. No test starts
 a process, opens a connection or resolves a name: `tests/conftest.py`'s guard fails one that does (the one test that
 reaches the makers' pages on purpose, `LIMINAL_VENDOR_PAGES=1`, is marked `outside`). The machine's own grant, group
 and tools never show through either.
+
+The Netstat tab, the hosts database and the globe's data sets (0.9.0) are tested through the plugin
+(`tests/test_netstat.py`) over a stand-in socket table and the recorded machines' reads: the data sets as the library
+reads them, each asked in the one request its card names, with its licence, its credit and its wait, the submarine
+cables of every telecom category the map uses, and their digest pinned (the Windows firewall plugin names the same data
+sets); the socket tables' card naming every file the library's reader reads; the listeners another user holds named
+from the read kept, running no command, and one net-tools names no program for ("-") named by nothing; valid and present
+wherever the socket table can be read, its status saying so, present() running no read of the firewall there, and what
+the firewall needs saying what the tab needs, as root or not; the Under WSL row inside WSL 2 alone, TCP's alone;
+nothing on Windows or macOS; the cards' facts asking nothing. The suite's guard (`tests/conftest.py`, `_no_real_hosts`,
+as the library's own suite has it) runs every test with `LIMINAL_HOSTS_RECORDING=shown`, the real socket reader
+refused and the hosts database and the layers' folder in the test's own folder, so a plugin a test attaches never reads
+this machine's sockets into this machine's database; and one test of its own attaches one under a login that says
+always. This machine's hosts file names no address in a test either. With a library from before 1.65.0 those tests
+are skipped, and the rest pass as 0.8.2's did.

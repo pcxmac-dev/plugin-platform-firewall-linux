@@ -86,6 +86,28 @@ installed and the distribution's apt is there, Install nftables... installs the 
 its size read without root and said first; installing it filters nothing. On a library from before the grant it works
 as 0.8.1.
 
+The Netstat tab, the hosts database and the globe's filters and layers (0.9.0; the user, 2026-11-16: "the firewall app
+should have a 'netstat' like interface for looking at active ports and what apps they are attached to, and the hosts
+that they connect to across the lan or wan. the firewall app should also have a globe that can be zoomed and rotated
+and geoip'd hosts are databased for the apps they talk to, the time they are connected to *this *computer"; "the
+globe-firewall should allow filtering, so i can view apps connected to hosts all across the globe, or ports talking to
+all hosts"): the library's Firewall base's (liminal-libs 1.65.0), the Netstat tab after the World Wide Web tab. It reads
+the kernel's socket tables in /proc/net as files, as the platform's user: no command, no capture, no root, no window.
+Each socket has its program where it is the platform's user's own (another user's is listed without it: only root may
+read which program holds a socket), its remote host, whether that host is this machine's, the local network's or the
+internet's, and its GeoIP place; a listener another user holds is named from the firewall's own root read where there
+is one (netstat_listeners: from the read kept, no command). The hosts database keeps each program's remote hosts, their
+ports, when they were seen and how long they were connected, recorded only while the Netstat or the World Wide Web tab
+is shown unless the user chooses always. The globe shows the traffic watched or the hosts recorded, filtered by program,
+port, direction and when they were last seen, and draws the internet's infrastructure from the data sets this plugin
+names (apis.INFRASTRUCTURE: OpenStreetMap's data centres, exchange points, submarine cables and lines on land through
+the Overpass API, Wikidata's exchange points, ground stations and teleports, EMODnet's cable routes in European
+waters), each downloaded only on the user's click once its licence is accepted. None of it needs root, so the plugin is
+valid wherever the socket table can be read, the firewall's own read refused or failed (B-revisions S2), and present
+there too; what the firewall needs then says what Netstat needs (netstat.needs_row). Inside WSL the tab ends with what
+WSL changes for it (the library's table, and the row seen in the user's Ubuntu: netstat.WSL_ROWS). On a library from
+before it the plugin works as 0.8.2 did, its table of what the firewall needs saying what the tab would need.
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND
 """
@@ -106,6 +128,7 @@ from . import apis as cards
 from . import changes as ch
 from . import firewalld as fwd_mod
 from . import install as install_mod
+from . import netstat as netstat_mod
 from . import nftables as nft_mod
 from . import read as read_mod
 from . import rights as rights_mod
@@ -118,7 +141,7 @@ from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 from .rights import PASSWORD_FIELD, Rights
 
-__version__ = "0.8.2"
+__version__ = "0.9.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -163,9 +186,16 @@ class LinuxFirewallPlugin(Firewall):
              "read whole and changed from the platform's page: nftables, iptables (nf_tables and legacy), ebtables, "
              "arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP (read only), under systemd, OpenRC or SysV "
              "scripts; never reached from Windows or macOS. Its World Wide Web tab draws where this machine's traffic "
-             "comes from and goes to on a globe, and its ports' traffic, while the tab is shown")
+             "comes from and goes to on a globe, and its ports' traffic, while the tab is shown"
+             + ("; its Netstat tab lists the listening ports and the open connections with the program behind each, "
+                "the hosts database keeps each program's remote hosts and how long they were connected, and the globe "
+                "shows them, filtered, with the internet's exchange points, data centres and cables"
+                if netstat_mod.library() else ""))
     api = "2.2"
-    apis = APIS  # what it attaches to: nftables, iptables, ebtables, ipset, firewalld, ufw, conntrack, eBPF... (apis.py)
+    # what it attaches to: nftables, iptables, ebtables, ipset, firewalld, ufw, conntrack, eBPF... (apis.py); and, with
+    # liminal-libs 1.65.0 (0.9.0), the kernel's socket tables and the sources of the globe's data sets, whose cards are
+    # left out with an older library, where the plugin reaches none of them (netstat.cards)
+    apis = netstat_mod.cards(APIS, cards.NETSTAT)
     order = 711
     ICON = "wallfire"  # a brick wall with a flame before it (liminal-libs 1.34.0; the user's picture: "use this icon for linux firewall")
     SECTION = "os"  # drawn under the platform's OS plugins (liminal-platform 0.26.0)
@@ -180,6 +210,12 @@ class LinuxFirewallPlugin(Firewall):
     # name servers asked for this network's public address (OpenDNS's and Google's, hw-stats's own).
     GEOIP_URL, GEOIP_LICENCE = cards.GEOIP_URL, cards.GEOIP_LICENCE
     ATTRIBUTION, PUBLIC_DNS = cards.ATTRIBUTION, cards.PUBLIC_DNS
+    # The Netstat tab, the hosts database and the globe's filters and layers (0.9.0): the base's too (its TABS, HOOKS,
+    # JOB_HOOKS, CANCEL_HOOKS and keys, from liminal-libs 1.65.0; an older base reads none of it). The data sets the
+    # globe's layers are downloaded from are this plugin's to name (apis.py): OpenStreetMap's through the Overpass API,
+    # Wikidata's and EMODnet's; the listeners another user holds are named from the firewall's own read
+    # (netstat_listeners).
+    INFRASTRUCTURE = cards.INFRASTRUCTURE
 
     def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None, clock=time.monotonic,
                  which=None):
@@ -320,13 +356,39 @@ class LinuxFirewallPlugin(Firewall):
             self._needs = {}
 
     def present(self) -> bool:
-        """Firewall tools this plugin reads on the Linux the platform runs on: never on Windows or macOS."""
+        """What this plugin serves on the Linux the platform runs on: firewall tools it reads, or (0.9.0) the Netstat
+        tab, the hosts database and the globe's filters, wherever the kernel's socket tables can be read with a library
+        that has them, the firewall's own read refused or not (B-revisions S2); never on Windows or macOS.
+
+        Where the Netstat tab is served that answers alone, before the firewall's own read is asked: the tray asks this
+        every minute while a page is open, and each read as root is a sudo -n that sudo notes, a refusal too."""
+        if self.not_for_here():
+            return False
+        if self._lib() is not None and netstat_mod.serves():
+            return True
+        return self.firewall_here()
+
+    def firewall_here(self) -> bool:
+        """Firewall tools this plugin reads on the Linux the platform runs on, its read answering (what present said
+        before 0.9.0, and what the framework's setup needs)."""
         if self.not_for_here():
             return False
         try:
             return self.shell.here and bool(self.config().manager)
         except CommandError:
             return False
+
+    def setup(self, log=print, steps=None) -> list[dict]:
+        """The library's setup of the framework's own part (its steps: enable, exposure, rules) over the firewall's
+        read. Where the plugin is present for its Netstat tab alone (0.9.0: no firewall tool here, or the firewall
+        cannot be read), nothing is changed and its first step says why, as it did before."""
+        if self.not_for_here() or self.scope_note() or self.firewall_here():
+            return super().setup(log, steps)
+        wanted = tuple(steps) if steps else self.STEPS
+        what = wanted[0] if wanted else "setup"
+        detail = "no firewall here this plugin drives"
+        log(f"{self.name}: {what}: FAILED: {detail}")
+        return [{"step": what, "ok": False, "detail": detail}]
 
     # -- the library's backend, over the read --------------------------------------------------------------------------
     def backend(self) -> str:
@@ -632,10 +694,13 @@ class LinuxFirewallPlugin(Firewall):
     def unread_status(self, error: CommandError) -> dict:
         """The status when the firewall cannot be read (0.9.0): valid with a `problem` where what is missing is root
         (Root access off, on from the platform's next start, or not this plugin's) or a firewall tool, and the library
-        has the grant; else not valid, as 0.8.1 (a library from before it, or a read failing for its own reasons)."""
+        has the grant; and valid with a `problem` too whatever else kept the read from answering, wherever the Netstat
+        tab is served (a library that has it, and the kernel's socket tables to read: netstat.serves), since none of
+        it needs root (B-revisions S2: "valid wherever it can read the socket table"). Else not valid, as 0.8.1: a
+        library from before the grant, or a read failing for its own reasons where the Netstat tab is not served."""
         r = self.rights()
         tools = self.tools_here()
-        if self._lib() is None or not (r.shown or not tools):
+        if self._lib() is None or not (r.shown or not tools or netstat_mod.serves()):
             return self._not_read(r, error, tools, present=True, summary=f"cannot be read: {error}",
                                   problem=str(error), why=f"cannot be read: {error}")
         wants_root = r.kind in ("off", "pending", "stale")
@@ -651,12 +716,13 @@ class LinuxFirewallPlugin(Firewall):
 
     def bare_status(self) -> dict:
         """The status when the read ran and found no firewall software (0.9.0: valid with a `problem` and nftables'
-        install where it can be offered; with a library from before the grant, not valid, as 0.8.1)."""
+        install where it can be offered, and present wherever the Netstat tab is served, as present() says; with a
+        library from before the grant, not valid and not present, as 0.8.1)."""
         r = self.rights()
         if self._lib() is None:
             return self._not_read(r, None, [], present=False, summary="no firewall software here",
                                   why="no firewall software here: nftables, iptables, ufw or firewalld")
-        return self._not_read(r, None, [], present=False, summary="no firewall software here",
+        return self._not_read(r, None, [], present=netstat_mod.serves(), summary="no firewall software here",
                               problem="No firewall tool is installed here (nftables, iptables, ufw, firewalld): "
                                       "nothing filters.")
 
@@ -694,7 +760,9 @@ class LinuxFirewallPlugin(Firewall):
 
         0.9.0, with the library's grant: the Root access row in place of root for the read (its state and its one
         action, Turn on... or Turn off..., in a fourth column), and the tool's row offering Install nftables... where it
-        is `offered` (install_offered). With a library from before it, as 0.8.1, and the switch's library said."""
+        is `offered` (install_offered). With a library from before it, as 0.8.1, and the switch's library said. Last,
+        what the Netstat tab and the hosts database need (netstat.needs_row): no rights, so they work meanwhile; or
+        the library or the socket table they lack."""
         new = r.kind != "old" and self._lib() is not None
         rows = []
         if new and r.shown:
@@ -715,6 +783,9 @@ class LinuxFirewallPlugin(Firewall):
                           "label": "Install nftables"}])
         else:
             rows.append(["A firewall tool", here, INSTALL])
+        # 0.9.0: what the Netstat tab and the hosts database need (no rights), in words that follow whether the platform
+        # runs as root (then every socket's program is read)
+        rows.append(netstat_mod.needs_row(root=r.kind == "root"))
         columns = [{"title": "What"}, {"title": "Here"}, {"title": "What to do"}]
         if new:
             columns.append({"title": ""})
@@ -743,6 +814,30 @@ class LinuxFirewallPlugin(Firewall):
         kept, view = self._read, self.world_view(make=False)
         address = str(getattr(view, "address", "") or "") if view is not None else ""
         return xdp_words(kept[1], address) if kept and address else ""
+
+    # -- the Netstat tab (0.9.0): the base's, and what the firewall's own read knows that the socket table cannot ------
+    def netstat_listeners(self) -> dict[tuple[str, int], str]:
+        """The listening sockets the firewall's own read names by program ({(proto, port): program}: ss -ltnp and ss
+        -lunp, as root, see every listener's program), which the base's Netstat tab uses for a listener whose program
+        the socket table cannot say (another user's: only root reads which program holds it). From the read kept,
+        never a new one, and without waiting on a read under way (the tab runs no command): {} before a read, and on a
+        machine the plugin is not for."""
+        if self.not_for_here():
+            return {}
+        kept = self._read
+        return netstat_mod.listeners(kept[1]) if kept else {}
+
+    def netstat(self) -> dict:
+        """The Netstat tab's page: the listening ports and the open connections with the program behind each.
+
+        The base's (liminal-libs 1.65.0), read from the kernel's socket tables with no command, no capture and no
+        root, a listener another user holds named from the firewall's read kept (netstat_listeners); inside a WSL
+        distribution its Under WSL table ends with what was seen in the user's Ubuntu (netstat.WSL_ROWS: a port
+        listening here at 127.0.0.1 is reached from Windows too). LookupError with a library from before it."""
+        base = getattr(super(), "netstat", None)
+        if not callable(base):
+            raise LookupError(f"the Netstat tab needs liminal-libs {netstat_mod.NETSTAT_LIBS}")
+        return netstat_mod.with_wsl_rows(base())
 
 
 def under_wsl(rights: Rights | None = None) -> list[dict]:

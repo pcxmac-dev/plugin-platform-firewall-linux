@@ -1,5 +1,64 @@
 # Changelog
 
+## 0.9.0 (2026-11-18)
+
+The Netstat tab, the hosts database, and the globe's filters and internet infrastructure. The user, 2026-11-16: "the
+firewall app should have a 'netstat' like interface for looking at active ports and what apps they are attached to,
+and the hosts that they connect to across the lan or wan. the firewall app should also have a globe that can be
+zoomed and rotated and geoip'd hosts are databased for the apps they talk to, the time they are connected to *this
+*computer"; "the globe-firewall should allow filtering, so i can view apps connected to hosts all across the globe, or
+ports talking to all hosts. The globe should have the same kind of geography associated with the exchanges globe, but
+the firewall globe should instead of exchanges, have all the backbones,ibones, major internet infrastructure, (as many
+as possible) datacenter locations." The tab, the database, the filters and the layers are liminal-libs 1.65.0's
+Firewall base's; the plugin names what they reach (`apis.py`) and what is Linux's own (`netstat.py`).
+liminal-platform 0.33.0 draws the layers.
+
+- **Netstat**, a tab after World Wide Web, asked every 3 s while it is shown: the kernel's socket tables
+  (`/proc/net/tcp`, `tcp6`, `udp`, `udp6`) read as files, as the platform's user: no command, no capture, no root, no
+  window, no name looked up. Each socket with its program, pid and systemd unit where it is the platform's user's own
+  (only root may read which program holds another user's, so such a socket is listed without it, in words), the
+  remote host and port, whether that host is this machine's, the local network's or the internet's, its name in
+  `/etc/hosts` or its GeoIP place, its state, and since when a reading first listed it (Linux does not say when a
+  socket began). A listening port another user holds is named from the firewall's own read as root where there is one
+  (`netstat_listeners`: from the read kept, no command run for it). A UDP socket connected to a peer shows that peer.
+- **Valid wherever the socket table can be read.** None of it needs root, so with no firewall tool, with sudo asking
+  for a password and Root access off, or with a read that failed for its own reasons, the plugin stays valid and in
+  the tray, its Main page saying what is missing and offering only what it can do; its table of what the firewall
+  needs ends with a row for the Netstat tab and the hosts database. Where the tab is served, whether the plugin is
+  present is answered before the firewall's read is asked, so the tray's ask every minute runs no sudo.
+- **The hosts database**, this machine's own (the data folder's `hosts/hosts.db`, made 0600 in a folder made 0700, at
+  most 50,000 rows): each program's remote hosts, their ports, when they were first and last seen, how long they were
+  connected, how many connections, and their places. Linux gives no start for a connection, so its time connected is
+  what was seen: a gap of more than 30 s between two readings adds nothing. It records only while the Netstat or the
+  World Wide Web tab is shown, unless you choose all the time the platform runs (Recording..., the setting
+  `LIMINAL_HOSTS_RECORDING`, kept through the login: off Windows only until the platform restarts today, and the page
+  says so); Forget... removes every row, asked twice.
+- **The globe** shows the traffic watched or the hosts recorded, filtered by program, by port, by direction and by
+  when they were last seen, the eight programs and the eight ports with the most hosts right under it. It draws the
+  internet's infrastructure from five free-licensed data sets (`INFRASTRUCTURE`), each downloaded only on your click,
+  as a job (its size and its licence said first and accepted in so many words; Cancel stops it), kept on this
+  machine and credited where it is drawn: data centres, submarine cables of every telecom category and their landing
+  stations, and telecom lines on land (OpenStreetMap, through the public Overpass API, ODbL 1.0); exchange points,
+  ground stations and teleports (Wikidata, CC0); telecom cable routes in European waters (EMODnet Human Activities'
+  WFS, CC BY 4.0, asked longitude first). PeeringDB, root-server sites and cloud regions are left out: not
+  free-licensed, or no licence stated.
+- **Under WSL** the tab ends with what WSL changes for it (the library's table), and the row seen in the user's Ubuntu
+  (WSL 2, NAT networking, 2026-11-18): a TCP port listening there at 127.0.0.1 is reached from Windows' own 127.0.0.1
+  too (wslrelay.exe's in Windows' table); UDP is not forwarded. What was not seen is not said.
+- **Four more cards** (plugin API 2.2), their pages read on 2026-11-18: the kernel's socket tables (procfs: every file
+  the library's reading opens, `sockets.LINUX_FILES`), the Overpass API, the Wikidata Query Service and EMODnet Human
+  Activities (WFS). Their facts say the socket tables' last reading, how the hosts are recorded, what the database
+  holds and each data set's state, asking nothing. iproute2's card says the Netstat listeners come from ss's programs.
+- Its floor is liminal-libs[geo]>=1.65.0. Given an older library all the same, it works as 0.8.2 did, its table of
+  what the firewall needs saying what the tab would need, and none of the four cards.
+
+Tests: test_netstat.py (skipped on an older library: the tab is the base's; the data sets, the cables asked of every
+telecom category, pinned by their digest; the listeners named from the read kept; valid and present wherever the
+socket table can be read, and the needs row; the WSL row; nothing read on Windows or macOS; a login that says always
+starts nothing real); test_world.py, test_apis.py, test_plugin.py, test_read.py and test_rights.py follow the
+library; tests/conftest.py's `_no_real_hosts` guard, as the library's, with the socket tables' readability and WSL
+stood in: no test reads this machine's socket table or writes its hosts database.
+
 ## 0.8.2 (2026-11-18)
 
 Root access, asked for on the plugin's own page, and only if required. The user, 2026-11-17, of the firewall that

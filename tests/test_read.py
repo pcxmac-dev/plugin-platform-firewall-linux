@@ -12,6 +12,7 @@ from liminal_libs.machines import linux as linux_mod
 from liminal_libs.machines.linux import Shell
 from plugin_platform_firewall_linux import LinuxFirewallPlugin
 from plugin_platform_firewall_linux import firewalld as fwd
+from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux import nftables as nft
 from plugin_platform_firewall_linux import read, system, ufw, xtables
 from plugin_platform_firewall_linux.model import Entry, parse_address, parse_ports, spans_of
@@ -60,6 +61,14 @@ def test_the_read_has_a_folder_of_its_own_or_stops_and_says_so(monkeypatch):
             return 1, read.MARK + "\n", words + "\n"
         return 0, "", ""
 
+    st = LinuxFirewallPlugin(shell=Shell("local", runner=runner), native="", clock=lambda: 1000.0).status()
+    # 0.9.0: valid all the same, its problem in the read's words: the Netstat tab needs no read (B-revisions S2)
+    if netstat_mod.library():
+        assert (st["valid"], st["why"], st["summary"]) == (True, "", "not read: its read failed")
+        assert st["problem"] == f"The firewall cannot be read here: {words}." and ran == [["sh", "-c", read.SCRIPT]]
+    # with no socket table to read either (or a library from before the Netstat tab): not valid, as before
+    monkeypatch.setattr(netstat_mod, "tables_here", lambda: False)
+    ran.clear()
     st = LinuxFirewallPlugin(shell=Shell("local", runner=runner), native="", clock=lambda: 1000.0).status()
     assert st["valid"] is False and st["why"] == f"cannot be read: {words}" and ran == [["sh", "-c", read.SCRIPT]]
 

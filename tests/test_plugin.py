@@ -16,6 +16,7 @@ from liminal_libs.machines.linux import Shell, why_not_native
 from liminal_libs.machines.plugin import CommandError
 
 from plugin_platform_firewall_linux import MACHINE, READ_S, LinuxFirewallPlugin, rights
+from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux.changes import ACCEPT, Risky
 from plugin_platform_firewall_linux.read import SCRIPT
 
@@ -297,12 +298,19 @@ def test_default_policies_on_and_off_and_saving_per_distribution():
     assert fake.changes[-2:] == [["ufw", "--force", "enable"], ["rc-update", "add", "ufw", "default"]]
 
 
-def test_a_failure_is_said_with_what_was_done_before_it():
+def test_a_failure_is_said_with_what_was_done_before_it(monkeypatch):
     fake = FakeLinux("fedora-43-firewalld")
     fake.replies[("firewall-cmd", "--permanent", "--zone=FedoraServer", "--remove-port=8443/tcp")] = (1, "", "Error: NOT_ENABLED: 8443:tcp")
     with pytest.raises(CommandError, match=r"NOT_ENABLED: 8443:tcp \(done before it: firewall-cmd --zone=FedoraServer --remove-port=8443/tcp\)"):
         plugin(fake).remove_rule("zone FedoraServer", "port 8443/tcp")
     fw = LinuxFirewallPlugin(shell=Shell("local", runner=lambda a, t: (1, "", "sudo: a password is required")), native="")
+    st = fw.status()
+    # 0.9.0: a read that fails leaves the plugin valid, with the read's words as its problem, where the Netstat tab is
+    # served (B-revisions S2); not valid where it is not (no socket table to read, or a library from before the tab)
+    if netstat_mod.library():
+        assert st["valid"] and st["why"] == "" and "a password is required" in st["problem"]
+    monkeypatch.setattr(netstat_mod, "tables_here", lambda: False)
+    fw.forget()
     st = fw.status()
     assert not st["valid"] and st["why"].startswith("cannot be read:") and "a password is required" in st["why"]
 
@@ -321,6 +329,7 @@ def test_what_the_firewall_needs_is_said_when_it_cannot_be_read_or_there_is_none
 
     for name in rights.NAMES:
         monkeypatch.delattr(linux_mod, name, raising=False)
+    monkeypatch.setattr(netstat_mod, "library", lambda: False)  # nor the Netstat tab (liminal-libs 1.65.0), later still
     monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 1000, raising=False)  # the platform is no root: sudo -n asks
     ran: list = []
 
@@ -332,7 +341,9 @@ def test_what_the_firewall_needs_is_said_when_it_cannot_be_read_or_there_is_none
     st = fw.status()
     assert not st["valid"] and st["why"].startswith("cannot be read: sh needs root on this machine")
     needs = st["tables"][0]
-    assert needs["title"] == "What the firewall needs here" and [r[0] for r in needs["rows"]] == ["Root for the read", "A firewall tool"]
+    assert needs["title"] == "What the firewall needs here"
+    assert [r[0] for r in needs["rows"]] == ["Root for the read", "A firewall tool", "Netstat and the hosts database"]
+    assert needs["rows"][2][1] == "not in this library"  # 0.9.0 on a library from before its Netstat tab: said
     assert needs["rows"][0][1] == "sudo asks for a password" and "sudo -n, which never asks" in needs["rows"][0][2]
     assert needs["rows"][0][2].endswith(rights.old_words())
     assert f"needs liminal-libs {rights.NEEDS_LIBS}" in needs["rows"][0][2]  # the number set at landing, one place
@@ -355,7 +366,9 @@ def test_what_the_firewall_needs_is_said_when_it_cannot_be_read_or_there_is_none
     bare = LinuxFirewallPlugin(shell=Shell("local", runner=refused), native="", which=lambda t: 1 / 0)  # not looked for
     st = bare.status()
     assert (st["present"], st["valid"], st["summary"]) == (False, False, "no firewall software here")
-    assert [r[:2] for r in st["tables"][0]["rows"]] == [["A firewall tool", "none installed: no nft, iptables, ufw or firewall-cmd here"]]
+    assert [r[:2] for r in st["tables"][0]["rows"]] == [
+        ["A firewall tool", "none installed: no nft, iptables, ufw or firewall-cmd here"],
+        ["Netstat and the hosts database", "not in this library"]]
     assert [t["title"] for t in st["tables"]] == ["What the firewall needs here", "Under WSL"]
 
 

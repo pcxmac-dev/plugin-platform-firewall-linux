@@ -140,3 +140,21 @@ def _no_real_hosts(monkeypatch, request, tmp_path_factory):
         except Exception:  # noqa: BLE001 - a test's own book that it broke on purpose
             pass
     assert not refused, f"the test read this machine's socket table for real: {refused}"
+
+
+@pytest.fixture(autouse=True)
+def _no_real_trace(monkeypatch):
+    """liminal-libs 1.67.0: the World Wide Web tab traces every connection's route while it is asked. In a test no route
+    is traced for real (Windows' ICMP API and the tracers are refused: the test that reaches them fails) and the routes'
+    thread never starts (a stand-in that starts nothing). A library before 1.67.0 traces nothing."""
+    try:
+        from liminal_libs import netpath
+        from liminal_libs.machines import routes
+    except ImportError:
+        return
+
+    def refused(*args, **kwargs):
+        raise AssertionError("the test traced a route for real: give netpath.trace a probe and a run of its own")
+    monkeypatch.setattr(netpath, "_icmp_probe", refused)
+    monkeypatch.setattr(netpath, "_trace_run", refused, raising=False)
+    monkeypatch.setattr(routes.Routes, "_thread", staticmethod(lambda work: None))

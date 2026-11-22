@@ -195,13 +195,16 @@ def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
         "Google's name servers (o-o.myaddr.l.google.com)",
         # the Netstat tab's and the globe's internet infrastructure (0.9.0; the Topology Zoo's, 0.9.1)
         "The kernel's socket tables (procfs)", "Overpass API", "Wikidata Query Service",
-        "EMODnet Human Activities (WFS)", "Internet Topology Zoo"]
+        "EMODnet Human Activities (WFS)", "Internet Topology Zoo",
+        "OurAirports", "GeoNames"]  # liminal-libs 1.73.0: what routers' names are read with
     rights_cards = (cards.SUDO, cards.GROUPS, cards.APT)  # their addresses read again, or for the first time, in 0.9.0
     assert all(a.verified == "2026-11-11" for a in cards.FIREWALL if a not in rights_cards)
     assert all(a.verified == "2026-11-17" for a in rights_cards)
     assert all(a.verified == "2026-11-15" for a in cards.WORLD)
-    assert all(a.verified == cards.NETSTAT_VERIFIED == "2026-11-18" for a in cards.NETSTAT[:-1])
-    assert cards.NETSTAT[-1] is cards.TOPOLOGY_ZOO  # the Topology Zoo's pages, read on 2026-11-19
+    assert all(a.verified == cards.NETSTAT_VERIFIED == "2026-11-18" for a in cards.NETSTAT[:-3])
+    assert cards.NETSTAT[-3] is cards.TOPOLOGY_ZOO  # the Topology Zoo's pages, read on 2026-11-19
+    assert cards.NETSTAT[-2:] == (cards.OURAIRPORTS_API, cards.GEONAMES_API)  # liminal-libs 1.73.0
+    assert all(a.verified == cards.ROUTERS_VERIFIED == "2026-11-22" for a in cards.NETSTAT[-2:])
     assert cards.TOPOLOGY_ZOO.verified == cards.GLOBE_VERIFIED == "2026-11-19"
     assert all(a.docs and a.used and a.covered for a in cards.APIS)
     assert all(len(a.areas) > len(a.covered) for a in cards.APIS)  # more of each API than the plugin uses

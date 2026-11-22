@@ -1191,6 +1191,21 @@ EMODNET_LAYERS = ("emodnet:bshcontiscables", "emodnet:cicacables", "emodnet:shom
 # out, which leaves the lines most like backbones. Wikidata's data centres are asked with their kinds (P279*: colocation
 # centres among them, 211 items against 168, a count of 2026-11-19). The Topology Zoo's archive is the file alone, its
 # size as GitHub gave it (2026-11-19).
+# liminal-libs 1.72.1: IANA's RDAP bootstrap files, IPv4 and IPv6: which registry holds an address, its routers'
+# networks then looked up of that registry (the library's machines/lookups.py, within the registries' limits); named
+# here, as every outside host is, never in the library
+RDAP_BOOTSTRAP = ("https://data.iana.org/rdap/ipv4.json", "https://data.iana.org/rdap/ipv6.json")
+# liminal-libs 1.73.0: what routers' names are read with (machines/names.py), drawn as layers too, each downloaded on
+# the user's click with its size and its licence first
+OURAIRPORTS_CSV = "https://davidmegginson.github.io/ourairports-data/airports.csv"  # 12.2 MB (2026-11-22)
+OURAIRPORTS_LICENCE = ("OurAirports releases all of its data to the public domain: it may be used for any purpose, "
+                       "with no permission needed, and comes with no guarantee of accuracy or fitness for use.")
+OURAIRPORTS_CREDIT = {"text": "OurAirports", "url": "https://ourairports.com/data/"}
+GEONAMES_CITIES = "https://download.geonames.org/export/dump/cities15000.zip"  # 3.2 MB (2026-11-22)
+GEONAMES_LICENCE = ("GeoNames' data is free under the Creative Commons Attribution 4.0 licence: it may be used, "
+                    "shared and adapted for any purpose, GeoNames credited as its source.")
+GEONAMES_CREDIT = {"text": "GeoNames", "url": "https://www.geonames.org/"}
+
 INFRASTRUCTURE = (
     {**OSM, "id": "osm-datacentres", "title": "Data centres", "size": 2_000_000, "wait": 210,
      "about": "about 5,000 sites, and its few exchange points",
@@ -1231,6 +1246,15 @@ INFRASTRUCTURE = (
      "licence": ZOO_LICENCE, "credit": ZOO_CREDIT, "size": 348_613, "wait": 60,
      "about": ("261 maps of backbone networks (GÉANT, Internet2, ESnet, Sprint, NTT, Cogent and more), each network's "
                "newest drawn: logical links, not fibre")},
+    # liminal-libs 1.73.0: the airports' codes and the cities routers' names are read with, drawn as layers too
+    {"id": "ourairports", "title": "Airports and their codes", "format": "ourairports", "url": OURAIRPORTS_CSV,
+     "source": "OurAirports, through its data's mirror on GitHub", "licence_name": "Public domain",
+     "licence": OURAIRPORTS_LICENCE, "credit": OURAIRPORTS_CREDIT, "size": 12_800_000, "wait": 180,
+     "about": "the world's large and medium airports with a three-letter code: routers' names are read with them"},
+    {"id": "geonames-cities", "title": "Cities of the world", "format": "geonames", "url": GEONAMES_CITIES,
+     "source": "GeoNames", "licence_name": "CC BY 4.0", "licence": GEONAMES_LICENCE, "credit": GEONAMES_CREDIT,
+     "size": 3_400_000, "wait": 120,
+     "about": "the cities of 15,000 people or more: named on the globe, and routers' names read with them"},
 )
 
 PROCFS = Api(
@@ -1551,11 +1575,83 @@ TOPOLOGY_ZOO = Api(
     verified=GLOBE_VERIFIED,
 )
 
+# liminal-libs 1.73.0: the sources of what routers' names are read with (the library's machines/names.py)
+ROUTERS_VERIFIED = "2026-11-22"  # the two cards' pages, read on 2026-11-22
+OURAIRPORTS_API = Api(
+    name="OurAirports",
+    maker="OurAirports (David Megginson and its contributors), its data mirrored on GitHub",
+    about=("OurAirports keeps the world's airports, each with its codes, its place, its town and its country, and "
+           "releases all of it to the public domain. The globe asks for its airports file once, on your click: each "
+           "large or medium airport with a three-letter code is kept as a point of the airports layer, and routers' "
+           "names are read with the codes (sea, fra) to place each router at its airport's town where the trace's "
+           "time allows it. The request names the file alone and nothing about this machine."),
+    kind="feed",
+    base=OURAIRPORTS_CSV,
+    version="airports.csv as its mirror served it on 2026-11-22: 12.2 MB, one row an airport, its codes among them",
+    auth="none: no account and no key",
+    limits="none named for one file; asked once on your click, waited for 180 s",
+    costs="",
+    links=(
+        Link("OurAirports' data", "https://ourairports.com/data/", "docs"),
+        Link("Its data's mirror on GitHub", "https://github.com/davidmegginson/ourairports-data", "reference"),
+    ),
+    areas=(
+        Area("The airports", "every airport, heliport and seaplane base it knows, one CSV file",
+             "https://ourairports.com/data/",
+             covered="the file, asked once on your click: the large and medium airports with a three-letter code"),
+        Area("The rest", "runways, frequencies, navigation aids, countries and regions, a file each",
+             "https://ourairports.com/data/"),
+    ),
+    calls=(
+        Call(f"GET {OURAIRPORTS_CSV}", "every airport it knows, one CSV file", "The airports",
+             used=("Download… on the World Wide Web tab's Internet infrastructure table, once, on your word, as a job "
+                   "the page may cancel; https on every hop, to this host alone"),
+             docs="https://ourairports.com/data/"),
+    ),
+    verified=ROUTERS_VERIFIED,
+)
+
+GEONAMES_API = Api(
+    name="GeoNames",
+    maker="GeoNames (geonames.org)",
+    about=("GeoNames keeps the world's places, free under CC BY 4.0, and offers them as files by kind and size. The "
+           "globe asks for its file of the cities of 15,000 people or more once, on your click: each is kept as a "
+           "point of the cities layer, the most people first (20,000 of them), named on the globe as it comes nearer, "
+           "and routers' names are read with them (a city's name, or a city and its state as sttlwa). The request "
+           "names the file alone and nothing about this machine."),
+    kind="feed",
+    base=GEONAMES_CITIES,
+    version="cities15000.zip as served on 2026-11-22: 3.2 MB, one text file, one tab-separated row a city",
+    auth="none: no account and no key (its web services need one; its files do not)",
+    limits="none named for its files; asked once on your click, waited for 120 s",
+    costs="",
+    links=(
+        Link("GeoNames' files", "https://download.geonames.org/export/dump/", "docs"),
+        Link("Its licence: CC BY 4.0", "https://creativecommons.org/licenses/by/4.0/", "terms"),
+    ),
+    areas=(
+        Area("The cities", "the cities of 15,000 people or more, one zipped text file",
+             "https://download.geonames.org/export/dump/",
+             covered="the file, asked once on your click: every city in it, the most people first"),
+        Area("Its other files", "all its places, by country, and the smaller towns' files",
+             "https://download.geonames.org/export/dump/"),
+        Area("Its web services", "searches and lookups, with an account", "https://www.geonames.org/export/"),
+    ),
+    calls=(
+        Call(f"GET {GEONAMES_CITIES}", "the cities of 15,000 people or more", "The cities",
+             used=("Download… on the World Wide Web tab's Internet infrastructure table, once, on your word, as a job "
+                   "the page may cancel; https on every hop, to this host alone"),
+             docs="https://download.geonames.org/export/dump/"),
+    ),
+    verified=ROUTERS_VERIFIED,
+)
+
 FIREWALL = (NFTABLES, IPTABLES, EBTABLES, IPSET, FIREWALLD_API, UFW, CONNTRACK, BPF, IPROUTE2, SERVICES,  # its read
             SUDO, GROUPS, APT)  # and its changes; Root access's and nftables' install's (0.9.0)
 WORLD = (CAPTURE, DBIP_LITE, OPENDNS, GOOGLE)  # the World Wide Web tab's (0.8.0)
 # the Netstat tab's and the globe's infrastructure (0.9.0; the Topology Zoo's, 0.9.1)
-NETSTAT = (PROCFS, OVERPASS_API, WIKIDATA, EMODNET, TOPOLOGY_ZOO)
+NETSTAT = (PROCFS, OVERPASS_API, WIKIDATA, EMODNET, TOPOLOGY_ZOO,
+           OURAIRPORTS_API, GEONAMES_API)  # liminal-libs 1.73.0: what routers' names are read with
 APIS = FIREWALL + WORLD + NETSTAT
 
 
@@ -1712,7 +1808,8 @@ def netstat_facts(plugin) -> dict[str, dict[str, str]]:
     if d.get("error"):
         tables["Problem"] = str(d["error"])
     out: dict[str, dict[str, str]] = {PROCFS.name: tables}
-    sources = {"overpass": OVERPASS_API, "sparql": WIKIDATA, "geojson": EMODNET, "gml": TOPOLOGY_ZOO}
+    sources = {"overpass": OVERPASS_API, "sparql": WIKIDATA, "geojson": EMODNET, "gml": TOPOLOGY_ZOO,
+               "ourairports": OURAIRPORTS_API, "geonames": GEONAMES_API}
     for s in d.get("sets") or ():
         card = sources.get(str(s.get("format") or "")) if isinstance(s, dict) else None
         if card is not None:

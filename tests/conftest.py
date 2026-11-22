@@ -158,3 +158,15 @@ def _no_real_trace(monkeypatch):
     monkeypatch.setattr(netpath, "_icmp_probe", refused)
     monkeypatch.setattr(netpath, "_trace_run", refused, raising=False)
     monkeypatch.setattr(routes.Routes, "_thread", staticmethod(lambda work: None))
+    # liminal-libs 1.72.0: nor is a router looked up for real (its name by reverse DNS, its network by RDAP and the
+    # registries' bootstrap files), and the lookups' thread never starts. A library before 1.72.0 has no lookups.
+    try:
+        from liminal_libs.machines import lookups
+    except ImportError:
+        return
+
+    def looked_up(*args, **kwargs):
+        raise AssertionError("the test looked a router up for real: give the lookups stand-ins")
+    monkeypatch.setattr(lookups, "_ptr", looked_up)
+    monkeypatch.setattr(lookups, "_get", looked_up)
+    monkeypatch.setattr(lookups.Lookups, "_thread", staticmethod(lambda work: None))

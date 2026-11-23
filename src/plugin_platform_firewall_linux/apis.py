@@ -85,8 +85,8 @@ GEOIP_ASN_LICENCE = (  # DB-IP's own terms for it (db-ip.com/db/download/ip-to-a
     "DB-IP's IP to ASN Lite database is licensed under the Creative Commons Attribution 4.0 International License "
     "(CC BY 4.0). You may use, share and adapt it for any purpose, even commercially, provided you credit DB-IP.com for "
     "the data, with a link back to db-ip.com on every page that shows or uses its results: this tab shows \"IP "
-    "Geolocation by DB-IP\", linked, wherever its networks are. It is updated monthly. The download is about 9.2 MB "
-    "(485,292 ranges), and one copy is kept on this machine, beside the GeoIP file.")
+    "Geolocation by DB-IP\", linked, wherever its networks are. It is updated monthly. The download is about 5 MB "
+    "(9.2 MB unpacked, 485,292 ranges), and one copy is kept on this machine, beside the GeoIP file.")
 ATTRIBUTION = {"text": "IP Geolocation by DB-IP", "url": "https://db-ip.com"}  # DB-IP's own link, as its terms give it
 # the name servers asked for this network's public address, which the GeoIP file places as home when the user set no
 # place of their own: each answers with the asker's own address, and the question names no other machine. (the name, its

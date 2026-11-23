@@ -598,7 +598,7 @@ def test_its_asn_file_is_db_ips_ip_to_asn_lite_under_the_same_licence():
     assert MACHINE.GEOIP_ASN_URL == "https://download.db-ip.com/free/dbip-asn-lite-{year}-{month}.mmdb.gz" == cards.GEOIP_ASN_URL
     assert world.month_url(MACHINE.GEOIP_ASN_URL, 2026, 11) == "https://download.db-ip.com/free/dbip-asn-lite-2026-11.mmdb.gz"
     for said in ("Creative Commons Attribution 4.0 International License", "(CC BY 4.0)", "credit DB-IP.com for the data",
-                 "link back to db-ip.com", "\"IP Geolocation by DB-IP\"", "9.2 MB", "485,292"):
+                 "link back to db-ip.com", "\"IP Geolocation by DB-IP\"", "about 5 MB", "9.2 MB unpacked", "485,292"):
         assert said in MACHINE.GEOIP_ASN_LICENCE, said
     assert next(a for a in cards.DBIP_LITE.areas if a.name == "IP to ASN Lite").covered
     assert any(c.area == "IP to ASN Lite" and c.used and "dbip-asn-lite" in c.name for c in cards.DBIP_LITE.calls)

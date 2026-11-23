@@ -505,7 +505,8 @@ def test_db_ips_file_is_downloaded_from_its_own_address_only_once_its_licence_is
     assert page["globe"]["attribution"] == MARK
     places = next(t for t in page["tables"] if t["title"] == "Places")  # (0.9.0: the globe's choice is the first)
     assert "Places: IP Geolocation by DB-IP, https://db-ip.com." in places["note"]
-    assert "forms" not in page and "actions" not in page
+    asn = [world.ASN_FORM] if hasattr(world, "ASN_FORM") else []  # liminal-libs 1.75.0: the ASN file, once the GeoIP file is in
+    assert [f["id"] for f in page.get("forms", [])] == asn and [a["form"] for a in page.get("actions", [])] == asn
     facts = fw.api_facts()[cards.DBIP_LITE.name]
     assert facts["File"] == "dbip-city-lite-2026-11.mmdb, built 2026-11-01" and facts["Read"].startswith("memory-mapped")
     assert fw.world_geoip(True)["said"].startswith("dbip-city-lite-2026-11.mmdb is installed already")
@@ -589,3 +590,15 @@ def test_the_tabs_facts_are_what_it_watched_and_asking_them_makes_and_starts_not
     # the base's view is reached through its accessor alone (world_view, liminal-libs 1.55.0), never its private attribute
     source = inspect.getsource(cards)
     assert "_world" not in source and "vars(" not in source and "__dict__" not in source
+
+
+def test_its_asn_file_is_db_ips_ip_to_asn_lite_under_the_same_licence():
+    """liminal-libs 1.75.0: DB-IP's IP to ASN Lite beside the city file, each network's AS number and operator (its
+    download page read 2026-11-22: 9.2 MB, 485,292 ranges, CC BY 4.0, the same credit)."""
+    assert MACHINE.GEOIP_ASN_URL == "https://download.db-ip.com/free/dbip-asn-lite-{year}-{month}.mmdb.gz" == cards.GEOIP_ASN_URL
+    assert world.month_url(MACHINE.GEOIP_ASN_URL, 2026, 11) == "https://download.db-ip.com/free/dbip-asn-lite-2026-11.mmdb.gz"
+    for said in ("Creative Commons Attribution 4.0 International License", "(CC BY 4.0)", "credit DB-IP.com for the data",
+                 "link back to db-ip.com", "\"IP Geolocation by DB-IP\"", "9.2 MB", "485,292"):
+        assert said in MACHINE.GEOIP_ASN_LICENCE, said
+    assert next(a for a in cards.DBIP_LITE.areas if a.name == "IP to ASN Lite").covered
+    assert any(c.area == "IP to ASN Lite" and c.used and "dbip-asn-lite" in c.name for c in cards.DBIP_LITE.calls)

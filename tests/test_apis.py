@@ -271,10 +271,14 @@ def test_the_capture_card_names_every_libpcap_call_the_librarys_capture_makes(mo
 
 
 def test_the_db_ip_card_names_the_download_the_tab_makes_and_the_readers_calls_the_library_makes():
-    [download] = [c for c in cards.DBIP_LITE.used if c.name.startswith("GET ")]
+    [download] = [c for c in cards.DBIP_LITE.used if c.name.startswith("GET ") and "city-lite" in c.name]
     now = datetime(2026, 11, 15, tzinfo=timezone.utc).timestamp()
     for year, month in world.months(now):  # this month's file and last month's: the two the tab asks for (a GET of each)
         assert pattern(download.name).fullmatch(world.month_url(MACHINE.GEOIP_URL, year, month))
+    # liminal-libs 1.75.0: and the ASN file's, beside it
+    [asn] = [c for c in cards.DBIP_LITE.used if c.name.startswith("GET ") and "asn-lite" in c.name]
+    for year, month in world.months(now):
+        assert pattern(asn.name).fullmatch(world.month_url(MACHINE.GEOIP_ASN_URL, year, month))
     assert cards.DBIP_LITE.base.startswith(MACHINE.GEOIP_URL.replace("{year}", "<year>").replace("{month}", "<month>"))
     assert cards.DBIP_LITE.link("terms") == "https://db-ip.com/db/lite.php"  # its licence and the credit it asks for
     assert "https://creativecommons.org/licenses/by/4.0/" in {x.url for x in cards.DBIP_LITE.links}
@@ -285,7 +289,7 @@ def test_the_db_ip_card_names_the_download_the_tab_makes_and_the_readers_calls_t
             "Reader.get(<address>)": r"_reader\.get\(address\)",
             "Reader.get_with_prefix_len(<address>)": r"\.get_with_prefix_len\(",
             "Reader.metadata()": r"\.metadata\(\)"}
-    assert {c.name for c in cards.DBIP_LITE.used} == {download.name, *made}
+    assert {c.name for c in cards.DBIP_LITE.used} == {download.name, asn.name, *made}  # 1.75.0: the ASN file's too
     for call, said in made.items():
         assert re.search(said, source), call
     [memory] = [c for c in cards.DBIP_LITE.calls if "MODE_MEMORY" in c.name]

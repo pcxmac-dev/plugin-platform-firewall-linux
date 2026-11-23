@@ -211,6 +211,8 @@ class LinuxFirewallPlugin(Firewall):
     # name (apis.py): DB-IP's Lite City, this month's file; its licence, in words; DB-IP's credit beside the places; and the
     # name servers asked for this network's public address (OpenDNS's and Google's, hw-stats's own).
     GEOIP_URL, GEOIP_LICENCE = cards.GEOIP_URL, cards.GEOIP_LICENCE
+    # liminal-libs 1.75.0: the ASN file beside it, each network's AS number and operator (an older library offers neither)
+    GEOIP_ASN_URL, GEOIP_ASN_LICENCE = cards.GEOIP_ASN_URL, cards.GEOIP_ASN_LICENCE
     RDAP_BOOTSTRAP = cards.RDAP_BOOTSTRAP  # liminal-libs 1.72.1: the routers' networks are looked up from these
     ATTRIBUTION, PUBLIC_DNS = cards.ATTRIBUTION, cards.PUBLIC_DNS
     # The Netstat tab, the hosts database and the globe's filters and layers (0.9.0): the base's too (its TABS, HOOKS,

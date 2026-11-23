@@ -78,6 +78,15 @@ GEOIP_LICENCE = (  # DB-IP's own terms (db-ip.com/db/lite.php), in plain words, 
     "Geolocation by DB-IP\", linked, wherever its places are. It is DB-IP's free subset of its paid data, updated "
     "monthly, with reduced accuracy. The download is about 60 MB (about 121 MB unpacked), and one copy is kept on this "
     "machine.")
+# liminal-libs 1.75.0: the ASN file beside it, DB-IP's IP to ASN Lite in MaxMind DB form ({year} and {month} filled in
+# by the library), downloaded only on the user's word: each network's AS number and organisation
+GEOIP_ASN_URL = "https://download.db-ip.com/free/dbip-asn-lite-{year}-{month}.mmdb.gz"
+GEOIP_ASN_LICENCE = (  # DB-IP's own terms for it (db-ip.com/db/download/ip-to-asn-lite, read 2026-11-22), in plain words
+    "DB-IP's IP to ASN Lite database is licensed under the Creative Commons Attribution 4.0 International License "
+    "(CC BY 4.0). You may use, share and adapt it for any purpose, even commercially, provided you credit DB-IP.com for "
+    "the data, with a link back to db-ip.com on every page that shows or uses its results: this tab shows \"IP "
+    "Geolocation by DB-IP\", linked, wherever its networks are. It is updated monthly. The download is about 9.2 MB "
+    "(485,292 ranges), and one copy is kept on this machine, beside the GeoIP file.")
 ATTRIBUTION = {"text": "IP Geolocation by DB-IP", "url": "https://db-ip.com"}  # DB-IP's own link, as its terms give it
 # the name servers asked for this network's public address, which the GeoIP file places as home when the user set no
 # place of their own: each answers with the asker's own address, and the question names no other machine. (the name, its
@@ -985,7 +994,8 @@ DBIP_LITE = Api(
                       "watched (let go once watching stops, mapped again at its next ask); the last 4096 answers kept, "
                       "each cut short; the local network's addresses never looked up")),
         Area("IP to Country Lite", "each range's country alone (732,796 ranges)", DBIP + "db/download/ip-to-country-lite"),
-        Area("IP to ASN Lite", "each range's AS number and organisation (485,292 ranges)", DBIP + "db/download/ip-to-asn-lite"),
+        Area("IP to ASN Lite", "each range's AS number and organisation (485,292 ranges)", DBIP + "db/download/ip-to-asn-lite",
+             covered="each network's AS number and operator, in the hop table and with the places: read on this PC from the data folder's geoip/asn/, beside the GeoIP file, memory-mapped as it is"),
         Area("The CSV files", "the same data as CSV (City Lite's is 660 MB unpacked)", DBIP + "db/download/ip-to-city-lite"),
         Area("The lookup API", "an address's place asked of DB-IP's servers; never asked here, for it would send the address away",
              DBIP + "api/doc.php"),
@@ -1002,7 +1012,7 @@ DBIP_LITE = Api(
         Call("GET https://download.db-ip.com/free/dbip-country-lite-<year>-<month>.mmdb.gz", "a month's Country Lite file",
              "IP to Country Lite", docs=DBIP + "db/download/ip-to-country-lite"),
         Call("GET https://download.db-ip.com/free/dbip-asn-lite-<year>-<month>.mmdb.gz", "a month's ASN Lite file",
-             "IP to ASN Lite", docs=DBIP + "db/download/ip-to-asn-lite"),
+             "IP to ASN Lite", used="Install the ASN file… and Update…, once the GeoIP file is in and you accept its licence, run by the platform as a job: this month's, else last month's; https on every hop, from download.db-ip.com alone", docs=DBIP + "db/download/ip-to-asn-lite"),
         Call("maxminddb.open_database(<file>, MODE_MMAP_EXT)", "the file opened, memory-mapped by the C extension",
              "The MMDB file", used="the file opened for lookups (MODE_MMAP, pure Python, without the extension); a download checked",
              docs=READER_DOCS),

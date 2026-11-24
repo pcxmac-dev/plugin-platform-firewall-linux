@@ -70,6 +70,10 @@ class Plan:
     said: str
     risk: str = ""
     lines: list = field(default_factory=list)
+    # What a plan that fails part way takes back (the review of 2026-11-21, item 26): once `undo_after` of its steps
+    # are done, a later step failing runs `undo` (each step unchecked: what was not made yet is not there to take back).
+    undo: list = field(default_factory=list)
+    undo_after: int = 0
 
 
 @dataclass(frozen=True)
@@ -234,21 +238,42 @@ def _make_firewalld(cfg: Config, spec: Spec, risk: str) -> Plan:
     svc = f"{PREFIX}-{spec.name}"
     tool = "firewall-cmd" if f.running else "firewall-offline-cmd"
     perm = ["--permanent"] if f.running else []
-    steps = [Step([tool, *perm, f"--new-service={svc}"]),
+    # A service of Liminal's left in no zone filters nothing and the page cannot see it (its rules come from the
+    # services a zone uses), yet --new-service refuses its name for good (NAME_CONFLICT): one left so (by a make that
+    # failed part way before 0.9.2) is removed first, unless firewalld's saved configuration still names it in a zone
+    # or a policy (the review of 2026-11-21, item 26). The name is NAME's: lowercase letters, digits and dashes.
+    if any(svc in z.words("services") or any(f'service name="{svc}"' in r for r in z.rich) for z in [*f.zones, *f.policies]):
+        raise ValueError(f"a Liminal rule named {spec.name} is there already (the service {svc}, in a zone or a policy not in "
+                         "force now): remove it first")
+    fc = " ".join([tool, *perm])
+    q = shlex.quote(svc)
+    used = f'(^|[[:space:]"]){svc}([[:space:]"]|$)'
+    leftover = (f"fc={shlex.quote(fc)}; if $fc --info-service={q} >/dev/null 2>&1; then "
+                f"if {{ $fc --list-all-zones; $fc --list-all-policies; }} 2>/dev/null | grep -Eq {shlex.quote(used)}; then "
+                f"echo {shlex.quote(f'firewalld saved {svc} in a zone or a policy not in force now: remove it there, or reload firewalld (firewall-cmd --reload) and read again')} >&2; exit 1; fi; "
+                f"$fc --delete-service={q}; fi")
+    steps = [Step(["sh", "-c", leftover], label=f"removed {svc} where one was left in no zone"),
+             Step([tool, *perm, f"--new-service={svc}"]),
              Step([tool, *perm, f"--service={svc}", f"--set-description=made by the Liminal platform: {spec.words}"])]
     protocols = ("tcp", "udp") if spec.protocol == "any" else (spec.protocol,)
     for a, b in spec.spans:
         for proto in protocols:
             steps.append(Step([tool, *perm, f"--service={svc}", f"--add-port={a if a == b else f'{a}-{b}'}/{proto}"]))
     if not spec.source and spec.action == "allow":
-        steps.append(Step([tool, *perm, f"--zone={zone}", f"--add-service={svc}"]))
+        use = f"--add-service={svc}"
     else:
-        rich = fwd_mod.rich_rule(spec.action, address_family(spec.source), spec.source, "", (), service=svc)
-        steps.append(Step([tool, *perm, f"--zone={zone}", f"--add-rich-rule={rich}"]))
+        use = f"--add-rich-rule={fwd_mod.rich_rule(spec.action, address_family(spec.source), spec.source, '', (), service=svc)}"
+    steps.append(Step([tool, *perm, f"--zone={zone}", use]))
     if f.running:
         steps.append(Step(["firewall-cmd", "--reload"]))
+    # Failing after the service is made (a port refused, the zone's step, the reload), what was saved is taken back:
+    # the zone's use of it, then the service, so nothing is left where the page cannot see it (the review of
+    # 2026-11-21, item 26). Only the saved configuration was changed: the reload is the last step.
+    undo = [Step([tool, *perm, f"--zone={zone}", use.replace("--add-", "--remove-", 1)], check=False),
+            Step([tool, *perm, f"--delete-service={svc}"], check=False)]
     return Plan(steps, f"made in firewalld's zone {zone}: {spec.words}, as the service {svc}"
-                + ("" if f.running else "; firewalld is stopped: it holds the rule for when it runs"), risk)
+                + ("" if f.running else "; firewalld is stopped: it holds the rule for when it runs"), risk,
+                undo=undo, undo_after=2)
 
 
 def _nft_place(cfg: Config, chain: nft_mod.Chain, spec: Spec) -> list:

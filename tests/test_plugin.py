@@ -6,6 +6,7 @@ runs on (a WSL distribution it runs inside too, its page saying what WSL changes
 all, nor for a distribution reached from Windows."""
 from __future__ import annotations
 
+import re
 import sys
 
 import pytest
@@ -20,7 +21,7 @@ from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux.changes import ACCEPT, Risky
 from plugin_platform_firewall_linux.read import SCRIPT
 
-from machines import FakeLinux
+from machines import FakeLinux, answer
 
 WANTED = [Rule("mail-example-test", ports=(25, 587), detail="the mail server container")]
 APP = [8765, 8775, 8785, 8795]
@@ -152,7 +153,8 @@ def test_a_rule_made_through_each_front_end():
     # firewalld: a service of Liminal's in the default zone, a rich rule for a network
     fake = FakeLinux("fedora-43-firewalld")
     plugin(fake).make_rule("office", "in", "allow", "tcp", "8443-8444", "10.1.0.0/16")
-    assert fake.changes == [["firewall-cmd", "--permanent", "--new-service=liminal-office"],
+    assert fake.changes[0][:2] == ["sh", "-c"] and "--delete-service=liminal-office" in fake.changes[0][2]  # one left in no zone
+    assert fake.changes[1:] == [["firewall-cmd", "--permanent", "--new-service=liminal-office"],
                             ["firewall-cmd", "--permanent", "--service=liminal-office",
                              "--set-description=made by the Liminal platform: let tcp port 8443-8444 coming in from 10.1.0.0/16"],
                             ["firewall-cmd", "--permanent", "--service=liminal-office", "--add-port=8443-8444/tcp"],
@@ -172,6 +174,78 @@ def test_a_rule_made_through_each_front_end():
     plugin(fake).make_rule("one", "in", "reject", "udp", "161", "10.0.0.9")
     assert fake.changes == [["iptables", "-t", "filter", "-I", "INPUT", "1", "-s", "10.0.0.9", "-p", "udp", "--dport", "161", "-m", "comment",
                              "--comment", "liminal:one", "-j", "REJECT"]]
+
+
+class Firewalld(FakeLinux):
+    """A recorded firewalld machine whose saved services are kept: --new-service refuses a name there already
+    (NAME_CONFLICT, as firewalld does), --delete-service removes one, the step clearing one left in no zone removes it
+    when no zone uses it; `fail` answers the first command starting so with an error, once."""
+
+    def __init__(self, fail=(), services=()):
+        super().__init__("fedora-43-firewalld")
+        self.saved, self.used, self.fail = set(services), set(), tuple(fail)
+
+    def __call__(self, args, timeout):
+        self.calls.append(list(args))
+        cmd = args[2:] if args[:2] == ["sudo", "-n"] else list(args)
+        if cmd[:2] == ["sh", "-c"] and cmd[2] == SCRIPT:
+            self.reads += 1
+            return 0, answer(self.sections), ""
+        if self.fail and " ".join(cmd).startswith(" ".join(self.fail)):
+            self.fail = ()
+            return 1, "", "Error: INVALID_PORT"
+        word = cmd[-1] if cmd else ""
+        if cmd[:2] == ["sh", "-c"]:  # the leftover's clearing: what its script does, on this stand-in's state
+            svc = re.search(r"--delete-service='?([a-z0-9-]+)", cmd[2]).group(1)
+            if svc in self.saved and svc not in self.used:
+                self.saved.discard(svc)
+            return 0, "", ""
+        if word.startswith("--new-service="):
+            svc = word.split("=", 1)[1]
+            if svc in self.saved:
+                return 26, "", f"Error: NAME_CONFLICT: new_service(): '{svc}'"
+            self.saved.add(svc)
+        elif word.startswith("--delete-service="):
+            self.saved.discard(word.split("=", 1)[1])
+        elif word.startswith(("--add-service=", "--add-rich-rule=")):
+            self.used.add(re.search(r"liminal-[a-z0-9-]+", word).group(0))
+        elif word.startswith(("--remove-service=", "--remove-rich-rule=")):
+            self.used.discard(re.search(r"liminal-[a-z0-9-]+", word).group(0))
+        return 0, "", ""
+
+
+def test_a_firewalld_rule_failing_part_way_is_taken_back_and_made_again():
+    # the review of 2026-11-21, item 26: the service made first was left in no zone, unseen, its name refused for good
+    fake = Firewalld(fail=("firewall-cmd", "--permanent", "--service=liminal-office", "--set-description"))
+    fw = plugin(fake)
+    with pytest.raises(CommandError, match=r"INVALID_PORT .*taken back as it failed part way: firewall-cmd --permanent "
+                                           r"--delete-service=liminal-office"):
+        fw.make_rule("office", "in", "allow", "tcp", "8443")
+    assert fake.saved == set() and ["firewall-cmd", "--permanent", "--delete-service=liminal-office"] in fake.changes
+    assert fw.make_rule("office", "in", "allow", "tcp", "8443")["said"].startswith("made in firewalld's zone FedoraServer")
+    assert fake.saved == {"liminal-office"} and fake.used == {"liminal-office"}
+    # one the zone's step had used, the reload failing: the zone's use taken back too, then the service
+    fake = Firewalld(fail=("firewall-cmd", "--reload"))
+    with pytest.raises(CommandError, match="INVALID_PORT"):
+        plugin(fake).make_rule("office", "in", "allow", "tcp", "8443", "10.1.0.0/16")
+    assert fake.saved == set() and fake.used == set()
+
+
+def test_a_firewalld_service_of_liminals_left_in_no_zone_is_replaced_by_a_make_of_its_name():
+    # one left by a make that failed before 0.9.2: the read cannot see it (no zone uses it), the make clears it first
+    fake = Firewalld(services={"liminal-office"})
+    plugin(fake).make_rule("office", "in", "allow", "tcp", "8443")
+    assert fake.saved == {"liminal-office"} and fake.used == {"liminal-office"}
+    script = fake.changes[0][2]
+    assert "--info-service=liminal-office" in script and "--list-all-zones" in script and "--list-all-policies" in script
+    assert "exit 1" in script.split("--delete-service")[0]  # never while firewalld's saved zones or policies name it
+    # one in a zone not in force now is a rule of that name there already: refused before anything runs
+    fake = Firewalld()
+    zones = fake.sections["firewalld.zones"]
+    fake.set("firewalld.zones", zones[1] + "\nidle\n  target: default\n  services: liminal-office\n")
+    with pytest.raises(ValueError, match="there already"):
+        plugin(fake).make_rule("office", "in", "allow", "tcp", "8443")
+    assert fake.changes == []
 
 
 def test_a_block_with_nowhere_to_go_makes_a_table_of_liminals_own_and_an_allow_with_nothing_dropping_is_not_needed():

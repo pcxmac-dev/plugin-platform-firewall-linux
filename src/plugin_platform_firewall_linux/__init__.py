@@ -143,7 +143,7 @@ from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
 from .read import SCRIPT, Config
 from .rights import PASSWORD_FIELD, Rights
 
-__version__ = "0.9.1"
+__version__ = "0.9.2"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -474,9 +474,22 @@ class LinuxFirewallPlugin(Firewall):
         ran: list[str] = []
         try:
             with rights_mod.refusals(ran):  # a failure says the steps done before it
-                for step in plan.steps:
-                    rights_mod.run(sh, *step.args, password=password, stdin=step.stdin, check=step.check)
-                    ran.append(step.words)
+                try:
+                    for step in plan.steps:
+                        rights_mod.run(sh, *step.args, password=password, stdin=step.stdin, check=step.check)
+                        ran.append(step.words)
+                except Exception:
+                    # A plan failing part way takes back what it made (Plan.undo), said with the steps done: a
+                    # firewalld service left in no zone was unseen and its name refused for good (the review of
+                    # 2026-11-21, item 26).
+                    if plan.undo and len(ran) >= plan.undo_after:
+                        for step in plan.undo:
+                            try:
+                                rights_mod.run(sh, *step.args, password=password, stdin=step.stdin, check=step.check)
+                                ran.append(f"taken back as it failed part way: {step.words}")
+                            except Exception:
+                                ran.append(f"not taken back: {step.words}")
+                    raise
         finally:
             self.forget()
         return ran

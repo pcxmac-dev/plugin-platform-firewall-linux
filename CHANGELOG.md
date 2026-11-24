@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.9.2 (2026-11-24)
+
+A firewalld rule that fails part way is taken back (the review of 2026-11-21, item 26, finding 16).
+
+- **What a make saved before failing is taken back** (`changes.py` `Plan.undo`, `_run`). Under firewalld a rule is a
+  service made first (`--new-service=liminal-<name>`), then its description, its ports, the zone's use of it and the
+  reload. A step failing after the service was made left it in no zone: the page's rules come only from the services a
+  zone uses, so it was not seen, and every later make of the name failed on NAME_CONFLICT. Now a plan names what takes
+  it back: for firewalld, the zone's use of the service, then the service (`--delete-service`), each unchecked. The
+  failure says them after the steps done before it ("taken back as it failed part way: ...").
+- **A service of Liminal's left in no zone is replaced by a make of its name.** One left so by an earlier version is
+  removed first, unless firewalld's saved configuration still names it in a zone or a policy (then the make stops in
+  words: remove it there, or reload firewalld). One used in a zone or a policy not in force now is a rule of that name
+  there already: refused before anything runs, as one in force is.
+- Tests: `test_a_firewalld_rule_failing_part_way_is_taken_back_and_made_again`,
+  `test_a_firewalld_service_of_liminals_left_in_no_zone_is_replaced_by_a_make_of_its_name`, over the recorded Fedora
+  43 machine with a stand-in that keeps firewalld's saved services.
+
 ## 0.9.1 (2026-11-19)
 
 Backbone networks on the globe, and a globe that zooms to 96x. The user, 2026-11-19: "i need to zoom in a few more

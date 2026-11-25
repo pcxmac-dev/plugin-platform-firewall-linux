@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import pathlib
 
+from liminal_libs.machines.linux import Shell
 from plugin_platform_firewall_linux.read import MARK, SCRIPT
 
 RECORDED = pathlib.Path(__file__).parent / "recorded"
@@ -67,7 +68,7 @@ class FakeLinux:
 
     def __call__(self, args, timeout):
         self.calls.append(list(args))
-        cmd = args[2:] if args[:2] == ["sudo", "-n"] else list(args)
+        cmd = args[len(SUDO):] if args[:len(SUDO)] == SUDO else list(args)
         if cmd[:2] == ["sh", "-c"] and cmd[2] == SCRIPT:
             self.reads += 1
             return 0, answer(self.sections), ""
@@ -81,11 +82,21 @@ class FakeLinux:
         """The commands run but the read, without sudo (sudo -n, or 0.9.0's sudo -S -k -p "" -- with a password)."""
         out = []
         for c in self.calls:
-            cmd = c[6:] if c[:6] == SUDO_S else c[2:] if c[:2] == ["sudo", "-n"] else c
+            cmd = c[6:] if c[:6] == SUDO_S else c[len(SUDO):] if c[:len(SUDO)] == SUDO else c
             if cmd[:2] == ["sh", "-c"] and cmd[2] == SCRIPT:
                 continue
             out.append(cmd)
         return out
 
 
+def shell_sudo() -> list[str]:
+    """The sudo the library's Shell puts before a command run as root on this machine when the platform is not root,
+    read from Shell.prefix itself (liminal-libs 1.80.0 made it sudo -n --), so the stand-ins follow the library
+    whoever runs the tests."""
+    shell = Shell("local")
+    shell.root = lambda: False  # the platform not root, as on a user's machine
+    return shell.prefix()
+
+
+SUDO = shell_sudo()
 SUDO_S = ["sudo", "-S", "-k", "-p", "", "--"]  # the library's sudo with a password on its standard input (1.62.0)

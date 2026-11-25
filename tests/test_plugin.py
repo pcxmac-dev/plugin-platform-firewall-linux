@@ -21,7 +21,7 @@ from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux.changes import ACCEPT, Risky
 from plugin_platform_firewall_linux.read import SCRIPT
 
-from machines import FakeLinux, answer
+from machines import SUDO, FakeLinux, answer
 
 WANTED = [Rule("mail-example-test", ports=(25, 587), detail="the mail server container")]
 APP = [8765, 8775, 8785, 8795]
@@ -104,7 +104,7 @@ def test_one_read_kept_a_minute_refreshed_and_read_again_after_a_change(monkeypa
     monkeypatch.setattr(linux_mod.os, "geteuid", lambda: 1000, raising=False)  # not root: sudo -n, never a password asked
     fake2 = FakeLinux("gentoo-openrc-nftables")
     plugin(fake2).status()
-    assert fake2.calls == [["sudo", "-n", "sh", "-c", SCRIPT]]
+    assert fake2.calls == [[*SUDO, "sh", "-c", SCRIPT]]
 
 
 def test_presets_and_find():
@@ -187,7 +187,7 @@ class Firewalld(FakeLinux):
 
     def __call__(self, args, timeout):
         self.calls.append(list(args))
-        cmd = args[2:] if args[:2] == ["sudo", "-n"] else list(args)
+        cmd = args[len(SUDO):] if args[:len(SUDO)] == SUDO else list(args)
         if cmd[:2] == ["sh", "-c"] and cmd[2] == SCRIPT:
             self.reads += 1
             return 0, answer(self.sections), ""
@@ -423,7 +423,7 @@ def test_what_the_firewall_needs_is_said_when_it_cannot_be_read_or_there_is_none
     assert f"needs liminal-libs {rights.NEEDS_LIBS}" in needs["rows"][0][2]  # the number set at landing, one place
     assert needs["rows"][1][1].startswith("none installed") and "apt install nftables (Debian, Ubuntu)" in needs["rows"][1][2]
     assert [c["title"] for c in needs["columns"]] == ["What", "Here", "What to do"] and len(st["tables"]) == 1
-    assert looked == ["nft", "iptables", "ufw", "firewall-cmd"] and ran and all(a[:2] == ["sudo", "-n"] for a in ran)
+    assert looked == ["nft", "iptables", "ufw", "firewall-cmd"] and ran and all(a[:len(SUDO)] == SUDO for a in ran)
     nft = LinuxFirewallPlugin(shell=Shell("local", runner=refused), native="", which=lambda t: "/usr/sbin/nft" if t == "nft" else None)
     assert nft.status()["tables"][0]["rows"][1][1:] == ["nftables installed", "none needed"]
     under = {"title": "Under WSL", "note": "What running inside a WSL distribution changes for this plugin.",
@@ -460,7 +460,7 @@ class Numbered(FakeLinux):
 
     def __call__(self, args, timeout):
         out = super().__call__(args, timeout)
-        cmd = args[2:] if args[:2] == ["sudo", "-n"] else list(args)
+        cmd = args[len(SUDO):] if args[:len(SUDO)] == SUDO else list(args)
         if cmd[:3] == ["ufw", "--force", "delete"] and cmd[3].isdecimal():
             del self.rows[int(cmd[3]) - 1]
             self.show()

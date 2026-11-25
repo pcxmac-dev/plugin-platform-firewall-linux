@@ -22,7 +22,7 @@ from liminal_libs.machines.linux import Shell
 from plugin_platform_firewall_linux import LinuxFirewallPlugin, rights
 from plugin_platform_firewall_linux.read import SCRIPT
 
-from machines import RECORDED, SUDO_S, FakeLinux, answer
+from machines import RECORDED, SUDO, SUDO_S, FakeLinux, answer
 
 PASSWORD = "Sesame-7f3e9a1c-liminal-test"  # the one password this sudo takes: a test's, never anyone's
 LIB = rights.library()  # the library's rights; None for a library from before them
@@ -75,8 +75,8 @@ class Sudo(FakeLinux):
             return self.as_root(args[len(SUDO_S):], (stdin or "").split("\n", 1)[1])
         if args == LISTING:
             return self.listing()
-        if args[:2] == ["sudo", "-n"]:
-            cmd = args[2:]
+        if args[:len(SUDO)] == SUDO:
+            cmd = args[len(SUDO):]
             if cmd == [self.paths.read]:
                 if self.state in ("on", "pending") and self.active:
                     self.reads += 1
@@ -180,11 +180,11 @@ class Sudo(FakeLinux):
         """The commands run as root but the read, without sudo's own words."""
         out = []
         for c in self.calls:
-            cmd = c[len(SUDO_S):] if c[:len(SUDO_S)] == SUDO_S else c[2:] if c[:2] == ["sudo", "-n"] else c
+            cmd = c[len(SUDO_S):] if c[:len(SUDO_S)] == SUDO_S else c[len(SUDO):] if c[:len(SUDO)] == SUDO else c
             read = (cmd[:2] == ["sh", "-c"] and cmd[2:3] == [SCRIPT]) or cmd == [self.paths.read]
             if read or c == LISTING or c[:3] == ["sudo", "-n", "-l"] or c[:1] == ["cat"]:
                 continue
-            if c[:len(SUDO_S)] == SUDO_S or c[:2] == ["sudo", "-n"] or self.root:
+            if c[:len(SUDO_S)] == SUDO_S or c[:len(SUDO)] == SUDO or self.root:
                 out.append(cmd)
         return out
 

@@ -28,7 +28,7 @@ from plugin_platform_firewall_linux.changes import ACCEPT, Risky
 from plugin_platform_firewall_linux.read import SCRIPT
 from plugin_platform_firewall_linux.rights import PASSWORD_FIELD, WrongPassword
 
-from machines import SUDO_S, FakeLinux, answer
+from machines import SUDO, SUDO_S, FakeLinux, answer
 from sudo import LISTING, NEEDS_PASSWORD, PASSWORD, WRONG, Sudo, installed_read
 
 NEEDS = "What the firewall needs here"
@@ -84,7 +84,7 @@ def test_not_shown_where_a_rule_of_the_users_own_runs_the_read(monkeypatch):
     st = fw.status()
     assert st["valid"] and st["rootAccess"] == rights.OWN == ("sudo runs its read without a password, by a rule of "
                                                              "your own: Root access is not needed")
-    assert sudo.calls[0] == ["sudo", "-n", "sh", "-c", SCRIPT]  # 0.8.1's read, which the rule allows
+    assert sudo.calls[0] == [*SUDO, "sh", "-c", SCRIPT]  # 0.8.1's read, which the rule allows
     assert "Root access" not in first_cells(table(st, "Firewall")) and not {"root-on", "root-off"} & set(ids(st))
     assert all(PASSWORD_FIELD not in f["fields"] for f in st["forms"])  # sudo's policy says none is needed
     fw.status()
@@ -130,11 +130,11 @@ def test_off_the_rules_are_not_read_and_turn_on_is_offered_with_its_words(monkey
     hooks = fw.interface()["hooks"]
     assert all(f["hook"] in hooks for f in st["forms"]) and "world" in hooks  # valid: its tabs are asked too
     fw.status(), fw.present()
-    assert sudo.calls.count(["sudo", "-n", "sh", "-c", SCRIPT]) == 1  # a refusal kept as long as a read
+    assert sudo.calls.count([*SUDO, "sh", "-c", SCRIPT]) == 1  # a refusal kept as long as a read
     fw.refresh  # noqa: B018 - Refresh reads again (and is refused again)
     with pytest.raises(Exception, match="needs root"):
         fw.refresh()
-    assert sudo.calls.count(["sudo", "-n", "sh", "-c", SCRIPT]) == 2
+    assert sudo.calls.count([*SUDO, "sh", "-c", SCRIPT]) == 2
 
 
 def test_turned_on_it_makes_the_group_and_the_grant_with_the_password_once_in_force_from_the_next_start(monkeypatch):
@@ -163,11 +163,11 @@ def test_turned_on_it_makes_the_group_and_the_grant_with_the_password_once_in_fo
     assert root[1] == rights.PENDING and "a terminal opened after it was turned on" in root[2]
     assert root[3]["form"] == "root-off" and ids(st) == ["root-off"]
     assert form(st, "root-off")["fields"] == [FIXED, PASSWORD_FIELD]  # its helper cannot run yet: the password asked
-    assert ["sudo", "-n", sudo.paths.read] not in sudo.calls  # nothing installed is run before it is in force
+    assert [*SUDO, sudo.paths.read] not in sudo.calls  # nothing installed is run before it is in force
     with pytest.raises(ValueError, match="your password for sudo is needed: the take-back helper cannot run"):
         fw.root_access("off")
     out = fw.root_access("off", PASSWORD)
-    assert ["sudo", "-n", sudo.paths.helper] in sudo.calls  # then sudo -S, the cleanup an argument of sh -c
+    assert [*SUDO, sudo.paths.helper] in sudo.calls  # then sudo -S, the cleanup an argument of sh -c
     assert sudo.run_as_root[-1][:2] == ["sh", "-c"] and "rm -rf" in sudo.run_as_root[-1][2]
     assert out["said"].startswith("Root access is off") and fw.status()["rootAccess"] == rights.OFF
 
@@ -177,9 +177,9 @@ def test_on_the_read_runs_the_installed_file_through_sudo_n_and_every_change_ask
     fw = sudo.install(monkeypatch)
     st = fw.status()
     assert st["valid"] and st["rootAccess"] == rights.ON == "on: a rule lets its read run as root, nothing else"
-    assert ["sudo", "-n", sudo.paths.read] in sudo.calls and ["sudo", "-n", "sh", "-c", SCRIPT] not in sudo.calls
+    assert [*SUDO, sudo.paths.read] in sudo.calls and [*SUDO, "sh", "-c", SCRIPT] not in sudo.calls
     first = sudo.calls.index  # compared with the plugin's own read first (the library's granted), then run
-    assert first(["cat", "--", sudo.paths.read]) < first(["sudo", "-n", sudo.paths.read])
+    assert first(["cat", "--", sudo.paths.read]) < first([*SUDO, sudo.paths.read])
     parts = table(st, "Firewall")
     [root] = [r for r in parts["rows"] if r[0] == "Root access"]
     assert root[1] == rights.ON and root[3]["text"] == sudo.paths.read and sudo.paths.rule in root[3]["sub"]
@@ -197,13 +197,13 @@ def test_on_the_read_runs_the_installed_file_through_sudo_n_and_every_change_ask
     before = len(sudo.calls)
     with pytest.raises(CommandError, match="needs your password for sudo, and nothing here asks for it"):
         fw.allow("mail", (2525,))
-    assert not [c for c in sudo.calls[before:] if c[:len(SUDO_S)] == SUDO_S or c[:3] == ["sudo", "-n", "nft"]]
+    assert not [c for c in sudo.calls[before:] if c[:len(SUDO_S)] == SUDO_S or c[:len(SUDO) + 1] == [*SUDO, "nft"]]
     fw.wanted = lambda: [Rule("mail-example-test", ports=(25, 587))]  # the framework's setup: a rule to make
     done = {d["step"]: d for d in fw.setup(log=lambda line: None)}
     assert done["rules"]["ok"] is False and "needs your password for sudo" in done["rules"]["detail"]
     before = len(sudo.calls)
     out = fw.root_access("off")
-    assert ["sudo", "-n", sudo.paths.helper] in sudo.calls[before:] and out["said"].startswith("Root access is off")
+    assert [*SUDO, sudo.paths.helper] in sudo.calls[before:] and out["said"].startswith("Root access is off")
     assert not [f for f in sudo.fed[before:] if f]  # no password handed for it
     assert fw.status()["rootAccess"] == rights.OFF
 
@@ -212,7 +212,7 @@ def test_an_installed_read_that_is_not_the_plugins_own_is_not_run_and_turn_on_ag
     sudo = Sudo("debian-13-nftables", state="stale")
     fw = sudo.install(monkeypatch)
     st = fw.status()
-    assert st["valid"] and st["rootAccess"] == rights.STALE and ["sudo", "-n", sudo.paths.read] not in sudo.calls
+    assert st["valid"] and st["rootAccess"] == rights.STALE and [*SUDO, sudo.paths.read] not in sudo.calls
     root = table(st, NEEDS)["rows"][0]
     assert root[:2] == ["Root access", "on, but its read installed is an older plugin's: it is not run"]
     assert root[3]["form"] == "root-on" and ids(st) == ["root-on", "root-off"]
@@ -221,7 +221,7 @@ def test_an_installed_read_that_is_not_the_plugins_own_is_not_run_and_turn_on_ag
     assert [c[:2] for c in sudo.run_as_root] == [["sh", "-c"]]  # group and membership there already: the grant alone
     assert out["said"].startswith("Root access is on: the firewall's read runs as root")
     st = fw.status()
-    assert st["rootAccess"] == rights.ON and sudo.reads == 1 and ["sudo", "-n", sudo.paths.read] in sudo.calls
+    assert st["rootAccess"] == rights.ON and sudo.reads == 1 and [*SUDO, sudo.paths.read] in sudo.calls
 
 
 def test_a_password_sudo_refuses_is_a_refusal_and_nothing_is_changed(monkeypatch):
@@ -482,7 +482,7 @@ def test_with_a_library_from_before_the_grant_it_works_as_0_8_1_and_says_the_swi
                                 INSTALL]
     assert needs["rows"][2][:2] == ["Netstat and the hosts database", "not in this library"]  # what 0.9.0 would add
     assert needs["rows"][2][2].startswith(f"they need liminal-libs {netstat_mod.NETSTAT_LIBS} (this one is ")
-    assert ran == [["sudo", "-n", "sh", "-c", SCRIPT]]  # 0.8.1's one read, sudo -n
+    assert ran == [[*SUDO, "sh", "-c", SCRIPT]]  # 0.8.1's one read, sudo -n
     for ask in (lambda: fw.root_access("on", PASSWORD), lambda: fw.install_nftables(PASSWORD)):
         with pytest.raises(ValueError, match=re.escape(f"needs liminal-libs {rights.NEEDS_LIBS}")):
             ask()
@@ -492,7 +492,7 @@ def test_with_a_library_from_before_the_grant_it_works_as_0_8_1_and_says_the_swi
     assert st["valid"] and "rootAccess" not in st and all(PASSWORD_FIELD not in f["fields"] for f in st["forms"])
     assert "Root access" not in first_cells(table(st, "Firewall"))
     fw.make_rule("web", "in", "allow", "tcp", "8443", None, None, False, PASSWORD)  # a password given anyway: unused
-    assert fake.calls[-1][:2] == ["sudo", "-n"] and PASSWORD not in everywhere(fake.calls)
+    assert fake.calls[-1][:len(SUDO)] == SUDO and PASSWORD not in everywhere(fake.calls)
 
 
 # -- with the library's own sudo (liminal-libs 1.62.0, when it is installed) -------------------------------------------
@@ -571,7 +571,7 @@ def test_with_the_librarys_own_granted_the_installed_read_is_compared_then_run(m
             return (0, text, "") if text is not None else (1, "", "cat: No such file or directory")
         if args == list(linux_mod.SUDO_LIST):
             return 0, listing, ""
-        if args == ["sudo", "-n", paths.read]:
+        if args == [*SUDO, paths.read]:
             fake.reads += 1
             return 0, answer(fake.sections), ""
         return 1, "", "sudo: a password is required"
@@ -580,7 +580,7 @@ def test_with_the_librarys_own_granted_the_installed_read_is_compared_then_run(m
     fw = LinuxFirewallPlugin(shell=Shell("local", runner=runner), native="", clock=lambda: 1000.0)
     st = fw.status()
     assert st["valid"] and st["rootAccess"] == rights.ON and fake.reads == 1
-    assert ["cat", "--", paths.read] in fake.calls and ["sudo", "-n", "sh", "-c", SCRIPT] not in fake.calls
+    assert ["cat", "--", paths.read] in fake.calls and [*SUDO, "sh", "-c", SCRIPT] not in fake.calls
     installed["text"] = "#!/bin/sh\necho an older plugin's read\n"
     fw.forget()
     st = fw.status()

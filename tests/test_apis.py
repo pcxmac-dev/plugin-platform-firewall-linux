@@ -31,7 +31,7 @@ from plugin_platform_firewall_linux import system as sys_mod
 from plugin_platform_firewall_linux import ufw as ufw_mod
 from plugin_platform_firewall_linux.read import SCRIPT
 
-from machines import FakeLinux
+from machines import SUDO, FakeLinux
 from sudo import LIB, PASSWORD, Sudo
 
 
@@ -166,6 +166,12 @@ def pattern(name: str):
     return re.compile("".join(out), re.S)
 
 
+def carded(cmd: list[str]) -> list[str]:
+    """A command as the cards write it: Shell's sudo named sudo -n, the -- it ends with (liminal-libs 1.80.0) no word of
+    theirs."""
+    return [*(w for w in SUDO if w != "--"), *cmd[len(SUDO):]] if cmd[:len(SUDO)] == SUDO else cmd
+
+
 def canonical(cmd: list[str]) -> str | None:
     """A change as the cards name it (None for a script: its commands are matched by pattern; `env` and the variables it
     sets before a command left out); its own words when no card names it."""
@@ -214,7 +220,7 @@ def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
 
 def test_the_cards_name_every_command_of_the_read_and_every_change(monkeypatch):
     ran, read_calls, fed = drive(monkeypatch)
-    pool = [SCRIPT.replace("$fc", "firewall-cmd"), *(" ".join(c) for c in (*ran, *read_calls)), *planned(),
+    pool = [SCRIPT.replace("$fc", "firewall-cmd"), *(" ".join(carded(c)) for c in (*ran, *read_calls)), *planned(),
             *(shlex.join(c) for c in read_calls), *fed]  # 0.9.0: sudo -S -k -p '' as a shell writes it; the scripts fed
     driven = [a for a in cards.FIREWALL if LIB is not None or a not in (cards.SUDO, cards.GROUPS, cards.APT)]
     never = [f"{api.name}: {call.name}" for api in driven for call in api.used
@@ -223,7 +229,7 @@ def test_the_cards_name_every_command_of_the_read_and_every_change(monkeypatch):
     changes = {canonical(c) for c in ran} - {None}
     used = {c.name for api in MACHINE.apis for c in api.used}
     assert changes <= used, sorted(changes - used)
-    assert read_calls[0][:4] == ["sudo", "-n", "sh", "-c"] and read_calls[0][4] == SCRIPT  # the one read, as root through sudo
+    assert read_calls[0][:len(SUDO) + 2] == [*SUDO, "sh", "-c"] and read_calls[0][len(SUDO) + 2] == SCRIPT  # the one read, as root through sudo
 
 
 def test_its_facts_are_what_the_last_read_found_and_asking_them_runs_nothing(monkeypatch):

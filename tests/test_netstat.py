@@ -56,7 +56,7 @@ from plugin_platform_firewall_linux import netstat as netstat_mod  # noqa: E402
 from plugin_platform_firewall_linux.groups import UNKNOWN  # noqa: E402
 
 from conftest import Reached  # noqa: E402
-from machines import FakeLinux  # noqa: E402
+from machines import SUDO, FakeLinux  # noqa: E402
 from test_apis import pattern  # noqa: E402
 
 TABLES_HERE = netstat_mod.tables_here  # the real one, taken before any test (the suite's conftest stands it in)
@@ -498,7 +498,7 @@ def test_present_runs_no_read_of_the_firewall_where_the_netstat_tab_is_served(mo
     fw = plugin(fake)
     assert fw.present() and fw.present() and fake.calls == []
     monkeypatch.setattr(netstat_mod, "tables_here", lambda: False)  # no socket table here: the firewall's read
-    assert fw.present() and fake.reads == 1 and fake.calls[-1][:2] == ["sudo", "-n"]
+    assert fw.present() and fake.reads == 1 and fake.calls[-1][:len(SUDO)] == SUDO
 
 
 def test_the_needs_row_names_every_program_where_the_platform_runs_as_root(monkeypatch):

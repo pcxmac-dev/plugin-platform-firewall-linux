@@ -23,6 +23,11 @@ from machines import FakeLinux
 CHANGES = ("allow", "remove", "make_rule", "remove_rule", "set_policy", "switch", "save_rules", "root_access",
            "install_nftables")
 READS = ("present", "status", "refresh", "show_rules", "find_rules", "wanted", "world", "netstat")
+# 0.11.0: the base's other changes, and NetworkHost's (liminal-libs 1.96.0)
+NETWORK_CHANGES = ("move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
+                   "world_watching", "world_geoip", "world_asn", "world_layer_get", "world_layer_remove",
+                   "approve_plan", "grant_network", "revoke_network", "set_domain", "withdraw", "repoint",
+                   "remove_leftover", "forget_records")
 
 
 class Neighbour(MachinePlugin):
@@ -69,7 +74,8 @@ def attached(monkeypatch):
 
 def test_its_changes_are_said_to_be_asked_only_from_its_page_and_its_reads_by_anyone():
     fw = LinuxFirewallPlugin(shell=Shell("local", runner=FakeLinux("ubuntu-24.04-ufw")), native="")
-    assert set(internal.page_only(fw)) == set(CHANGES) and internal.plugin_only(fw) == ()  # what the platform reads
+    assert set(internal.page_only(fw)) == set(CHANGES) | set(NETWORK_CHANGES)  # 0.11.0
+    assert set(internal.plugin_only(fw)) == {"network_plan", "apply_network", "network_work"}  # what the platform reads
     assert [p for p in internal.problems(fw) if "ONLY_HOOKS" in p] == []  # each a hook of its own, someone may ask it
     for hook in CHANGES:
         assert asking.refusal(fw, hook, asking.PAGE) == ""

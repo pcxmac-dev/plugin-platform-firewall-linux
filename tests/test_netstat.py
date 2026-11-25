@@ -189,7 +189,8 @@ def texts(cells) -> list:
 
 # -- the tab, its hooks, its job and its setting: the base's -----------------------------------------------------------
 def test_the_tab_its_hooks_its_job_and_its_setting_are_the_firewall_bases():
-    assert MACHINE.TABS == Firewall.TABS and [t.id for t in MACHINE.TABS] == ["world", "netstat"]
+    assert MACHINE.TABS[:2] == Firewall.TABS
+    assert [t.id for t in MACHINE.TABS] == ["world", "netstat", "container_networks"]  # 0.11.0: the Networks tab
     tab = MACHINE.TABS[1]
     assert (tab.title, tab.hook, tab.every) == ("Netstat", "netstat", netstat.EVERY) and netstat.EVERY == 3.0
     assert set(netstat.HOOKS) <= set(MACHINE.HOOKS) and MACHINE.HOOKS[:len(Firewall.HOOKS)] == Firewall.HOOKS

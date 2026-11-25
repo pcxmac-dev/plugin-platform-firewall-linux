@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "plugin-platform-firewall-linux"
-version = "0.10.0"  # the plugin's own release (CHANGELOG.md); the app shows it on the Plugins view
+version = "0.11.0"  # the plugin's own release (CHANGELOG.md); the app shows it on the Plugins view
 description = """\
   Linux firewall for Liminal: the native Linux machine's whole firewall read and changed from the platform's page \
   (nftables, iptables nf_tables and legacy, ebtables, arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP read \
@@ -21,7 +21,7 @@ requires-python = ">=3.10"
 # command is read as sudo's), with its geo extra: maxminddb, which reads the GeoIP file the tabs place with. On an
 # older library the plugin still loads, and works as the release before what it lacks (each is found by name:
 # netstat.library, rights.library); on 1.65.0 the Topology Zoo's data set alone is left out, in words
-dependencies = ["liminal-libs[geo]>=1.80.0"]
+dependencies = ["liminal-libs[geo]>=1.96.0"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "maxminddb>=3.2"]  # maxminddb: the World Wide Web tab's tests read a GeoIP file they write

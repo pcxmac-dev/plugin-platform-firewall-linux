@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.11.0 (2026-11-25)
+
+Services' networks through this firewall, on liminal-libs 1.96.0's NetworkHost (service-containers-networking-2026-11-23.md
+§5.4 to §5.7; decision 20 as changed to (b), N9, N10; SERVICE-INTERFACE.md §9: "wsl"). Floor: liminal-libs 1.96.0. On
+0.10.0 (the review's PLT-H1, not landed).
+- **Its stack:** inside a WSL distribution it owns "wsl" (every Linux inside WSL 2 shares one VM's network: N9, the
+  Linux platform's firewall-linux is its one writer), on a machine of its own "linux"; it hands out from the Linux half
+  of Liminal's pool (10.77.128.0/17) and names under linux.<domain>. A bridge on this host is a connected route: none
+  is made; a nested segment (LXD's Docker inside liminal-oci) gets `ip route replace <its /24> via <liminal-oci>`.
+- **The limit (decision 20 b):** on a machine of its own, a service's published ports opened to your network keep new
+  connections to your subnets (the interfaces carrying a default route, never an engine's bridge): DOCKER-USER rules
+  where Docker's iptables backend has that chain (established traffic first, the original destination port matched
+  through conntrack), else a forward chain at priority -1 in Liminal's own `inet liminal` table; never Docker's own
+  tables, never a flush. Taken away by its mark alone. Inside WSL nothing is written for it (WSL's NAT: Windows'
+  firewall opens the port).
+- **Marks with the platform:** `liminal:svc-<owner>-<name>-<port> platform=<the platform that made it>`.
+- **`accept_shared`:** inside WSL, while another distribution's engine is seen in its one network (its bridges here,
+  no engine of this distribution's own), every plan that makes or opens asks a second time.
+- **Root without a password:** a plan's script runs as root through sudo -n (Root access, or a rule of yours), one
+  `sh -s` per plan; a change that needs your password is refused in words before anything runs (a service's work has
+  no form to type it into).
+- **Names, DHCP records, the Networks tab, no default domain:** the library's (you set the domain; no service is placed
+  until you do). Page-only: the base's other changes too (labels, moves, recording, watching, downloads).
+- The plugin's own `_facts` (what installing nftables takes) is `_install_facts` now: NetworkHost's `_facts` is a
+  method of the same name.
+- Tests: tests/test_networks.py (10), the library's conformance sequence among them inside WSL; each of its 12 gates
+  taken out once made a test fail.
+
 ## 0.10.0 (2026-11-24)
 
 run() runs a command as the platform's own user, and as root only when asked (the independent review's finding

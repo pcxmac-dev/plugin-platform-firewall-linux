@@ -1724,7 +1724,7 @@ def rights_facts(plugin) -> dict[str, dict[str, str]]:
     fact = getattr(kept[1], "fact", "") if kept else ""
     if fact:
         out[SUDO.name] = {"Root access": fact}
-    facts = getattr(plugin, "_facts", None)  # (when, install.Facts), where the install is offered
+    facts = getattr(plugin, "_install_facts", None)  # (when, install.Facts), where the install is offered (0.11.0: renamed)
     words = getattr(facts[1], "words", "") if facts else ""
     if words:
         out[APT.name] = {"Installing nftables": words}

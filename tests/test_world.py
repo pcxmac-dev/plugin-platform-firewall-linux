@@ -213,7 +213,7 @@ def traffic_of(book: TrafficBook) -> None:
 # -- the tab: the base's, this plugin naming its download, its licence, its credit and its name servers ---------------------
 def test_the_tab_its_hooks_and_its_setting_are_the_firewall_bases():
     # after Main and API, every 2 s (0.9.0, liminal-libs 1.65.0: the Netstat tab after it, the base's too)
-    assert MACHINE.TABS == Firewall.TABS and MACHINE.TABS[0] == Tab("world", "World Wide Web", "world", 2.0)
+    assert MACHINE.TABS[:len(Firewall.TABS)] == Firewall.TABS and MACHINE.TABS[0] == Tab("world", "World Wide Web", "world", 2.0)
     assert MACHINE.HOOKS[:len(Firewall.HOOKS)] == Firewall.HOOKS and {"world", "world_geoip"} <= set(Firewall.HOOKS)
     hooks = MACHINE.interface()["hooks"]
     # asked by name (Plugin.ask): the tab's page with no arguments, the install with the one its form sets and the log

@@ -153,8 +153,10 @@ from .groups import sort_entry
 from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS, parse_address
 from .read import SCRIPT, Config
 from .rights import PASSWORD_FIELD, Rights
+from .network import LinuxNetwork
+from liminal_libs.machines.segments import NetworkHost
 
-__version__ = "0.10.0"
+__version__ = "0.11.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -192,7 +194,7 @@ def find_tool(tool: str):
     return shutil.which(tool, path=TOOL_PATH)
 
 
-class LinuxFirewallPlugin(Firewall):
+class LinuxFirewallPlugin(Firewall, LinuxNetwork):
     name = "firewall-linux"
     title = "Linux firewall"
     about = ("the firewall of the Linux the platform runs on (a WSL distribution it runs inside too, what WSL changes said), "
@@ -214,15 +216,23 @@ class LinuxFirewallPlugin(Firewall):
     SECTION = "os"  # drawn under the platform's OS plugins (liminal-platform 0.26.0)
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
              "save_rules",  # the base's world and world_geoip among them (the World Wide Web tab, 0.8.0)
-             ROOT_HOOK, INSTALL_HOOK)  # 0.9.0: Root access turned on or off; nftables installed (a job)
+             ROOT_HOOK, INSTALL_HOOK,  # 0.9.0: Root access turned on or off; nftables installed (a job)
+             *(h for h in NetworkHost.HOOKS if h not in Firewall.HOOKS))  # 0.11.0: services' networks (network.py)
+    TABS = (*Firewall.TABS, *NetworkHost.TABS)  # 0.11.0: the Networks tab after the World Wide Web and Netstat tabs
+    ASKS = (*getattr(Firewall, "ASKS", ()), *NetworkHost.ASKS)
+    READ_HOOKS = tuple(dict.fromkeys((*Firewall.READ_HOOKS, *NetworkHost.READ_HOOKS)))
     JOB_HOOKS = (*Firewall.JOB_HOOKS, INSTALL_HOOK)  # run by the platform as jobs, their lines in the plugin's panel
     # Its changes as root, asked only from its page (0.10.0, the review's PLT-H1 follow-up; liminal-libs 1.66.0's
     # apps/asking.py): another plugin's ask is refused (403), and liminal-platform 0.34.0 refuses one over HTTP (401)
     # unless its login shows that you are at the page. Before, any program on this machine could ask them with two
     # headers, a second confirmation being only an argument. The base's allow and remove among them: the framework's
     # setup and the command line call their code in their own process, not through an ask.
-    PAGE_ONLY_HOOKS = ("allow", "remove", "make_rule", "remove_rule", "set_policy", "switch", "save_rules", ROOT_HOOK,
-                       INSTALL_HOOK)
+    PAGE_ONLY_HOOKS = (*NetworkHost.PAGE_ONLY_HOOKS,  # 0.11.0: approve_plan, the grants, the domain, Re-point…
+                       "allow", "remove", "make_rule", "remove_rule", "set_policy", "switch", "save_rules", ROOT_HOOK,
+                       INSTALL_HOOK,
+                       # 0.11.0 (service-containers-networking §8.1): the base's other changes too
+                       "move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
+                       "world_watching", "world_geoip", "world_asn", "world_layer_get", "world_layer_remove")
     # The World Wide Web tab (0.8.0): the base's (its TABS, JOB_HOOKS, keys, world, world_geoip, detach; world with the XDP
     # programs the last read found at the adapter watched said beside it, xdp_unseen), watched by libpcap at this
     # machine's adapter and on the Linux the platform runs on only (not_for_here). What it downloads and asks is this plugin's to
@@ -241,7 +251,13 @@ class LinuxFirewallPlugin(Firewall):
     INFRASTRUCTURE = cards.INFRASTRUCTURE
 
     def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None, clock=time.monotonic,
-                 which=None):
+                 which=None, book=None, platform: str = "", wsl: str | None = None):
+        # 0.11.0: services' networks: the network database in the data folder (liminal-libs 1.96.0's netbook), opened
+        # per call; a test's own book, platform and word for WSL ("" a machine of its own, else the distribution)
+        from liminal_libs.netbook import NetBook
+
+        NetworkHost.__init__(self, book=book if book is not None else NetBook(), platform=platform)
+        self._wsl_word = wsl
         self._shell = shell
         self._runner = runner
         self._native = native  # a test's word for why_not_native(): "" on Linux, else why not
@@ -252,9 +268,14 @@ class LinuxFirewallPlugin(Firewall):
         self._refused: tuple[float, str, bool] | None = None  # (when, words, denied): a read refused, kept as long
         self._rights: tuple[float, Rights] | None = None  # how the last read had its rights (0.9.0)
         self._needs: dict = {}  # whether a change, and the install, need the password: asked once per read
-        self._facts: tuple[float, install_mod.Facts] | None = None  # what installing nftables takes, kept FACTS_S
+        self._install_facts: tuple[float, install_mod.Facts] | None = None  # what installing nftables takes, kept FACTS_S
         self._preset = "in-allow"
         self._find = ""
+
+    def app_stopping(self) -> None:
+        """The platform stops: the base's, then its network works cancelled and joined, its plans forgotten."""
+        Firewall.app_stopping(self)
+        self.network_stopping()
 
     def api_facts(self) -> dict:
         """What the last read found of its APIs, asking nothing (a read under way is not waited for): each tool's version
@@ -669,12 +690,12 @@ class LinuxFirewallPlugin(Firewall):
     def install_facts(self, fresh: bool = False) -> install_mod.Facts:
         """What installing nftables takes here (install.read_facts: read without root), kept install.FACTS_S."""
         with self._lock:
-            kept = self._facts
+            kept = self._install_facts
             if not fresh and kept is not None and self._clock() - kept[0] < install_mod.FACTS_S:
                 return kept[1]
         facts = install_mod.read_facts(self.shell)
         with self._lock:
-            self._facts = (self._clock(), facts)
+            self._install_facts = (self._clock(), facts)
         return facts
 
     def install_nftables(self, password=None, log=None) -> dict:
@@ -704,7 +725,7 @@ class LinuxFirewallPlugin(Firewall):
         finally:
             self.forget()
             with self._lock:
-                self._facts = None
+                self._install_facts = None
         shown = [x for x in out.splitlines() if x.strip()][-install_mod.SHOWN_LINES:]
         for line in shown:
             say(line)

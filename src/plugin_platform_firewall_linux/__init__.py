@@ -110,8 +110,19 @@ there too; what the firewall needs then says what Netstat needs (netstat.needs_r
 WSL changes for it (the library's table, and the row seen in the user's Ubuntu: netstat.WSL_ROWS). On a library from
 before it the plugin works as 0.8.2 did, its table of what the firewall needs saying what the tab would need.
 
+Its run() as the platform's own user (0.10.0; the independent review's finding PLT-H1, checked 2026-11-23): a command
+asked of run() runs as the platform's user, and as root only when its caller says `elevated` (the command line's
+`run --elevated`), then through the library's `sudo -n --`, never asking a password. It ran every command as root, and
+liminal-platform's POST /api/machines/{name}/run handed it any words a program on this machine sent: that route is
+gone (the user, 2026-11-23: "Remove it"; liminal-platform 0.34.1), and only a command line asks run(), in its own
+process. And, from the review of that change: its changes are asked only from its page (PAGE_ONLY_HOOKS: a rule made
+or removed, a default policy, on and off, saving, Root access, nftables' install, and the base's allow and remove),
+so another plugin's ask is refused and the platform asks its login whether you are at the page; and the framework's
+allow reads its remote as the form's other side is read, so no word of it reaches nft unread.
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
-                                             | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND
+                                             | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME
+                                             | run [--elevated] -- COMMAND
 """
 from __future__ import annotations
 
@@ -139,11 +150,11 @@ from .apis import facts as api_facts_of
 from .changes import ACCEPT, NotNeeded, Risky
 from .groups import key as rule_key
 from .groups import sort_entry
-from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS
+from .model import DIRECTIONS, MAX_ROWS, OWNER_WORDS, PRESET_NAMES, PRESETS, parse_address
 from .read import SCRIPT, Config
 from .rights import PASSWORD_FIELD, Rights
 
-__version__ = "0.9.2"
+__version__ = "0.10.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -205,6 +216,13 @@ class LinuxFirewallPlugin(Firewall):
              "save_rules",  # the base's world and world_geoip among them (the World Wide Web tab, 0.8.0)
              ROOT_HOOK, INSTALL_HOOK)  # 0.9.0: Root access turned on or off; nftables installed (a job)
     JOB_HOOKS = (*Firewall.JOB_HOOKS, INSTALL_HOOK)  # run by the platform as jobs, their lines in the plugin's panel
+    # Its changes as root, asked only from its page (0.10.0, the review's PLT-H1 follow-up; liminal-libs 1.66.0's
+    # apps/asking.py): another plugin's ask is refused (403), and liminal-platform 0.34.0 refuses one over HTTP (401)
+    # unless its login shows that you are at the page. Before, any program on this machine could ask them with two
+    # headers, a second confirmation being only an argument. The base's allow and remove among them: the framework's
+    # setup and the command line call their code in their own process, not through an ask.
+    PAGE_ONLY_HOOKS = ("allow", "remove", "make_rule", "remove_rule", "set_policy", "switch", "save_rules", ROOT_HOOK,
+                       INSTALL_HOOK)
     # The World Wide Web tab (0.8.0): the base's (its TABS, JOB_HOOKS, keys, world, world_geoip, detach; world with the XDP
     # programs the last read found at the adapter watched said beside it, xdp_unseen), watched by libpcap at this
     # machine's adapter and on the Linux the platform runs on only (not_for_here). What it downloads and asks is this plugin's to
@@ -422,11 +440,16 @@ class LinuxFirewallPlugin(Firewall):
         return out
 
     def add_rule(self, rule: Rule) -> None:
+        """One of Liminal's own rules made, the framework's (the base's allow, its setup's rules), with no second
+        confirmation. Its remote is read as the form's other side is (model.parse_address: "any" for anywhere, else
+        an address or a network, written canonically), and anything else is a FirewallError before anything runs
+        (0.10.0): it went to the commands as it was given, and nft read a ';' in it as the start of a command of its
+        own, run as root (the review's PLT-H1 follow-up)."""
         if not rule.owned:
             raise FirewallError("only Liminal's own rules are made here")
-        spec = ch.Spec(rule.name, rule.direction, "allow" if rule.action == "allow" else "block", rule.protocol,
-                       tuple((p, p) for p in rule.ports), "" if rule.remote == "any" else rule.remote, "")
         try:
+            spec = ch.Spec(rule.name, rule.direction, "allow" if rule.action == "allow" else "block", rule.protocol,
+                           tuple((p, p) for p in rule.ports), parse_address(rule.remote), "")
             plan = ch.plan_make(self.config(fresh=True), spec, framework=True)
         except NotNeeded as e:
             raise FirewallNotNeeded(str(e)) from None
@@ -458,9 +481,27 @@ class LinuxFirewallPlugin(Firewall):
     def exposing(self, ports) -> list[tuple[int, str]]:
         return self.config().exposing(ports)
 
-    def run(self, *command: str, **options) -> str:
-        """A command on this machine, as root, its output."""
-        return self.shell.run(*command)
+    def run(self, *command: str, elevated: bool = False, **options) -> str:
+        """A command on this machine, its output, run as the platform's own user (0.10.0; the review's PLT-H1): as
+        root only when `elevated` is said (the command line's `run --elevated`), and then through the library's
+        `sudo -n --`, never a password: a command sudo wants a password for fails in words (CommandError, denied). A
+        platform that is root runs it as root all the same: that is its own user. Its other options change nothing,
+        `root=True` among them. Before 0.10.0 it ran every command as root, whatever asked it: liminal-platform's
+        POST /api/machines/{name}/run among them, a route gone since its 0.34.1.
+
+        A command refused for want of root, run as you, says so, and that a rule of yours letting sudo run it counts
+        only with `run --elevated`: the library's words alone told you to add such a rule, and the same command run
+        so fails again. Elevated, or with a platform that is root, the library's own words."""
+        try:
+            return self.shell.run(*command, root=elevated)
+        except CommandError as e:
+            if elevated or not getattr(e, "denied", False) or self.shell.root():
+                raise  # through sudo, or as root: the library's words fit
+            what = command[0] if command else "COMMAND"
+            raise CommandError(f"{e}. It ran as you, not through sudo: a rule letting sudo run it counts only for "
+                               f"`python -m plugin_platform_firewall_linux run --elevated -- {what} ...`; the "
+                               "platform's command line has no --elevated and runs every command as you",
+                               denied=True) from None
 
     def _run(self, plan: ch.Plan, password=None) -> list[str]:
         """A plan's commands one after another as root, with the password typed on its form handed to sudo for each

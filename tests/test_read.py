@@ -263,6 +263,10 @@ def test_what_a_form_types_is_checked():
     assert parse_address("10.1.2.3/8") == "10.0.0.0/8" and parse_address("any") == "" and parse_address("2001:db8::1") == "2001:db8::1"
     with pytest.raises(ValueError):
         parse_address("example.com")
+    # 0.10.0: never a zone, which Python's ipaddress keeps as it was typed (a space and a ';' too: nft's own words)
+    for zoned in ("fe80::1%eth0", "fe80::1%a;b", "fe80::1%x accept;flush ruleset", "fe80::%x;y/64"):
+        with pytest.raises(ValueError, match="names a zone"):
+            parse_address(zoned)
     assert spans_of("8000:8100,22") == ((8000, 8100), (22, 22))
     assert recorded("gentoo-openrc-nftables")["init"] == (0, "openrc init\n")
 

@@ -196,6 +196,21 @@ that as a second, explicit confirmation (`accept_risk`), in the plugin's own wor
 - stopping a firewall;
 - starting a service that flushes other programs' rules.
 
+**Asked only from the page** (0.10.0, `PAGE_ONLY_HOOKS`): every change above, Root access and nftables' install, and
+the library base's `allow` and `remove`. Another plugin's ask of one is refused, and liminal-platform 0.34.0 asks its
+login whether you are at the page before it asks one over HTTP (401 if not; a platform that holds no login asks it as
+before). The second confirmation is the page's: to the hook it is an argument, so until 0.10.0 any program on this
+machine that sent the platform's two headers could make any of these changes (the review of PLT-H1's fix,
+2026-11-24). The framework's setup and the command line call the plugin's code in their own process, not through an
+ask, and the reads are asked by anyone, as before.
+
+**The framework's own rules** (its setup's, the base's `allow`) are made with no second confirmation. Their remote is
+read as the form's other side is (0.10.0): "any" for anywhere, else an address or a network, written canonically, and
+anything else refused before anything runs. Until then it went to the commands as it was given, and nft, which reads
+its words as one script, ran whatever followed a `;` in it as root. An address with a zone (`fe80::1%eth0`) is
+refused in the form too, and every plan to make a rule checks its name, its other side and its interface however it
+was asked for (`changes.Spec`).
+
 ## The kernel and its firewall today
 
 Researched on 2026-11-08 for this release (the user: "research the current linux kernel").
@@ -346,6 +361,11 @@ logged, written, shown, put in a command line or an environment, nor left in an 
 password sudo refuses is a refusal ("sudo did not accept the password: nothing was changed; type it again"), so the form
 is filled again. A change asked without the password it needs (the framework's setup, the command line) is refused in
 words before sudo is asked.
+
+**A command of `run`** (0.10.0), asked only from a command line, runs as you. With `--elevated` it runs as root
+through `sudo -n --`, never asking a password: so only where the platform is root or a rule of yours lets sudo run it
+(below, From the command line). One refused for want of root, run as you, says so, and that such a rule counts only
+with `--elevated`.
 
 **Installing nftables.** Where none of nftables, iptables, ufw and firewalld is installed and the distribution's APT is
 there (Debian, Ubuntu and their kin), the tool's row offers **Install nftables…**, a job: the distribution's own package
@@ -682,9 +702,22 @@ python -m plugin_platform_firewall_linux setup            # everything; or one s
 python -m plugin_platform_firewall_linux exposure
 python -m plugin_platform_firewall_linux allow web 8443
 python -m plugin_platform_firewall_linux remove web
+python -m plugin_platform_firewall_linux run -- ip -br addr                   # as you
+python -m plugin_platform_firewall_linux run --elevated -- nft list ruleset   # as root, through sudo -n --
 ```
 
-The platform app drives the same hooks from its page.
+The platform app drives the same hooks from its page, all but `run`, which only a command line asks, in its own
+process: this one, or the platform's `liminal-platform machine firewall-linux run -- COMMAND`. `run` runs the command
+as you, the platform's own user (0.10.0). `--elevated`, counted only as run's first word, before the command's `--`,
+runs it as root through the library's `sudo -n --`, never asking a password: so only where the platform is root or a
+rule of yours lets sudo run that command without one; elsewhere it fails in words. The `--` after sudo's own words
+is liminal-libs 1.80.0's, the release this plugin needs since 0.10.0: no word of the command is read as sudo's. Every
+word after `--` is the command's own: `run -- x --elevated` runs `x` with that word, as you. Without a command the
+usage is printed and nothing runs. The platform's command line has no `--elevated`: what it runs, it runs as you. A
+command that needs root, run as you, fails in words that say it ran as you, not through sudo, and that a rule letting
+sudo run it counts only for `run --elevated`. Until 0.10.0 `run` ran every command as root, and liminal-platform's
+`POST /api/machines/<name>/run`, gone since its 0.34.1, handed it any words a program on this machine sent (the
+independent review's finding PLT-H1, 2026-11-23).
 
 ## Tests
 
@@ -734,3 +767,13 @@ refused and the hosts database and the layers' folder in the test's own folder, 
 this machine's sockets into this machine's database; and one test of its own attaches one under a login that says
 always. This machine's hosts file names no address in a test either. With a library from before 1.65.0 those tests
 are skipped, and the rest pass as 0.8.2's did.
+
+run() (0.10.0) is tested over a stand-in shell (`tests/test_run.py`): a command runs as you, and as root only when
+elevated, after sudo's words as the library's Shell puts them (`machines.shell_sudo()`), which must end with `--`, the
+package's floor being the library that puts it there; its words, one beginning with a dash too, are handed on as they
+are; a platform that is root runs it as itself; the command line counts `--elevated` only before the command's `--`,
+and runs nothing without a command; and a command refused for want of root names `run --elevated` only where it ran
+as you. Who may ask the changes (0.10.0) is tested through the library's own App, over a recorded machine
+(`tests/test_who_asks.py`): another plugin's ask and one that names no asker are refused and run nothing, not even a
+read, while the page's runs. And the framework's allow is given the remotes the review sent nft
+(`tests/test_plugin.py`), each refused with nothing run.

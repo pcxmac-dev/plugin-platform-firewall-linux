@@ -18,7 +18,7 @@ from liminal_libs.machines.plugin import CommandError
 
 from plugin_platform_firewall_linux import MACHINE, READ_S, LinuxFirewallPlugin, rights
 from plugin_platform_firewall_linux import netstat as netstat_mod
-from plugin_platform_firewall_linux.changes import ACCEPT, Risky
+from plugin_platform_firewall_linux.changes import ACCEPT, Risky, Spec
 from plugin_platform_firewall_linux.read import SCRIPT
 
 from machines import SUDO, FakeLinux, answer
@@ -511,6 +511,51 @@ def test_the_frameworks_setup_over_the_same_read():
     out = plugin(fake).setup(log=lambda m: None)
     assert [(d["step"], d["ok"]) for d in out] == [("enable", None), ("exposure", None), ("rules", None)]
     assert "an allow changes nothing" in out[2]["detail"] and "no switch" in out[0]["detail"]
+
+
+# What nft would have read as commands of their own (the review of PLT-H1's fix, 2026-11-24): it joins its words and
+# parses them as one script, a ';' between commands, all run as one transaction
+INJECTED = ("1.2.3.4 accept;flush ruleset;add table ip x;add chain ip x c;add rule ip x c", "fe80::1%a;b",
+            "fe80::1%x accept;delete table inet filter", "10.0.0.0/8 accept", '10.0.0.1" accept', "example.com")
+
+
+def test_the_frameworks_allow_reads_its_remote_as_the_forms_other_side_is_read():
+    """0.10.0: the base's allow made its rule from its remote as it was given (add_rule), with no second confirmation,
+    and nft read a ';' in it as the start of a command of its own, run as root. Now the remote is read as the Add a
+    rule form's other side is (parse_address: "any" for anywhere, else written canonically) and anything else is a
+    FirewallError before anything runs; a zone (its %) too, which ipaddress keeps as typed, in the form as well."""
+    fake = FakeLinux("gentoo-openrc-nftables")
+    fw = plugin(fake)
+    for remote in INJECTED:
+        with pytest.raises(FirewallError):
+            fw.allow("web", (8443,), "tcp", remote)
+    with pytest.raises(FirewallError, match="names a zone"):
+        fw.allow("web", (8443,), "tcp", "fe80::1%eth0")
+    for remote in INJECTED[1:3]:
+        with pytest.raises(ValueError, match="names a zone"):
+            fw.make_rule("web", "in", "allow", "tcp", "8443", remote)
+    assert fake.changes == []  # nothing ran but the reads
+    fw.allow("web", (8443,), "tcp", "10.1.2.3/8")  # written canonically, in the rule and its comment
+    fw.allow("everyone", (8444,), "tcp", "any")
+    assert fake.changes == [["nft", "insert", "rule", "inet", "filter", "input", "handle", "9", "ip", "saddr", "10.0.0.0/8",
+                             "tcp", "dport", "8443", "accept", "comment", '"liminal:web:tcp:8443:10.0.0.0/8"'],
+                            ["nft", "insert", "rule", "inet", "filter", "input", "handle", "9", "tcp", "dport", "8444",
+                             "accept", "comment", '"liminal:everyone:tcp:8444:any"']]
+
+
+def test_a_rules_words_are_checked_however_it_is_asked_for():
+    """0.10.0: a Spec, what every plan to make a rule is made from, holds its name, its other side and its interface as
+    the form's fields are read (NAME, parse_address, parse_interface), however it is made: a word that reaches a
+    command unread is refused where it is made, before any plan."""
+    good = {"name": "web", "direction": "in", "action": "allow", "protocol": "tcp", "spans": ((8443, 8443),),
+            "source": "10.0.0.0/8", "interface": "eth0"}
+    assert Spec(**good).words == "let tcp port 8443 coming in from 10.0.0.0/8 on eth0"
+    assert Spec(**{**good, "source": "", "interface": ""}).words == "let tcp port 8443 coming in"
+    for field, bad in [*(("source", r) for r in INJECTED), ("source", "any"), ("source", "10.1.2.3/8"),
+                       ("source", None), ("interface", "eth0;x"), ("interface", "any"), ("name", "web;x"),
+                       ("name", "Web")]:
+        with pytest.raises(ValueError):
+            Spec(**{**good, field: bad})
 
 
 def test_only_the_linux_the_platform_runs_on_has_its_firewall_driven():

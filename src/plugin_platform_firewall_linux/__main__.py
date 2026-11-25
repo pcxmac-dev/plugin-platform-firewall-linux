@@ -1,6 +1,11 @@
 """`python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS ...] | setup [STEP ...] | exposure |
-allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND`: the plugin from the command line (the platform app
-drives the same hooks from its page, every change there confirmed first)."""
+allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run [--elevated] -- COMMAND`: the plugin from the command line (the
+platform app drives the same hooks from its page, every change there confirmed first, and since 0.10.0 asked only
+from it, its PAGE_ONLY_HOOKS; all but `run`, which only a command line asks). The command line calls the plugin's code
+in this process, never through an ask. `run` runs COMMAND as you, the platform's own user (0.10.0); `--elevated`,
+counted only as run's first word, before the command's `--`, runs it as root through the library's `sudo -n --`, never
+asking a password. Every word after `--` is the command's own: `run -- x --elevated` runs x with that word, as you. No
+command: this usage, and nothing is run."""
 from __future__ import annotations
 
 import json
@@ -13,7 +18,7 @@ from . import MACHINE
 from .model import PRESET_NAMES
 
 USAGE = ("python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS ...] | setup [STEP ...] | exposure "
-         "| allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run -- COMMAND")
+         "| allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME | run [--elevated] -- COMMAND")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -52,9 +57,11 @@ def main(argv: list[str] | None = None) -> int:
             print("removed" if MACHINE.remove(rest[0]) else f"no Liminal rule named {rest[0]}")
             return 0
         if what == "run":
+            elevated = rest[:1] == ["--elevated"]  # run's first word alone: after `--` it is one of the command's words
+            rest = rest[1:] if elevated else rest
             command = rest[1:] if rest[:1] == ["--"] else rest
             if command:
-                print(MACHINE.run(*command), end="")
+                print(MACHINE.run(*command, elevated=elevated), end="")
                 return 0
     except (CommandError, ValueError, LookupError) as e:
         print(str(e), file=sys.stderr)

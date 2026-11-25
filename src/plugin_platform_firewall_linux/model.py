@@ -115,10 +115,15 @@ def parse_ports(text) -> tuple:
 
 
 def parse_address(text) -> str:
-    """An address or a network typed in a form, as written canonically ("" for anywhere); ValueError otherwise."""
+    """An address or a network typed in a form, as written canonically ("" for anywhere); ValueError otherwise. Never
+    one with a zone (fe80::1%eth0, 0.10.0): a rule names none, and Python's ipaddress keeps whatever follows the % as
+    it was typed, a space or a ';' too, which nft would read as words of its own (the review's PLT-H1 follow-up)."""
     raw = str(text or "").strip()
     if raw.lower() in ("", "any", "anywhere", "*"):
         return ""
+    if "%" in raw:
+        raise ValueError(f"{raw!r} names a zone (after its %): a rule's other side is an address or a network alone "
+                         "(fe80::1, 10.0.0.0/8, 2001:db8::/32)")
     try:
         if "/" in raw:
             return str(ipaddress.ip_network(raw, strict=False))

@@ -78,7 +78,11 @@ class Plan:
 
 @dataclass(frozen=True)
 class Spec:
-    """A rule asked for (Liminal's: its name is kept with it)."""
+    """A rule asked for (Liminal's: its name is kept with it). Its name, its other side and its interface, the words
+    the commands making it take as they are, are checked however it is made (0.10.0): a name as NAME says, the other
+    side and the interface as parse_address and parse_interface write them; ValueError in words for anything else.
+    The framework's allow made one from its remote as it was given, and nft reads its words as one script, where a
+    ';' starts a command of its own (the review's PLT-H1 follow-up)."""
 
     name: str
     direction: str  # in | out | fwd
@@ -87,6 +91,16 @@ class Spec:
     spans: tuple  # local ports, () for every port
     source: str  # an address or a network ("" for anywhere): the remote side
     interface: str
+
+    def __post_init__(self):
+        if not isinstance(self.name, str) or not NAME.match(self.name):
+            raise ValueError("a name is lowercase letters, digits and dashes (48 at most): web, office-ssh")
+        if not isinstance(self.source, str) or parse_address(self.source) != self.source:
+            raise ValueError(f"{self.source!r} is not an address or a network as a rule names one (10.0.0.0/8, "
+                             "2001:db8::/32), nor empty for anywhere")
+        if not isinstance(self.interface, str) or parse_interface(self.interface) != self.interface:
+            raise ValueError(f"{self.interface!r} is not an interface's name (eth0, enp3s0, wg0), nor empty for every "
+                             "interface")
 
     @property
     def words(self) -> str:

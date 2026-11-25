@@ -1,5 +1,59 @@
 # Changelog
 
+## 0.10.0 (2026-11-24)
+
+run() runs a command as the platform's own user, and as root only when asked (the independent review's finding
+PLT-H1, rated high, checked 2026-11-23). The user, 2026-11-23, of liminal-platform's route that handed run() any
+words: "Remove it" (gone since liminal-platform 0.34.1). And from the review of that change, 2026-11-24, each finding
+checked a second time: the framework's allow reads its remote as the form does, the changes are asked only from the
+page, a command refused for want of root says what helps, and the library it needs is 1.80.0.
+
+- **As you unless elevated** (`run(*command, elevated=False)`). It asked the library's `Shell.run` for root, its
+  default (`sudo -n`, or nothing in front when the platform is root), for every command. With the platform's
+  `POST /api/machines/<name>/run`, which passed it any list of words, any program on this machine could run what it
+  liked as root wherever the platform could: a platform that is root, or sudo without a password. The route's only
+  checks were its bind to 127.0.0.1, a Host header the client chooses and a constant header anyone can send. Now a
+  command runs as the platform's own user, and as root only when its caller says `elevated`, through the library's
+  `sudo -n --` (liminal-libs 1.80.0: no word of the command is read as sudo's), never asking a password: a command
+  sudo wants a password for fails in words. A platform that is root runs it as root, as itself. Its other options
+  change nothing (`root=True` among them). admin-linux's run() was so already.
+- **The command line: `run [--elevated] -- COMMAND`.** `--elevated` counts only as run's first word, before the
+  command's `--`; every word after `--` is the command's own (`run -- x --elevated` runs x with that word, as you).
+  No command: the usage, and nothing is run. The platform's command line has no `--elevated`: its
+  `liminal-platform machine firewall-linux run -- COMMAND` runs the command as you.
+- **The framework's allow reads its remote as the form does** (`add_rule`; the review's first finding, rated high,
+  there since 0.4.0). The base's `allow` made one of Liminal's rules from its remote as it was given, with no second
+  confirmation. nft joins its words and reads them as one script, a `;` between commands, so a remote of
+  `1.2.3.4 accept;flush ruleset;...` flushed the whole ruleset as root, Docker's and ufw's tables with it, wherever
+  the platform runs nft as root. Now the remote is read as the Add a rule form's other side (`model.parse_address`:
+  "any" for anywhere, else an address or a network, written canonically), and anything else is a FirewallError
+  before anything runs. A zone (`fe80::1%eth0`) is refused in the form too: Python's ipaddress keeps whatever follows
+  the `%` as it was typed, a space and a `;` among it. And a `Spec`, what every plan to make a rule is made from,
+  checks its name, its other side and its interface however it is made, so no word reaches a command unread.
+- **The changes are asked only from the page** (`PAGE_ONLY_HOOKS`, liminal-libs 1.66.0's word; the review's second
+  finding, rated medium): a rule made or removed, a default policy, on and off, saving, Root access, nftables'
+  install, and the base's allow and remove. Another plugin's ask of one is refused (403), and liminal-platform 0.34.0
+  refuses one over HTTP (401) unless its login shows that you are at the page. Before, any program on this machine
+  asked them with the two headers PLT-H1 named, a second confirmation being only an argument (`accept_risk`): ufw
+  turned off, a rule letting everyone reach every port, Root access taken back. A platform that holds no login asks
+  them as before. The setup and the command line call the plugin's code in their own process, not through an ask, so
+  they work as before; so do its reads.
+- **A command refused for want of root says what helps** (run's words). The library words every such refusal alike:
+  run the platform as root, or let sudo run it without a password. Run as you, such a rule changes nothing: the same
+  command fails again. So the words go on: it ran as you, not through sudo, and a rule letting sudo run it counts
+  only for `python -m plugin_platform_firewall_linux run --elevated -- COMMAND`; the platform's command line has no
+  `--elevated`. Elevated, or with a platform that is root, the library's words stay as they are.
+- `pyproject.toml`: liminal-libs[geo]>=1.80.0, the release whose Shell puts `sudo -n --` before a command run as root.
+  run --elevated relies on it: with an older one `run --elevated -- -u nobody id` runs id as nobody, sudo reading `-u`
+  as its own, and the tests passed there, sudo's words read from that library.
+- Tests: `tests/test_run.py`, over a stand-in shell: a command as you, as root only when elevated (sudo's words read
+  from the library's Shell, `machines.shell_sudo()`), its words given as they are, a dash first too, a platform that
+  is root, and the command line's cases; sudo's words ending with `--` and the package's floor at 1.80.0; a command
+  refused for want of root, as you, elevated and as root. `tests/test_plugin.py`: the framework's allow refusing the
+  review's remotes and running nothing, a network written canonically; a Spec refusing what reaches a command
+  unread. `tests/test_read.py`: a zone refused. `tests/test_who_asks.py`: the changes refused to another plugin and to
+  no one through the library's own App, nothing run, the page's ask run, its reads asked by anyone.
+
 ## 0.9.2 (2026-11-24)
 
 A firewalld rule that fails part way is taken back (the review of 2026-11-21, item 26, finding 16).

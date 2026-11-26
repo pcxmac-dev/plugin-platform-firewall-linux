@@ -40,8 +40,8 @@ free-licensed, or no licence stated.
 
 The globe's newer sources (0.13.0, liminal-libs 1.104.0), their pages read on 2026-11-26 (`VERIFIED_GLOBE2`): Natural
 Earth, AfTerFibre, TopoHub, RIPE Atlas, CelesTrak and the sgp4 package on PyPI, each a card (GLOBE2) and their data sets
-GLOBE2_SETS, at the end of INFRASTRUCTURE; the same in both firewall plugins but the sgp4 wheel each pins
-(SGP4_PACKAGE).
+GLOBE2_SETS, at the end of INFRASTRUCTURE; the same in both firewall plugins but the sgp4 wheels each pins
+(SGP4_WHEELS; this machine's SGP4_PACKAGE, sgp4_package).
 
 The right to capture is CAP_NET_RAW alone, for the platform alone (the card's auth and its calls, as the library's
 world.capture_help words it since 1.55.0): AmbientCapabilities=CAP_NET_RAW in the platform's system unit, or setcap
@@ -1298,6 +1298,8 @@ NATURAL_EARTH_SITE = "https://www.naturalearthdata.com/"
 NATURAL_EARTH_DOWNLOAD = NATURAL_EARTH_SITE + "http//www.naturalearthdata.com/download/10m/cultural/"  # its own links
 NATURAL_EARTH_ROADS = NATURAL_EARTH_DOWNLOAD + "ne_10m_roads.zip"  # 8.66 MB, version 5.0.0 (2026-11-26)
 NATURAL_EARTH_RAILWAYS = NATURAL_EARTH_DOWNLOAD + "ne_10m_railroads.zip"  # 14.42 MB, version 4.0.0 (2026-11-26)
+# its North America supplement (XNR Productions' roads, denser): 45.57 MB, version 4.0.0, on the roads page (2026-11-26)
+NATURAL_EARTH_ROADS_NA = NATURAL_EARTH_DOWNLOAD + "ne_10m_roads_north_america.zip"
 NATURAL_EARTH_CDN = "naciscdn.org"  # where its download links send the file on to
 AFTERFIBRE_SITE = "https://afterfibre.opentelecomdata.org/"  # afterfibre.nsrc.org sends you here (2026-11-26)
 AFTERFIBRE_TILES = "https://d316kar6yg8hyq.cloudfront.net/africa-fiber/{z}/{x}/{y}.mvt"  # its map's tiles, layer fiber
@@ -1306,16 +1308,13 @@ TOPOHUB_REPO = "https://github.com/piotrjurkiewicz/topohub"
 TOPOHUB_WORLD = "https://raw.githubusercontent.com/piotrjurkiewicz/topohub/master/data/backbone/world.json"  # 1.04 MB
 ATLAS_PROBES = "https://ftp.ripe.net/ripe/atlas/probes/archive/meta-latest"  # every probe and anchor, bzip2, 2 MB
 ATLAS_LATEST = "https://atlas.ripe.net/api/v2/measurements/5151/latest/"  # the built-in IPv4 traceroute's newest
+ATLAS_LATEST6 = "https://atlas.ripe.net/api/v2/measurements/6152/latest/"  # ... and the IPv6 one's (the user's)
 ATLAS_TERMS = "https://www.ripe.net/manage-ips-and-asns/db/support/documentation/ripe-atlas-terms-and-conditions/"
 CELESTRAK_GP = "https://celestrak.org/NORAD/elements/gp.php"  # CelesTrak's GP elements, its CSV (the OMM fields)
-# HughesNet's three geostationary satellites by their catalogue numbers, and the countries their beams reach (the
-# globe's countries by their ISO 3166-1 numeric ids): Jupiter 1 the United States and Canada, Jupiter 2 and 3 the
-# United States, Canada and the Latin American countries HughesNet is sold in
+# HughesNet's three geostationary satellites by their catalogue numbers, each drawn with its full 25-degree cap (the
+# user, 2026-11-26: "Full 25° cap"; no beams' countries are named, none having been read from Hughes' own pages)
 HUGHESNET = {"38551": "EchoStar XVII (Jupiter 1)", "41893": "EchoStar XIX (Jupiter 2)",
              "57479": "EchoStar XXIV (Jupiter 3)"}
-AMERICAS = ["840", "124", "630", "484", "320", "340", "222", "558", "188", "591", "170", "218", "604", "076", "152",
-            "032"]
-HUGHESNET_BEAMS = {"38551": ["840", "124", "630"], "41893": AMERICAS, "57479": AMERICAS}
 
 NATURAL_EARTH_CREDIT = {"text": "Made with Natural Earth", "url": NATURAL_EARTH_SITE}
 AFTERFIBRE_CREDIT = {"text": "AfTerFibre, NSRC", "url": AFTERFIBRE_SITE}
@@ -1328,36 +1327,42 @@ NATURAL_EARTH_LICENCE = (
     "required; the page says \"Made with Natural Earth\", as Natural Earth suggests. These are the roads and railways "
     "at 1:10m, ferries left out: where traffic goes, not where fibre is. They are drawn as a stand-in for fibre where "
     "none is mapped, since long-haul fibre most often runs beside them, and routes found along them alone say so. The "
-    "data comes as it is.")
+    "file is asked at the link Natural Earth publishes on its own site, which sends it on once to naciscdn.org, "
+    "Natural Earth's own CDN: no other host is followed. The data comes as it is.")
 AFTERFIBRE_LICENCE = (
-    "AfTerFibre's map of Africa's fibre on land is free under the Creative Commons Attribution 4.0 International "
-    "licence (creativecommons.org/licenses/by/4.0), as its records say; its site today states no licence of its own. "
-    "It may be copied, shared and adapted for any purpose, commercial uses included, as long as it is credited, the "
-    "licence is linked and changes are said. So wherever its fibre is drawn the page says \"AfTerFibre, NSRC\", linked "
-    "to its site. What is changed: its map's tiles are read at one zoom (5), so a route is drawn thinned, and of each "
-    "route only who runs it, whose it is, whether it is lit and its country are kept; its contributors' names and "
-    "e-mail addresses are never kept. Its undersea layer is another maker's and is not asked for. It comes as it is.")
+    "AfTerFibre's licence is unconfirmed. Its site today states no licence of its own; records of it elsewhere (the "
+    "EU's Africa Knowledge Platform, whose page could not be read here) say it is under the Creative Commons "
+    "Attribution 4.0 International licence (creativecommons.org/licenses/by/4.0), and that could not be confirmed. It "
+    "is offered as that licence asks: wherever its fibre is drawn the page says \"AfTerFibre, NSRC\", linked to its "
+    "site, and what is changed is said. What is changed: its map's tiles are read at one zoom (5), so a route is drawn "
+    "thinned, and of each route only who runs it, whose it is, whether it is lit and its country are kept; its "
+    "contributors' names and e-mail addresses are never kept. Its undersea layer is another maker's and is not asked "
+    "for. It comes as it is.")
 TOPOHUB_LICENCE = (
     "TopoHub's repository on GitHub is under the MIT licence, which lets its contents be used, copied, changed and "
     "passed on for any purpose, as long as its copyright notice goes with them. No licence is stated for its data or "
     "for the sources its model is built from, so this is the repository's licence and no more. The page credits it as "
     "\"TopoHub (P. Jurkiewicz, SoftwareX 24, 2023)\", linked to its repository. Its backbones are a model: cities and "
-    "the land and submarine links between them as TopoHub builds them, not any operator's map, and the data comes as "
-    "it is.")
+    "the land and submarine links between them as TopoHub builds them, not any operator's map; its cities are drawn as "
+    "a layer of their own, whose title says no licence is stated for its data. The data comes as it is.")
 ATLAS_LICENCE = (
     "RIPE Atlas's data is the RIPE NCC's, under its RIPE Atlas Service Terms and Conditions (version 3.5, in force "
     "since 4 November 2025). Their article 4.5 says any commercial use of it needs the RIPE NCC's permission first, and "
     "article 10.2 that its databases are passed on to others only with its written authorisation. So it is downloaded "
     "for non-commercial use on this PC alone and never passed on; commercial use needs the RIPE NCC's permission. The "
-    "page credits it as \"RIPE Atlas (RIPE NCC)\", linked to atlas.ripe.net. The data comes as it is.")
+    "page credits it as \"RIPE Atlas (RIPE NCC)\", linked to atlas.ripe.net. The traceroutes are the newest result of "
+    "every connected probe asked, anchors among them, one request for each 300 probes. The data comes as it is.")
 CELESTRAK_LICENCE = (
     "CelesTrak states no licence for the orbits it publishes: they are the US Space Force's general perturbations "
     "elements (from its 18th Space Defense Squadron), passed on free of charge by CelesTrak (T.S. Kelso). Its usage "
     "policy asks that they are fetched no more than once an update (every 2 hours), asked compressed, used only from "
-    "an answer that is OK, and that any other answer stops the download and is shown to a person. So they are asked "
-    "only on your click, compressed, never again by themselves, Update… not offered before 2 hours, and a refusal "
-    "stops it in words. The page credits it as \"CelesTrak (T.S. Kelso)\", linked to celestrak.org. The orbits come as "
-    "they are: a satellite's place from them is good to a few kilometres for some days.")
+    "an answer that is OK, that any other answer stops the download and is shown to a person, and that nothing is "
+    "asked for 15 minutes after a 500 or 503. So they are asked first on your click, compressed; after that they are "
+    "fetched again by themselves every 2 hours at the soonest, and only while the World Wide Web tab is open, never "
+    "while it is closed. Update… is not offered before 2 hours, any answer but OK stops the refreshing and is said on "
+    "the tab until you update them yourself, and after a 500 or 503 nothing is asked for 15 minutes. The page credits "
+    "it as \"CelesTrak (T.S. Kelso)\", linked to celestrak.org. The orbits come as they are: a satellite's place from "
+    "them is good to a few kilometres for some days.")
 NATURAL_EARTH = {"format": "shapefile", "source": "Natural Earth", "licence_name": "Public domain",
                  "licence": NATURAL_EARTH_LICENCE, "credit": NATURAL_EARTH_CREDIT, "hosts": [NATURAL_EARTH_CDN],
                  "stand_in": True, "step": 0.05, "wait": 120}
@@ -1365,16 +1370,16 @@ ATLAS = {"source": "RIPE Atlas (RIPE NCC)", "licence_name": "RIPE Atlas terms 3.
          "licence": ATLAS_LICENCE, "credit": ATLAS_CREDIT}
 CELESTRAK = {"format": "omm-csv", "url": CELESTRAK_GP, "source": "CelesTrak", "licence_name": "none stated by CelesTrak",
              "licence": CELESTRAK_LICENCE, "credit": CELESTRAK_CREDIT, "retry": False, "every": 7200, "gzip": True,
-             "wait": 120}
+             "refresh": True, "pause": 900, "wait": 120}  # the user, 2026-11-26: "Refresh by itself"
 GLOBE2_SETS = (
     # item 24: Africa's fibre on land, as its map's tiles at zoom 5 (56 of them, asked one after another on the one
     # click); the roads and railways, a stand-in for fibre where none is mapped
     {"id": "afterfibre", "title": "Africa's terrestrial fibre", "format": "mvt", "layer": "fibre", "member": "fiber",
      "url": AFTERFIBRE_TILES, "tiles": {"zoom": 5, "bounds": AFTERFIBRE_BOUNDS}, "size": 3_000_000,
-     "source": "AfTerFibre (NSRC), its map's tiles", "licence_name": "CC BY 4.0", "licence": AFTERFIBRE_LICENCE,
-     "credit": AFTERFIBRE_CREDIT, "wait": 60,
-     "about": ("Africa's fibre on land as NSRC's AfTerFibre maps it, live and planned; its contributors' names and "
-               "addresses are never kept")},
+     "source": "AfTerFibre (NSRC), its map's tiles", "licence_name": "unconfirmed (CC BY 4.0, as records say)",
+     "licence": AFTERFIBRE_LICENCE, "credit": AFTERFIBRE_CREDIT, "wait": 60,
+     "about": ("Africa's fibre on land as NSRC's AfTerFibre maps it, live and planned, its licence unconfirmed; its "
+               "contributors' names and addresses are never kept")},
     {**NATURAL_EARTH, "id": "ne-roads", "title": "Major roads (a stand-in for fibre)", "layer": "roads",
      "url": NATURAL_EARTH_ROADS, "member": "ne_10m_roads", "size": 8_660_000, "drop": {"featurecla": ["Ferry"]},
      "about": ("the world's major roads at 1:10m, ferries left out: where no fibre is mapped, long-haul fibre most "
@@ -1383,20 +1388,34 @@ GLOBE2_SETS = (
      "url": NATURAL_EARTH_RAILWAYS, "member": "ne_10m_railroads", "size": 14_420_000,
      "drop": {"featurecla": ["Railroad ferry"]},
      "about": "the world's railways at 1:10m, train ferries left out: a stand-in for fibre, as the roads"},
+    # the user, 2026-11-26: North America's denser roads, offered on its own click, its limit raised for it alone
+    {**NATURAL_EARTH, "id": "ne-roads-na", "title": "North America's roads (a stand-in for fibre)", "layer": "roads",
+     "url": NATURAL_EARTH_ROADS_NA, "size": 45_570_000, "most": 96 << 20, "drop": {"featurecla": ["Ferry"]},
+     "wait": 180,
+     "about": ("North America's roads at 1:10m, denser than the world's (XNR Productions'), ferries left out: 45.6 MB, "
+               "its limit raised for it alone")},
     # items 28 and 29: sources of the composite database, each behind its download
     {"id": "topohub-world", "title": "The world's backbones, a model (TopoHub)", "format": "topohub",
      "url": TOPOHUB_WORLD, "size": 1_040_000, "source": "TopoHub, through GitHub",
      "licence_name": "MIT, the repository's; its data's own not stated", "licence": TOPOHUB_LICENCE,
      "credit": TOPOHUB_CREDIT, "wait": 60,
      "about": ("cities and the land and submarine links between them, as TopoHub models them: a model, not an "
-               "operator's map")},
+               "operator's map, and no licence stated for its data")},
     {**ATLAS, "id": "atlas-probes", "title": "RIPE Atlas probes and anchors", "format": "atlas-probes",
      "url": ATLAS_PROBES, "size": 2_000_000, "wait": 60,
      "about": "every probe's and anchor's place, country and network: where RIPE Atlas measures from"},
-    {**ATLAS, "id": "atlas-traceroutes", "title": "RIPE Atlas traceroutes from its anchors", "format": "atlas-latest",
-     "url": ATLAS_LATEST, "query": "format=json", "needs": "atlas-probes", "size": 5_000_000, "wait": 120,
-     "about": ("the newest traceroute of each anchor: routers near an anchor placed, and the links between "
-               "routers")},
+    # the user, 2026-11-26: every connected probe's results, not the anchors' alone (some 12,000 probes: about 50 MB,
+    # its limit raised for it alone), and the IPv6 measurement (6152) beside the IPv4 one (5151)
+    {**ATLAS, "id": "atlas-traceroutes", "title": "RIPE Atlas traceroutes from its probes (IPv4)",
+     "format": "atlas-latest", "url": ATLAS_LATEST, "query": "format=json", "needs": "atlas-probes", "ask": "probes",
+     "size": 50_000_000, "most": 100 << 20, "wait": 120,
+     "about": ("the newest IPv4 traceroute of every connected probe and anchor: routers near a probe placed, and the "
+               "links between routers")},
+    {**ATLAS, "id": "atlas-traceroutes6", "title": "RIPE Atlas traceroutes from its probes (IPv6)",
+     "format": "atlas-latest", "url": ATLAS_LATEST6, "query": "format=json", "needs": "atlas-probes", "ask": "probes",
+     "family": 6, "size": 25_000_000, "most": 64 << 20, "wait": 120,
+     "about": ("the newest IPv6 traceroute of every connected probe with IPv6 (its size an estimate: fewer probes "
+               "have IPv6)")},
     # item 32: the satellites' orbits, one constellation a data set, in this order (its colour: --sky-1, -2, -3)
     {**CELESTRAK, "id": "celestrak-starlink", "title": "Starlink's orbits", "constellation": "starlink",
      "query": "GROUP=starlink&FORMAT=csv", "size": 2_000_000,
@@ -1404,22 +1423,52 @@ GLOBE2_SETS = (
     {**CELESTRAK, "id": "celestrak-oneweb", "title": "Eutelsat OneWeb's orbits", "constellation": "oneweb",
      "query": "GROUP=oneweb&FORMAT=csv", "size": 120_000, "about": "every OneWeb satellite's orbit"},
     {**CELESTRAK, "id": "celestrak-hughesnet", "title": "HughesNet's satellites", "constellation": "hughesnet",
-     "queries": [f"CATNR={n}&FORMAT=csv" for n in HUGHESNET], "beams": HUGHESNET_BEAMS, "size": 3_000,
-     "about": "EchoStar XVII (Jupiter 1), XIX (Jupiter 2) and XXIV (Jupiter 3), geostationary"},
+     "queries": [f"CATNR={n}&FORMAT=csv" for n in HUGHESNET], "size": 3_000,
+     "about": "EchoStar XVII (Jupiter 1), XIX (Jupiter 2) and XXIV (Jupiter 3), geostationary, each its full cap"},
 )
 SGP4_LICENCE = (
     "The sgp4 package (Brandon Rhodes) is free under the MIT licence: anyone may use, copy, change, merge, publish and "
     "pass it on, free of charge, as long as its copyright notice and the licence go with it. It comes with no "
     "warranty of any kind.")
 SGP4_PYPI = "https://pypi.org/project/sgp4/"
-# the sgp4 package the satellites are placed with (the library's Firewall base's SKY_PACKAGE): its pure Python
-# wheel, for any Linux and any Python 3; its size and sha256 as PyPI's file list gave them (2026-11-26)
-SGP4_PACKAGE = {"version": "2.27", "name": "sgp4-2.27-py3-none-any.whl",
-                "url": ("https://files.pythonhosted.org/packages/78/cd/"
-                        "06dc91b31f2b919e788396c2cb5ad313d5ce0754321165343fd585c4be53/"
-                        "sgp4-2.27-py3-none-any.whl"),
-                "size": 123_299, "sha256": "5f3f5716649988b638fbe7fcda592830e0956f548ca273b93cfa5f75917b9087",
-                "licence": SGP4_LICENCE, "licence_name": "MIT"}
+# the sgp4 package the satellites are placed with (the library's Firewall base's SKY_PACKAGE), a wheel a machine (the
+# user, 2026-11-26: the faster manylinux abi3 wheel on Linux), their names, sizes and sha256 as PyPI's own file list of
+# 2.27 gave them (2026-11-26): on x86-64 with glibc (manylinux_2_5 on) and Python 3.11 or later the manylinux abi3
+# wheel, its C extension the faster; on any other machine (arm64, or musl's Alpine among them) or Python, the pure
+# Python wheel, the same math, slower
+SGP4_WHEELS = {
+    "manylinux_x86_64": {
+        "name": "sgp4-2.27-cp311-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl",
+        "folders": "d6/75/633ad7874db149df164168090951e676cdc3541a12d43b2cbb9d20ecb721/", "size": 218_130,
+        "sha256": "4d3775313120dcb6239535fa0c94cb6d5b089fd84bbfb15220923ae38dec7296"},
+    "any": {"name": "sgp4-2.27-py3-none-any.whl", "folders": "78/cd/"
+            "06dc91b31f2b919e788396c2cb5ad313d5ce0754321165343fd585c4be53/", "size": 123_299,
+            "sha256": "5f3f5716649988b638fbe7fcda592830e0956f548ca273b93cfa5f75917b9087"},
+}
+
+
+def sgp4_wheel(machine: str | None = None, libc: str | None = None, python: tuple | None = None) -> str:
+    """The sgp4 wheel this machine gets (SGP4_WHEELS' key): manylinux_x86_64 on x86-64 with glibc and Python 3.11 or
+    later, else the pure Python one."""
+    import platform
+    import sys
+    machine = (platform.machine() if machine is None else machine).lower()
+    libc = (platform.libc_ver()[0] if libc is None else libc).lower()
+    python = tuple(sys.version_info[:2]) if python is None else tuple(python)
+    return ("manylinux_x86_64" if machine in ("x86_64", "amd64") and libc == "glibc" and python >= (3, 11)
+            else "any")
+
+
+def sgp4_package(wheel: str | None = None) -> dict:
+    """The sgp4 package's pin (the library's Package: version, url, name, size, sha256, licence) of a wheel of
+    SGP4_WHEELS, this machine's when not given (sgp4_wheel)."""
+    found = SGP4_WHEELS[sgp4_wheel() if wheel is None else wheel]
+    return {"version": "2.27", "name": found["name"],
+            "url": "https://files.pythonhosted.org/packages/" + found["folders"] + found["name"],
+            "size": found["size"], "sha256": found["sha256"], "licence": SGP4_LICENCE, "licence_name": "MIT"}
+
+
+SGP4_PACKAGE = sgp4_package()
 
 INFRASTRUCTURE = (
     {**OSM, "id": "osm-datacentres", "title": "Data centres", "size": 2_000_000, "wait": 210,
@@ -1866,15 +1915,17 @@ GEONAMES_API = Api(
 NATURAL_EARTH_API = Api(
     name="Natural Earth (1:10m roads and railways)",
     maker="Natural Earth (NACIS and its volunteers)",
-    about=("A public domain map of the world at three scales. The globe asks for two of its 1:10m files once each, on "
-           "your click: the major roads and the railways, each a zipped ESRI shapefile read in memory by the library "
+    about=("A public domain map of the world at three scales. The globe asks for three of its 1:10m files once each, "
+           "on your click: the major roads, North America's roads and the railways, each a zipped ESRI shapefile read "
+           "in memory by the library "
            "(its shapefile reader: longitude and latitude in WGS 84 alone), ferries left out, a vertex kept every 0.05 "
            "degrees. They are drawn dashed, as a stand-in for fibre where none is mapped: a route found along them "
            "alone says so, and one along real fibre, cables or backbones is preferred wherever one is near enough."),
     kind="feed",
     base=NATURAL_EARTH_DOWNLOAD,
-    version=("ne_10m_roads.zip 5.0.0 (8.66 MB) and ne_10m_railroads.zip 4.0.0 (14.42 MB), as their pages said on "
-             "2026-11-26; each link sends the file on to naciscdn.org, Natural Earth's own CDN"),
+    version=("ne_10m_roads.zip 5.0.0 (8.66 MB), ne_10m_roads_north_america.zip 4.0.0 (45.57 MB) and "
+             "ne_10m_railroads.zip 4.0.0 (14.42 MB), as their pages said on 2026-11-26; each link sends the file on to "
+             "naciscdn.org, Natural Earth's own CDN"),
     auth="none: no account and no key",
     limits="none named; asked once a file on your click, the one redirect to naciscdn.org followed and no other",
     costs="",
@@ -1892,7 +1943,8 @@ NATURAL_EARTH_API = Api(
              + "downloads/10m-cultural-vectors/railroads/",
              covered="every railway but the train ferries, as the railways layer"),
         Area("North America's roads", "a denser file of North America's roads (45.6 MB)", NATURAL_EARTH_SITE
-             + "downloads/10m-cultural-vectors/roads/"),
+             + "downloads/10m-cultural-vectors/roads/",
+             covered="every road but the ferries, into the roads layer, its limit raised to 96 MB for it alone"),
         Area("The rest of its map", "countries, places, rivers, relief and more, at 1:10m, 1:50m and 1:110m",
              NATURAL_EARTH_SITE + "downloads/"),
     ),
@@ -1917,7 +1969,8 @@ AFTERFIBRE_API = Api(
     kind="feed",
     base=AFTERFIBRE_TILES,
     version="its map's tiles (layer fiber, zooms 2 to 14) as its TileJSON gave them on 2026-11-26",
-    auth="none: no account and no key; CC BY 4.0 accepted on the page before a download",
+    auth=("none: no account and no key; its licence unconfirmed (CC BY 4.0, as records elsewhere say), accepted on "
+          "the page before a download"),
     limits="none named; 56 tiles asked one after another on your click, 2 MB a tile and 128 tiles at most",
     costs="",
     links=(
@@ -1950,8 +2003,9 @@ TOPOHUB_API = Api(
     about=("A collection of network topologies, among them a model of the world's backbones: its cities, the land "
            "links between them and the submarine cables' landing points and links, each link with its length. The "
            "globe asks for its world file once, on your click (1.04 MB), draws its links as the backbone model layer "
-           "and gives its cities and links to the composite database as evidence of a model, the weakest kind: a "
-           "model, not an operator's map."),
+           "and its cities as a layer of their own, and gives its cities and links to the composite database as "
+           "evidence of a model, the weakest kind: a model, not an operator's map. No licence is stated for its "
+           "data."),
     kind="feed",
     base=TOPOHUB_WORLD,
     version="its master branch as read on 2026-11-26: data/backbone/world.json, networkx node-link JSON",
@@ -1983,19 +2037,21 @@ TOPOHUB_API = Api(
 RIPE_ATLAS = Api(
     name="RIPE Atlas",
     maker="the RIPE NCC",
-    about=("The RIPE NCC's network of probes and anchors that measure the internet. The globe asks for two things, "
-           "each on your click: the archive of every probe and anchor (its place, country and networks), drawn as the "
-           "probes layer; then, with it, the newest result of the built-in IPv4 traceroute (measurement 5151) of each "
-           "anchor, 300 anchors a request: a router answering within a millisecond of its anchor is placed at the "
-           "anchor, and each two answering hops in a row are a link, both given to the composite database. Private "
-           "addresses and this machine's own are never kept."),
+    about=("The RIPE NCC's network of probes and anchors that measure the internet. The globe asks for three "
+           "things, each on your click: the archive of every probe and anchor (its place, country and networks), drawn "
+           "as the probes layer; then, with it, the newest result of the built-in IPv4 traceroute (measurement 5151) "
+           "of every connected probe, anchors among them, and of the IPv6 one (6152) of every connected probe with "
+           "IPv6, 300 probes a request: a router answering within a millisecond of its probe is placed at the probe, "
+           "and each two answering hops in a row are a link, both given to the composite database. Private addresses "
+           "and this machine's own are never kept."),
     kind="rest",
     base="https://atlas.ripe.net/api/v2/",
     version="its REST API v2 and its probes archive's meta-latest, as read on 2026-11-26",
     auth="none for public measurements' results and the probes archive: no account and no key",
     limits=("its terms (3.5): commercial use needs the RIPE NCC's permission (art. 4.5), its databases passed on only "
             "with its written authorisation (art. 10.2); its latest results are cached for 5 minutes. Asked once on "
-            "your click: the archive in one request, the anchors' results about 3 requests"),
+            "your click: the archive in one request, each measurement's results one request for each 300 probes "
+            "(about 40 for IPv4: some 50 MB, its limit raised to 100 MB for it alone)"),
     costs="",
     links=(
         Link("RIPE Atlas's documentation", "https://atlas.ripe.net/docs/", "docs"),
@@ -2010,7 +2066,7 @@ RIPE_ATLAS = Api(
              covered="meta-latest: each one's id, place, country, networks, whether an anchor, its status"),
         Area("Latest results", "a measurement's newest result from each probe asked",
              "https://atlas.ripe.net/docs/",
-             covered="measurement 5151's, the anchors' alone, 300 a request"),
+             covered="measurements 5151's and 6152's, every connected probe's, 300 a request"),
         Area("The daily dumps", "every public result of a day, about 72 GB: not asked for",
              "https://atlas.ripe.net/docs/"),
         Area("Measurements of one's own", "traceroutes and pings asked of probes, with an account and credits",
@@ -2021,10 +2077,15 @@ RIPE_ATLAS = Api(
              used=("Download… on the World Wide Web tab's Internet infrastructure table, run by the platform as a "
                    "job: one GET, https, from ftp.ripe.net alone"),
              docs="https://ftp.ripe.net/ripe/atlas/probes/archive/"),
-        Call("GET " + ATLAS_LATEST + "?format=json&probe_ids=<300 anchors>", "the anchors' newest traceroutes",
+        Call("GET " + ATLAS_LATEST + "?format=json&probe_ids=<300 probes>", "the probes' newest IPv4 traceroutes",
              "Latest results",
-             used=("Download… on the World Wide Web tab once the probes are in, run by the platform as a job: about "
-                   "3 GETs one after another, https, from atlas.ripe.net alone"),
+             used=("Download… on the World Wide Web tab once the probes are in, run by the platform as a job: one GET "
+                   "for each 300 connected probes, one after another, https, from atlas.ripe.net alone"),
+             docs="https://atlas.ripe.net/docs/"),
+        Call("GET " + ATLAS_LATEST6 + "?format=json&probe_ids=<300 probes>", "the probes' newest IPv6 traceroutes",
+             "Latest results",
+             used=("Download… on the World Wide Web tab once the probes are in, as the IPv4 one: the connected probes "
+                   "with IPv6 alone"),
              docs="https://atlas.ripe.net/docs/"),
     ),
     verified=VERIFIED_GLOBE2,
@@ -2034,19 +2095,22 @@ CELESTRAK_API = Api(
     name="CelesTrak (GP orbits)",
     maker="CelesTrak (T.S. Kelso); orbits from the US Space Force's 18th Space Defense Squadron",
     about=("CelesTrak publishes every tracked satellite's general perturbations elements, by group or by catalogue "
-           "number. The globe asks for three constellations' orbits, each on your click: Starlink's and OneWeb's "
+           "number. The globe asks for three constellations' orbits, each first on your click: Starlink's and "
+           "OneWeb's "
            "groups, and HughesNet's three geostationary satellites by their numbers (one request each), as CSV, "
            "compressed. They are kept in the plugin's own database and placed with the sgp4 package, each satellite's "
-           "footprint the ground that sees it 25 degrees above the horizon or more, all of a constellation's drawn as "
-           "one area in its own colour."),
+           "footprint the ground that sees it 25 degrees above the horizon or more (a geostationary one's its full "
+           "cap), all of a constellation's drawn as one area in its own colour. After your first download they are "
+           "fetched again by themselves every 2 hours at the soonest while the World Wide Web tab is open."),
     kind="feed",
     base=CELESTRAK_GP,
     version="its GP data (CSV, the OMM fields) as its formats page gave it on 2026-11-26",
     auth="none: no account and no key",
     limits=("its usage policy: once an update at most (every 2 hours), compressed, only an OK answer used, any other "
             "stops the download and is said to you, nothing after a 500 or 503 for 15 minutes, and more than 50 "
-            "errors in 2 hours blocks the address. Asked only on your click, never again by itself, Update… not "
-            "offered before 2 hours"),
+            "errors in 2 hours blocks the address. Asked first on your click, then again by itself every 2 hours at "
+            "the soonest while the World Wide Web tab is open (never while it is closed), Update… not offered before "
+            "2 hours, any answer but OK stopping that until you update it yourself"),
     costs="",
     links=(
         Link("GP data formats", "https://celestrak.org/NORAD/documentation/gp-data-formats.php", "docs"),
@@ -2059,7 +2123,7 @@ CELESTRAK_API = Api(
              covered="GROUP=starlink and GROUP=oneweb, as CSV"),
         Area("Catalogue numbers", "one satellite by its number (CATNR)",
              "https://celestrak.org/NORAD/documentation/gp-data-formats.php",
-             covered="CATNR=38551, 41893 and 57479: EchoStar XVII, XIX and XXIV, HughesNet's"),
+             covered="CATNR=38551, 41893 and 57479: EchoStar XVII, XIX and XXIV, HughesNet's, each its full cap"),
         Area("Other formats", "TLE, XML, KVN and JSON", "https://celestrak.org/NORAD/documentation/gp-data-formats.php"),
         Area("The satellite catalogue", "every object's launch, owner and status (SATCAT)",
              "https://celestrak.org/satcat/"),
@@ -2067,7 +2131,8 @@ CELESTRAK_API = Api(
     calls=(
         Call("GET " + CELESTRAK_GP + "?GROUP=<group>&FORMAT=csv", "a group's orbits as CSV", "Groups",
              used=("Download… and Update… on the World Wide Web tab's Internet infrastructure table, run by the "
-                   "platform as a job: one GET a constellation, gzip asked, https, from celestrak.org alone"),
+                   "platform as a job, then again by itself while the tab is open: one GET a constellation, gzip "
+                   "asked, https, from celestrak.org alone"),
              docs="https://celestrak.org/NORAD/documentation/gp-data-formats.php"),
         Call("GET " + CELESTRAK_GP + "?CATNR=<number>&FORMAT=csv", "one satellite's orbit as CSV",
              "Catalogue numbers",

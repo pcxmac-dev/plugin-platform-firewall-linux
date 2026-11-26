@@ -38,6 +38,11 @@ format), and their addresses were read on 2026-11-18 (`NETSTAT_VERIFIED`), the T
 nothing (the base's netstat_view(make=False)). PeeringDB, root-server sites and cloud regions are not among them: not
 free-licensed, or no licence stated.
 
+The globe's newer sources (0.13.0, liminal-libs 1.104.0), their pages read on 2026-11-26 (`VERIFIED_GLOBE2`): Natural
+Earth, AfTerFibre, TopoHub, RIPE Atlas, CelesTrak and the sgp4 package on PyPI, each a card (GLOBE2) and their data sets
+GLOBE2_SETS, at the end of INFRASTRUCTURE; the same in both firewall plugins but the sgp4 wheel each pins
+(SGP4_PACKAGE).
+
 The right to capture is CAP_NET_RAW alone, for the platform alone (the card's auth and its calls, as the library's
 world.capture_help words it since 1.55.0): AmbientCapabilities=CAP_NET_RAW in the platform's system unit, or setcap
 cap_net_raw=ep on a copy of Python that is the platform's own. Never on the system's Python, which every program and

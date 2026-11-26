@@ -24,7 +24,9 @@ size and its licence, exactly as the eight before them, and nothing is downloade
   footprint at 25 degrees of elevation drawn as one merged area, a geostationary satellite's the countries its beams
   reach (`HUGHESNET_BEAMS`). The sgp4 package is pinned (`SGP4_PACKAGE`: its pure Python wheel (sgp4-2.27-py3-none-any.whl, 123.3 kB, for any Linux), its size and sha256 from PyPI's
   file list) and offered beside the data sets as the base's `SKY_PACKAGE`; until it is downloaded the sky says it needs
-  it and places nothing.
+  it and places nothing. Its download and removal are the page's alone (`world_sky_get` and `world_sky_remove` in
+  `PAGE_ONLY_HOOKS`, as `world_layer_get` is), and its licence's acceptance is kept in your own login store as
+  `licence-sgp4`.
 - Six cards for their sources (Natural Earth, AfTerFibre, TopoHub, RIPE Atlas, CelesTrak, sgp4), their pages read on
   2026-11-26 (`VERIFIED_GLOBE2`); each data set's facts under its card.
 - Tests: the seventeen data sets' digest pinned (`INFRASTRUCTURE_SHA256`, the Windows plugin's too); each new set

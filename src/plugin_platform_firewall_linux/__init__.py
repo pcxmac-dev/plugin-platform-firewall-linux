@@ -248,7 +248,9 @@ class LinuxFirewallPlugin(Firewall, LinuxNetwork):
                        INSTALL_HOOK,
                        # 0.11.0 (service-containers-networking §8.1): the base's other changes too
                        "move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
-                       "world_watching", "world_geoip", "world_asn", "world_layer_get", "world_layer_remove")
+                       "world_watching", "world_geoip", "world_asn", "world_layer_get", "world_layer_remove",
+                       # 0.13.0: the sgp4 package's download and removal, code the plugin then imports
+                       "world_sky_get", "world_sky_remove")
     # The World Wide Web tab (0.8.0): the base's (its TABS, JOB_HOOKS, keys, world, world_geoip, detach; world with the XDP
     # programs the last read found at the adapter watched said beside it, xdp_unseen), watched by libpcap at this
     # machine's adapter and on the Linux the platform runs on only (not_for_here). What it downloads and asks is this plugin's to

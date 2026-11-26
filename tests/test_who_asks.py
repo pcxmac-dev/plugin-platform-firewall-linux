@@ -22,14 +22,16 @@ from machines import FakeLinux
 
 CHANGES = ("allow", "remove", "make_rule", "remove_rule", "set_policy", "switch", "save_rules", "root_access",
            "install_nftables")
-READS = ("present", "status", "refresh", "show_rules", "find_rules", "wanted", "world", "netstat")
+READS = ("present", "status", "refresh", "show_rules", "find_rules", "wanted", "world", "netstat", "world_sky")
 # 0.11.0: the base's other changes, and NetworkHost's (liminal-libs 1.96.0)
 NETWORK_CHANGES = ("move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
                    "world_watching", "world_geoip", "world_asn", "world_layer_get", "world_layer_remove",
                    "approve_plan", "grant_network", "revoke_network", "set_domain", "withdraw", "repoint",
                    "remove_leftover", "forget_records",
                    # 0.12.0: the base's GeoIP sources, their file's download, use and removal (liminal-libs 1.101.0)
-                   "world_geoip_get", "world_geoip_use", "world_geoip_remove")
+                   "world_geoip_get", "world_geoip_use", "world_geoip_remove",
+                   # 0.13.0 (the review): the sgp4 package's download and removal, the page's alone
+                   "world_sky_get", "world_sky_remove")
 
 
 class Neighbour(MachinePlugin):

@@ -3,35 +3,48 @@
 ## 0.13.0 (2026-11-26, provisional)
 
 The globe's newer data sets (the Monday list's items 24, 27, 28, 29 and 32; the user, 2026-11-26: "Build first, ask per
-download"), on liminal-libs 1.104.0. Each is offered on the World Wide Web tab's Internet infrastructure table with its
-size and its licence, exactly as the eight before them, and nothing is downloaded until you click. Floor: liminal-libs
-1.104.0.
-- **Fibre on land and its stand-ins** (item 24): AfTerFibre's map of Africa's terrestrial fibre (NSRC, CC BY 4.0 as its
-  records say; its site states no licence now and offers no file, so its map's 56 tiles at zoom 5 are asked one after
-  another on the one click; its contributors' names and e-mail addresses are never kept), and Natural Earth's 1:10m
-  roads and railways (public domain, ferries left out), drawn dashed as stand-ins for fibre where none is mapped: a
-  route found along them alone says so, and real fibre, cables or backbones are preferred wherever one is near.
+download", and their answers of the same day), on liminal-libs 1.104.0. Each is offered on the World Wide Web tab's
+Internet infrastructure table with its size and its licence, exactly as the eight before them, and nothing is downloaded
+until you click. Floor: liminal-libs 1.104.0.
+- **Fibre on land and its stand-ins** (item 24): AfTerFibre's map of Africa's terrestrial fibre (NSRC; its licence
+  unconfirmed: its site states none, records elsewhere say CC BY 4.0, and the words say so; its site offers no file, so
+  its map's 56 tiles at zoom 5 are asked one after another on the one click; its contributors' names and e-mail
+  addresses are never kept), and Natural Earth's 1:10m roads and railways and, on its own click, its North America roads
+  (45.6 MB, its limit raised to 96 MB for it alone) (public domain, ferries left out, asked at Natural Earth's published
+  links with their one redirect to naciscdn.org), drawn dashed as stand-ins for fibre where none is mapped: a route
+  found along them alone says so, and real fibre, cables or backbones are preferred wherever one is near.
 - **In the plugin's own database** (item 27; the user, 2026-11-23: "Kept here, from my downloads"): what you download is
-  kept in the data folder's `infrastructure/infrastructure.db` and read by area as the globe comes nearer; an older
-  download's file is read into it once and left where it is.
+  kept in the data folder's `infrastructure/infrastructure.db` (SQLite) and read by area as the globe comes nearer; an
+  older download's file is read into it once and kept where it is (Remove… deletes it with its data set).
 - **Sources of the composite database** (items 28 and 29): TopoHub's model of the world's backbones (its repository's
-  MIT label; no licence is stated for its data, and its words say so), RIPE Atlas's probes and anchors, and the newest
-  traceroute of each anchor (measurement 5151, about 3 requests, offered once the probes are in; RIPE Atlas's terms 3.5:
-  for non-commercial use on this PC, commercial use needs the RIPE NCC's permission).
+  MIT label; no licence is stated for its data, and its words and its cities' own layer say so), RIPE Atlas's probes and
+  anchors, and the newest traceroutes of every connected probe, anchors among them: IPv4 (measurement 5151, some 12,000
+  probes, about 50 MB, its limit raised to 100 MB for it alone) and IPv6 (6152, the probes with IPv6), one request for
+  each 300 probes, each offered once the probes are in (RIPE Atlas's terms 3.5: for non-commercial use on this PC,
+  accepted; commercial use needs the RIPE NCC's permission).
 - **The satellites** (item 32; the user chose CelesTrak and the sgp4 package): Starlink's, OneWeb's and HughesNet's
-  orbits from CelesTrak (no licence stated; its usage policy kept: compressed, never asked twice on a busy answer,
-  Update… held back 2 hours, HughesNet's three satellites by their numbers), each constellation its own colour, every
-  footprint at 25 degrees of elevation drawn as one merged area, a geostationary satellite's the countries its beams
-  reach (`HUGHESNET_BEAMS`). The sgp4 package is pinned (`SGP4_PACKAGE`: its pure Python wheel (sgp4-2.27-py3-none-any.whl, 123.3 kB, for any Linux), its size and sha256 from PyPI's
-  file list) and offered beside the data sets as the base's `SKY_PACKAGE`; until it is downloaded the sky says it needs
-  it and places nothing. Its download and removal are the page's alone (`world_sky_get` and `world_sky_remove` in
-  `PAGE_ONLY_HOOKS`, as `world_layer_get` is), and its licence's acceptance is kept in your own login store as
-  `licence-sgp4`.
+  orbits from CelesTrak (no licence stated; its usage policy kept: compressed, never asked twice, Update… held back 2
+  hours, nothing asked for 15 minutes after a 500 or 503, HughesNet's three satellites by their numbers). After your
+  first download they are fetched again by themselves every 2 hours at the soonest, only while the World Wide Web tab is
+  open, never while it is closed; any answer but OK stops that until you update them yourself, and the tab says when the
+  next refresh is due. Each constellation its own colour, every footprint at 25 degrees of elevation drawn as one merged
+  area, HughesNet's satellites each its full 25-degree cap (no beams' countries are named). The sgp4 package is pinned
+  (`SGP4_PACKAGE`: its Linux wheels (SGP4_WHEELS, by sgp4_wheel; the user, 2026-11-26: the faster manylinux abi3 wheel):
+  on x86-64 with glibc and Python 3.11 or later
+  sgp4-2.27-cp311-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl (218,130 bytes, sha256
+  4d377531..., with its C extension), on arm64, on musl (Alpine) or an older Python the pure Python
+  sgp4-2.27-py3-none-any.whl (123,299 bytes, the same math, slower), their sizes and sha256 read from PyPI's own file
+  list) and offered beside the data sets as the base's `SKY_PACKAGE`, unpacked into the data folder's packages/; until
+  it is downloaded the sky says it needs it and places nothing. Its download and removal are the page's alone
+  (`world_sky_get` and `world_sky_remove` in `PAGE_ONLY_HOOKS`, as `world_layer_get` is), its licence's acceptance is
+  kept in your own login store per version (`licence-sgp4-2.27`), and a removal while it is loaded is finished when the
+  platform next starts.
 - Six cards for their sources (Natural Earth, AfTerFibre, TopoHub, RIPE Atlas, CelesTrak, sgp4), their pages read on
   2026-11-26 (`VERIFIED_GLOBE2`); each data set's facts under its card.
-- Tests: the seventeen data sets' digest pinned (`INFRASTRUCTURE_SHA256`, the Windows plugin's too); each new set
-  read by the library and offered with its licence first; HughesNet's beams named by the globe's own countries; the
-  sgp4 pin, its offer and the sky's words without it; the cards.
+- Tests: the nineteen data sets' digest pinned (`INFRASTRUCTURE_SHA256`, the Windows plugin's too); each new set read by
+  the library and offered with its licence first; the user's answers in the data sets and their words; HughesNet's full
+  caps; the sgp4 wheel a machine, its pin, its offer and the sky's words without it; the cards; the sky's download among
+  the jobs.
 
 ## 0.12.0 (2026-11-26)
 

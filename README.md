@@ -592,18 +592,21 @@ licence said first and accepted in so many words, and kept in the data folder's 
   between them as great circles. They are logical links as the operators' maps showed them about 2010 and 2011, placed
   at their cities, not today's fibre routes: no free map of those exists (operators keep them private or sell them).
 
-- **The globe's newer data sets** (0.13.0, liminal-libs 1.104.0), in the same table, each downloaded only on your
-  click, its size and its licence said first: **Africa's terrestrial fibre** (AfTerFibre, NSRC, CC BY 4.0: its map's 56
-  tiles, one after another; its contributors' names and addresses are never kept; about 3 MB), **Major roads** and
-  **Railways** (Natural Earth, 1:10m, public domain; 8.7 and 14.4 MB), drawn dashed as a stand-in for fibre where none
-  is mapped, **The world's backbones, a model** (TopoHub, its repository MIT, no licence stated for its data; 1.0 MB),
-  **RIPE Atlas probes and anchors** and **its anchors' newest traceroutes** (RIPE Atlas's terms 3.5: non-commercial use;
-  2 MB and about 5 MB), and **Starlink's**, **OneWeb's** and **HughesNet's** orbits (CelesTrak, no licence stated; asked
-  no more often than every 2 hours, as its usage policy asks). The satellites are placed with the **sgp4 package**
-  (MIT), offered beside them with its size and sha256 and kept in the data folder's `packages/`: until it is downloaded
-  the sky says it needs it. Each constellation is its own colour, its footprints (25 degrees of elevation) one merged
-  area; a geostationary satellite's, the countries its beams reach. Since this release what you download is kept in the
-  data folder's `infrastructure/infrastructure.db`, read by area as the globe comes nearer.
+- **The globe's newer data sets** (0.13.0, liminal-libs 1.104.0), in the same table, each downloaded only on your click,
+  its size and its licence said first: **Africa's terrestrial fibre** (AfTerFibre, NSRC, its licence unconfirmed: CC BY
+  4.0 as records elsewhere say; its map's 56 tiles, one after another; its contributors' names and addresses are never
+  kept; about 3 MB), **Major roads**, **North America's roads** and **Railways** (Natural Earth, 1:10m, public domain;
+  8.7, 45.6 and 14.4 MB, the North America file's limit raised for it alone), drawn dashed as a stand-in for fibre where
+  none is mapped, **The world's backbones, a model** (TopoHub, its repository MIT, no licence stated for its data; 1.0
+  MB; its cities a layer of their own), **RIPE Atlas probes and anchors** and **its probes' newest traceroutes**, IPv4
+  and IPv6 (RIPE Atlas's terms 3.5: non-commercial use; 2 MB, about 50 MB and about 25 MB, their limits raised for them
+  alone), and **Starlink's**, **OneWeb's** and **HughesNet's** orbits (CelesTrak, no licence stated; after your first
+  download fetched again by themselves every 2 hours at the soonest while the World Wide Web tab is open, never while it
+  is closed, as its usage policy allows). The satellites are placed with the **sgp4 package** (MIT, the wheel for this
+  machine), offered beside them with its size and sha256 and kept in the data folder's `packages/`: until it is
+  downloaded the sky says it needs it. Each constellation is its own colour, its footprints (25 degrees of elevation)
+  one merged area; a geostationary satellite's, its full cap. Since this release what you download is kept in the data
+  folder's `infrastructure/infrastructure.db`, read by area as the globe comes nearer.
 
 OpenStreetMap's are under the ODbL 1.0 (credited "© OpenStreetMap contributors"), Wikidata's in the public domain
 (CC0), EMODnet's under CC BY 4.0 (credited "EMODnet Human Activities; data originator Cogea Srl"), the Topology Zoo's

@@ -129,12 +129,15 @@ each acceptance of a licence is kept in that person's own login store, never in 
 named and not offered (the user, 2026-11-25: each source offered only after their yes): its row waits for your word,
 with no button, no card and no key asked (apis.GEOIP_SOURCES).
 
-The globe's newer data sets (0.13.0, liminal-libs 1.104.0; the Monday list's items 24, 27, 28, 29 and 32): AfTerFibre's
-fibre on land in Africa (its map's tiles; CC BY 4.0), Natural Earth's 1:10m roads and railways as stand-ins for fibre
-where none is mapped (public domain), TopoHub's backbone model, RIPE Atlas's probes and its anchors' newest traceroutes
-(non-commercial), and CelesTrak's orbits of Starlink, OneWeb and HughesNet, placed with the sgp4 package pinned here
-(SGP4_PACKAGE), each footprint at 25 degrees of elevation. Each is downloaded only on your click, its size and licence
-said first, and kept in the plugin's own infrastructure.db (GLOBE2_SETS, their cards GLOBE2).
+The globe's newer data sets (0.13.0, liminal-libs 1.104.0; the Monday list's items 24, 27, 28, 29 and 32, with the
+user's answers of 2026-11-26): AfTerFibre's fibre on land in Africa (its map's tiles; its licence unconfirmed), Natural
+Earth's 1:10m roads, North America's roads and railways as stand-ins for fibre where none is mapped (public domain),
+TopoHub's backbone model and its cities (no licence stated for its data), RIPE Atlas's probes and every connected
+probe's newest traceroutes, IPv4 and IPv6 (non-commercial), and CelesTrak's orbits of Starlink, OneWeb and HughesNet
+(refreshed by themselves every 2 hours at the soonest while the World Wide Web tab is open), placed with the sgp4
+package pinned here for this machine (SGP4_PACKAGE), each footprint at 25 degrees of elevation, HughesNet's each its
+full cap. Each is downloaded first only on your click, its size and licence said first, and kept in the plugin's own
+infrastructure.db (GLOBE2_SETS, their cards GLOBE2).
 
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME

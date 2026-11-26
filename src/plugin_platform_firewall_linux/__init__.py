@@ -261,6 +261,8 @@ class LinuxFirewallPlugin(Firewall, LinuxNetwork):
     # Wikidata's, EMODnet's and the Internet Topology Zoo's; the listeners another user holds are named from the
     # firewall's own read (netstat_listeners).
     INFRASTRUCTURE = cards.INFRASTRUCTURE
+    # 0.13.0 (liminal-libs 1.104.0): the sgp4 package the satellites are placed with, offered beside the data sets
+    SKY_PACKAGE = cards.SGP4_PACKAGE
 
     def __init__(self, shell: Shell | None = None, runner=None, native: str | None = None, clock=time.monotonic,
                  which=None, book=None, platform: str = "", wsl: str | None = None):

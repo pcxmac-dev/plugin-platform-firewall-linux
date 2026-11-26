@@ -44,9 +44,10 @@ from liminal_libs.apps.authorization import EnvironmentLogin  # noqa: E402
 from liminal_libs.machines import infrastructure, world  # noqa: E402
 from liminal_libs.machines import linux as linux_mod  # noqa: E402
 from liminal_libs.machines.firewall import Firewall  # noqa: E402
-from liminal_libs.machines.infrastructure import DataSet, Index  # noqa: E402
+from liminal_libs.machines.infrastructure import DataSet, Index, form  # noqa: E402
 from liminal_libs.machines.linux import Shell, why_not_native  # noqa: E402
 from liminal_libs.machines.netstat import NetstatView  # noqa: E402
+from liminal_libs.machines.world import size_words  # noqa: E402
 from liminal_libs.sources.apis import problems  # noqa: E402
 from liminal_libs.sources.conformance import problems as conformance  # noqa: E402
 
@@ -71,7 +72,7 @@ UNDER = {"title": "Under WSL", "note": "What running inside a WSL distribution c
          "rows": [["This Linux", "WSL 2: Ubuntu", "a WSL distribution on Windows: the sockets listed are its own"]]}
 # the data sets' digest (sha256 of apis.INFRASTRUCTURE as canonical JSON: sorted keys, no spaces, UTF-8): the Windows
 # firewall plugin names the same data sets, and its tests pin the same digest: a data set changed changes both
-INFRASTRUCTURE_SHA256 = "8e31ca180948d874e461d61aeb336d456f39224193f4786af35e800afeaa2549"
+INFRASTRUCTURE_SHA256 = "8a8a554b4ef50990febcda25ad58f00df72f68bdfd81670b4991c3ec400a4c4b"  # 0.13.0: seventeen
 # a map of the Topology Zoo's as its toolset wrote them (a network's values, its points with their places, its links),
 # in its archive's shape (gml.tar.gz: gzipped tar of GML files); none of it recorded
 NORDU = ('graph [\n  Network "NORDUnet"\n  DateYear "2010"\n  node [\n    id 0\n    label "Stockholm"\n'
@@ -215,13 +216,18 @@ def test_every_data_set_is_one_the_library_reads_asked_in_the_one_request_its_ca
     assert MACHINE.INFRASTRUCTURE is cards.INFRASTRUCTURE
     sets = [DataSet.of(d) for d in MACHINE.INFRASTRUCTURE]  # each reads, as the base's make_netstat_view reads it
     assert [d.id for d in sets] == ["osm-datacentres", "osm-cables", "osm-lines", "wikidata", "emodnet-cables",
-                                    "topology-zoo", "ourairports", "geonames-cities"]
+                                    "topology-zoo", "ourairports", "geonames-cities",
+                                    # 0.13.0 (liminal-libs 1.104.0): test_the_newer_data_sets_... below
+                                    "afterfibre", "ne-roads", "ne-railways", "topohub-world", "atlas-probes",
+                                    "atlas-traceroutes", "celestrak-starlink", "celestrak-oneweb",
+                                    "celestrak-hughesnet"]
+    sets = sets[:8]  # the eight of 0.9.0 to 0.12.0, each one request its card names
     card_of = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET,
                "gml": cards.TOPOLOGY_ZOO,
                 "ourairports": cards.OURAIRPORTS_API, "geonames": cards.GEONAMES_API}
     assert [d.format for d in sets] == ["overpass", "overpass", "overpass", "sparql", "geojson", "gml",
                                          "ourairports", "geonames"]
-    for d, said in zip(sets, MACHINE.INFRASTRUCTURE):
+    for d, said in zip(sets, MACHINE.INFRASTRUCTURE[:8]):
         card = card_of[d.format]
         address = d.address()
         assert d.url == card.base and d.host == card.base.split("/")[2]
@@ -327,8 +333,11 @@ def test_the_plugins_view_offers_each_data_set_as_a_job_its_licence_first(tmp_pa
         # the plugin's name and its version, nothing of yours (no version where its distribution says none)
         assert view.agent == netstat.agent_of(fw.name, fw.version) and view.agent.startswith("firewall-linux")
         forms = {f["id"]: f for f in view.index.forms(can=True)}
-        assert sorted(forms) == sorted(f"world-layer-{d['id']}" for d in cards.INFRASTRUCTURE)
-        for d in cards.INFRASTRUCTURE:
+        # each, but one read with another (RIPE Atlas's traceroutes with its probes) until that one is in
+        offered = [d for d in cards.INFRASTRUCTURE if not d.get("needs")]
+        assert sorted(forms) == sorted(f"world-layer-{d['id']}" for d in offered)
+        assert len(offered) == len(cards.INFRASTRUCTURE) - 1 and "world-layer-atlas-traceroutes" not in forms
+        for d in offered:
             f = forms[f"world-layer-{d['id']}"]
             assert f["hook"] == "world_layer_get" and f["job"] is True and f["hook"] in fw.JOB_HOOKS
             [accept] = [x for x in f["fields"] if x["type"] == "accept"]
@@ -341,7 +350,7 @@ def test_the_plugins_view_offers_each_data_set_as_a_job_its_licence_first(tmp_pa
 
 # -- the cards ---------------------------------------------------------------------------------------------------------
 def test_the_socket_tables_card_names_every_file_the_librarys_reader_reads():
-    assert problems(cards.NETSTAT) == [] and cards.APIS[-7:] == cards.NETSTAT
+    assert problems(cards.NETSTAT) == [] and cards.APIS[-13:] == cards.NETSTAT  # 0.13.0: six more
     files = {re.search(r"/proc/(\S+)", c.name).group(1) for c in cards.PROCFS.used}
     assert {f.replace("/<fd>", "") for f in files} == set(sockets.LINUX_FILES)  # those, and no other
     assert all(c.name.split()[0] in ("read", "readlink") for c in cards.PROCFS.used)  # files alone: no command
@@ -632,7 +641,10 @@ def test_the_netstat_facts_are_what_the_tab_read_and_asking_them_reads_nothing(m
     for d in cards.INFRASTRUCTURE:  # each data set under its source's card, none downloaded
         card = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET,
                 "gml": cards.TOPOLOGY_ZOO,
-                "ourairports": cards.OURAIRPORTS_API, "geonames": cards.GEONAMES_API}[d["format"]]
+                "ourairports": cards.OURAIRPORTS_API, "geonames": cards.GEONAMES_API,
+                "shapefile": cards.NATURAL_EARTH_API, "mvt": cards.AFTERFIBRE_API,
+                "topohub": cards.TOPOHUB_API, "atlas-probes": cards.RIPE_ATLAS, "atlas-latest": cards.RIPE_ATLAS,
+                "omm-csv": cards.CELESTRAK_API}[d["format"]]
         assert fw.api_facts()[card.name][d["title"]].startswith("not downloaded: the World Wide Web tab's")
     fw.detach()
     assert cards.PROCFS.name not in fw.api_facts()  # detached: the view let go, nothing said
@@ -679,3 +691,96 @@ def test_the_lines_written_for_the_netstat_tab_are_120_characters_at_most():
     for path in (here, Path(netstat_mod.__file__)):
         long = [i for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1) if len(line) > 120]
         assert long == [], (path.name, long)
+
+
+# -- liminal-libs 1.104.0: the fibre, its stand-ins, backbones, RIPE Atlas and the satellites (the Monday list's items
+# 24, 28, 29 and 32), the same in both firewall plugins -------------------------------------------------------------
+def _newer_sets() -> dict:
+    return {d["id"]: DataSet.of(d) for d in cards.INFRASTRUCTURE[8:]}
+
+
+def test_the_newer_data_sets_are_read_by_the_library_each_with_its_licence_and_credit_said_first(tmp_path):
+    """Item 24: AfTerFibre's fibre as its map's 56 tiles at zoom 5 (its site offers no file now), Natural Earth's roads
+    and railways as stand-ins for fibre, their one redirect to its CDN alone; items 28 and 29: TopoHub's model and RIPE
+    Atlas's probes and traceroutes, the traceroutes read with the probes; item 32: CelesTrak's three constellations,
+    asked compressed, never twice on a busy answer, Update… held back 2 hours, HughesNet's three satellites by their
+    numbers. Each said whole and offered as the eight before them (form)."""
+    sets = _newer_sets()
+    fibre = sets["afterfibre"]
+    assert (fibre.format, fibre.layer, fibre.member, len(fibre.tiles)) == ("mvt", "fibre", "fiber", 56)
+    assert {z for z, _, _ in fibre.tiles} == {5} and fibre.host == "d316kar6yg8hyq.cloudfront.net"
+    assert "never kept" in fibre.about and "contributors' names and e-mail addresses are never kept" in fibre.licence
+    for ident, layer, member in (("ne-roads", "roads", "ne_10m_roads"),
+                                 ("ne-railways", "railways", "ne_10m_railroads")):
+        d = sets[ident]
+        assert (d.format, d.layer, d.member, d.stand_in, d.step) == ("shapefile", layer, member, True, 0.05)
+        assert d.hosts == ("naciscdn.org",) and d.url.endswith(f"/download/10m/cultural/{member}.zip")
+        assert "a stand-in for fibre" in d.title and d.licence_name == "Public domain"
+    assert dict(sets["ne-roads"].drop) == {"featurecla": ("Ferry",)}
+    assert dict(sets["ne-railways"].drop) == {"featurecla": ("Railroad ferry",)}
+    assert sets["topohub-world"].format == "topohub" and "No licence is stated" in sets["topohub-world"].licence
+    probes, traces = sets["atlas-probes"], sets["atlas-traceroutes"]
+    assert (probes.format, traces.format, traces.needs) == ("atlas-probes", "atlas-latest", "atlas-probes")
+    assert traces.addresses(range(1, 601)) == [f"{cards.ATLAS_LATEST}?format=json&probe_ids="
+                                               + ",".join(str(i) for i in range(at, at + 300)) for at in (1, 301)]
+    for d in (probes, traces):
+        assert "article 4.5" in d.licence and "non-commercial" in d.licence_name
+    sky = [sets[f"celestrak-{c}"] for c in ("starlink", "oneweb", "hughesnet")]
+    assert [d.constellation for d in sky] == ["starlink", "oneweb", "hughesnet"]  # their colours' order
+    assert all((d.format, d.retry, d.every, d.gzip, d.host) == ("omm-csv", False, 7200.0, True, "celestrak.org")
+               for d in sky)
+    assert sky[2].addresses() == [f"{cards.CELESTRAK_GP}?CATNR={n}&FORMAT=csv" for n in ("38551", "41893", "57479")]
+    for d in sets.values():
+        assert d.credit["text"] in d.licence and d.about and d.title  # the credit the licence asks for, in its words
+        f = form(d, tmp_path)
+        words = f["confirm"]["words"]
+        assert f["job"] is True and f["hook"] == "world_layer_get" and size_words(d.size) in words
+        assert words.index(d.licence) < words.index("You are asked to accept it next")  # the licence first
+
+
+def test_hughesnets_beams_name_countries_of_the_globes_own_map():
+    """A geostationary satellite's footprint is its beams' reach: the countries its data set names for it, by the ids
+    of the globe's own map (world-atlas, ISO 3166-1 numeric), cut to its 25-degree cap on the page."""
+    import liminal_libs
+    world_map = Path(liminal_libs.__file__).parent / "ui" / "static" / "vendor" / "world" / "countries-110m.json"
+    ids = {str(g.get("id")) for g in json.loads(world_map.read_text(encoding="utf-8"))["objects"]["countries"][
+        "geometries"]}
+    beams = dict(_newer_sets()["celestrak-hughesnet"].beams)
+    assert set(beams) == {38551, 41893, 57479} and {"840", "124"} <= set(beams[38551])
+    for norad, countries in beams.items():
+        assert countries and set(countries) <= ids, norad
+
+
+def test_the_sgp4_package_is_pinned_offered_with_its_sum_and_licence_and_nothing_is_placed_without_it(tmp_path):
+    """Item 32: the orbit math is the sgp4 package's, pinned here (its wheel's address, size and sha256 as PyPI's own
+    file list gave them), offered on the tab beside the data sets, and until it is downloaded the sky says it needs it
+    and places nothing. Each constellation its own colour, in the data sets' order."""
+    from liminal_libs.machines import satellites
+    package = satellites.Package.of(cards.SGP4_PACKAGE)
+    assert package.version == "2.27" and package.licence_name == "MIT" and "MIT licence" in package.licence
+    assert package.source.url.startswith("https://files.pythonhosted.org/packages/")
+    assert package.source.url.endswith("/" + package.source.name) and len(package.source.sha256) == 64
+    assert MACHINE.SKY_PACKAGE is cards.SGP4_PACKAGE and "satellites" in cards.SGP4_API.about
+    view = satellites.SkyView(Index(tmp_path / "infrastructure", cards.INFRASTRUCTURE), cards.SGP4_PACKAGE,
+                              data_dir=tmp_path)
+    spec = view.spec()
+    assert [(c["id"], c["slot"], c["count"]) for c in spec["constellations"]] == [
+        ("starlink", 1, 0), ("oneweb", 2, 0), ("hughesnet", 3, 0)]
+    assert spec["needs"] and "sgp4" in view.read(0)["needs"]  # nothing placed without the package
+    [offer] = view.forms()
+    words = offer["confirm"]["words"]
+    assert offer["job"] is True and package.source.sha256 in words and "files.pythonhosted.org" in words
+    assert size_words(package.source.size) in words and offer["fields"][0]["words"] == package.licence
+    assert not (tmp_path / "packages").exists()  # nothing downloaded, nothing made
+
+
+def test_the_newer_sources_cards_name_their_pages_and_the_requests_made_of_them():
+    named = {a.name: a for a in cards.APIS}
+    for card in cards.GLOBE2:
+        assert named[card.name] is card and card in cards.NETSTAT and card.verified == cards.VERIFIED_GLOBE2
+        assert card.used and all("on the World Wide Web tab" in c.used for c in card.used)
+    for card in (cards.NATURAL_EARTH_API, cards.AFTERFIBRE_API, cards.TOPOHUB_API, cards.RIPE_ATLAS):
+        assert card.link("terms")
+    assert "never decoded or kept" in cards.AFTERFIBRE_API.about and "art. 4.5" in cards.RIPE_ATLAS.limits
+    assert "every 2 hours" in cards.CELESTRAK_API.limits and cards.SGP4_PACKAGE["url"] in cards.SGP4_API.used[0].name
+    assert problems(cards.APIS) == []

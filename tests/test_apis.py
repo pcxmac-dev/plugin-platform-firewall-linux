@@ -29,6 +29,7 @@ from plugin_platform_firewall_linux import netstat as netstat_mod
 from plugin_platform_firewall_linux import nftables as nft_mod
 from plugin_platform_firewall_linux import system as sys_mod
 from plugin_platform_firewall_linux import ufw as ufw_mod
+from plugin_platform_firewall_linux import world_in
 from plugin_platform_firewall_linux.read import SCRIPT
 
 from machines import SUDO, FakeLinux
@@ -189,7 +190,9 @@ def canonical(cmd: list[str]) -> str | None:
 def test_the_cards_are_sound_and_each_says_where_its_documentation_is():
     assert problems(cards.APIS) == [] and cards.APIS == cards.FIREWALL + cards.WORLD + cards.NETSTAT
     # 0.9.0: the Netstat tab's cards with a library that has it, else left out (the plugin reaches none of them there)
-    assert MACHINE.apis == (cards.APIS if netstat_mod.library() else cards.FIREWALL + cards.WORLD)
+    # 0.14.0: with liminal-libs 1.105.0 the World Wide Web tab's cards are plugin-platform-worldwideweb's
+    assert MACHINE.apis == ((cards.APIS if netstat_mod.library() else cards.FIREWALL + cards.WORLD) if world_in()
+                            else cards.FIREWALL + cards.NETSTAT[:1])
     assert [a.name for a in cards.APIS] == [
         "nftables (nft)", "iptables and ip6tables", "ebtables and arptables", "ipset", "firewalld", "ufw",
         "Connection tracking (conntrack)", "eBPF on the network (bpftool)", "iproute2 (ip and ss)",

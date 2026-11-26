@@ -175,7 +175,19 @@ from .rights import PASSWORD_FIELD, Rights
 from .network import LinuxNetwork
 from liminal_libs.machines.segments import NetworkHost
 
-__version__ = "0.13.0"
+__version__ = "0.14.0"
+
+
+def world_in(base=Firewall) -> bool:
+    """Whether the library's Firewall base still has the World Wide Web tab (0.14.0): from liminal-libs 1.105.0 it is
+    plugin-platform-worldwideweb's, and the base has no `world`."""
+    return callable(getattr(base, "world", None))
+
+
+# 0.14.0: what plugin-platform-worldwideweb asks of this plugin beside the base's services, with liminal-libs 1.105.0:
+# the XDP programs at the adapter its capture watches, which drop packets before libpcap is handed them
+UNSEEN_HOOK = "capture_unseen"
+OWN_SERVICES = () if world_in() else (UNSEEN_HOOK,)
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -219,27 +231,35 @@ class LinuxFirewallPlugin(Firewall, LinuxNetwork):
     about = ("the firewall of the Linux the platform runs on (a WSL distribution it runs inside too, what WSL changes said), "
              "read whole and changed from the platform's page: nftables, iptables (nf_tables and legacy), ebtables, "
              "arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP (read only), under systemd, OpenRC or SysV "
-             "scripts; never reached from Windows or macOS. Its World Wide Web tab draws where this machine's traffic "
-             "comes from and goes to on a globe, and its ports' traffic, while the tab is shown"
-             + ("; its Netstat tab lists the listening ports and the open connections with the program behind each, "
-                "the hosts database keeps each program's remote hosts and how long they were connected, and the globe "
-                "shows them, filtered, with the internet's exchange points, data centres and cables"
+             "scripts; never reached from Windows or macOS."
+             + (" Its World Wide Web tab draws where this machine's traffic comes from and goes to on a globe, and its "
+                "ports' traffic, while the tab is shown" if world_in() else "")
+             + (("; its Netstat tab lists the listening ports and the open connections with the program behind each, "
+                 "the hosts database keeps each program's remote hosts and how long they were connected, and the globe "
+                 "shows them, filtered, with the internet's exchange points, data centres and cables") if world_in()
+                else (" Its Netstat tab lists the listening ports and the open connections with the program behind "
+                      "each, and the hosts database keeps each program's remote hosts and how long they were connected")
                 if netstat_mod.library() else ""))
     api = "2.2"
     # what it attaches to: nftables, iptables, ebtables, ipset, firewalld, ufw, conntrack, eBPF... (apis.py); and, with
     # liminal-libs 1.65.0 (0.9.0), the kernel's socket tables and the sources of the globe's data sets, whose cards are
     # left out with an older library, where the plugin reaches none of them (netstat.cards)
-    apis = netstat_mod.cards(APIS, cards.NETSTAT)
+    # 0.14.0: with liminal-libs 1.105.0 the World Wide Web tab's cards (libpcap, DB-IP, the name servers, the data
+    # sets' sources) are plugin-platform-worldwideweb's, its apis.py holding them moved word for word
+    apis = (netstat_mod.cards(APIS, cards.NETSTAT) if world_in()
+            else tuple(a for a in APIS if a not in (*cards.WORLD, *cards.NETSTAT[1:])))
     order = 711
     ICON = "wallfire"  # a brick wall with a flame before it (liminal-libs 1.34.0; the user's picture: "use this icon for linux firewall")
     SECTION = "os"  # drawn under the platform's OS plugins (liminal-platform 0.26.0)
     HOOKS = (*Firewall.HOOKS, "refresh", "show_rules", "find_rules", "make_rule", "remove_rule", "set_policy", "switch",
              "save_rules",  # the base's world and world_geoip among them (the World Wide Web tab, 0.8.0)
              ROOT_HOOK, INSTALL_HOOK,  # 0.9.0: Root access turned on or off; nftables installed (a job)
-             *(h for h in NetworkHost.HOOKS if h not in Firewall.HOOKS))  # 0.11.0: services' networks (network.py)
+             *(h for h in NetworkHost.HOOKS if h not in Firewall.HOOKS),  # 0.11.0: services' networks (network.py)
+             *OWN_SERVICES)  # 0.14.0: what the World Wide Web plugin asks of it beside the base's services
     TABS = (*Firewall.TABS, *NetworkHost.TABS)  # 0.11.0: the Networks tab after the World Wide Web and Netstat tabs
     ASKS = (*getattr(Firewall, "ASKS", ()), *NetworkHost.ASKS)
-    READ_HOOKS = tuple(dict.fromkeys((*Firewall.READ_HOOKS, *NetworkHost.READ_HOOKS)))
+    READ_HOOKS = tuple(dict.fromkeys((*Firewall.READ_HOOKS, *NetworkHost.READ_HOOKS, *OWN_SERVICES)))
+    SERVICE_HOOKS = (*NetworkHost.SERVICE_HOOKS, *OWN_SERVICES)
     JOB_HOOKS = (*Firewall.JOB_HOOKS, INSTALL_HOOK)  # run by the platform as jobs, their lines in the plugin's panel
     # Its changes as root, asked only from its page (0.10.0, the review's PLT-H1 follow-up; liminal-libs 1.66.0's
     # apps/asking.py): another plugin's ask is refused (403), and liminal-platform 0.34.0 refuses one over HTTP (401)
@@ -251,9 +271,10 @@ class LinuxFirewallPlugin(Firewall, LinuxNetwork):
                        INSTALL_HOOK,
                        # 0.11.0 (service-containers-networking §8.1): the base's other changes too
                        "move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
-                       "world_watching", "world_geoip", "world_asn", "world_layer_get", "world_layer_remove",
-                       # 0.13.0: the sgp4 package's download and removal, code the plugin then imports
-                       "world_sky_get", "world_sky_remove")
+                       # (0.14.0: those of the World Wide Web tab only where the base still has it, an older library;
+                       # the sgp4 package's download and removal among them, code the plugin then imports)
+                       *(h for h in ("world_watching", "world_geoip", "world_asn", "world_layer_get",
+                                     "world_layer_remove", "world_sky_get", "world_sky_remove") if h in Firewall.HOOKS))
     # The World Wide Web tab (0.8.0): the base's (its TABS, JOB_HOOKS, keys, world, world_geoip, detach; world with the XDP
     # programs the last read found at the adapter watched said beside it, xdp_unseen), watched by libpcap at this
     # machine's adapter and on the Linux the platform runs on only (not_for_here). What it downloads and asks is this plugin's to
@@ -910,6 +931,19 @@ class LinuxFirewallPlugin(Firewall, LinuxNetwork):
         if unseen and isinstance(page.get("note"), str):
             page["note"] = f"{page['note']} {unseen}"
         return page
+
+    def capture_unseen(self, address) -> str:
+        """What an XDP program at the adapter of `address` drops before the capture sees it (another plugin's read).
+
+        0.14.0, for plugin-platform-worldwideweb (liminal-libs 1.105.0), whose capture watches that adapter: the words
+        the World Wide Web tab of this plugin said until then (xdp_words), from the read kept, never a new one; "" for
+        none, before a read, and for an address no adapter of the read holds. ValueError on a machine the plugin is not
+        for."""
+        here = self.not_for_here()
+        if here:
+            raise ValueError(f"not for this machine: {here}")
+        kept = self._read
+        return xdp_words(kept[1], address) if kept and isinstance(address, str) and address else ""
 
     def xdp_unseen(self) -> str:
         """The XDP programs the last read found at the adapter the World Wide Web tab watches, in words: "" for none,

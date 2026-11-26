@@ -54,6 +54,7 @@ from liminal_libs.sources.conformance import problems as conformance  # noqa: E4
 from plugin_platform_firewall_linux import MACHINE, LinuxFirewallPlugin  # noqa: E402
 from plugin_platform_firewall_linux import apis as cards  # noqa: E402
 from plugin_platform_firewall_linux import netstat as netstat_mod  # noqa: E402
+from plugin_platform_firewall_linux import world_in  # noqa: E402
 from plugin_platform_firewall_linux.groups import UNKNOWN  # noqa: E402
 
 from conftest import Reached  # noqa: E402
@@ -190,15 +191,23 @@ def texts(cells) -> list:
 
 # -- the tab, its hooks, its job and its setting: the base's -----------------------------------------------------------
 def test_the_tab_its_hooks_its_job_and_its_setting_are_the_firewall_bases():
-    assert MACHINE.TABS[:2] == Firewall.TABS
-    assert [t.id for t in MACHINE.TABS] == ["world", "netstat", "container_networks"]  # 0.11.0: the Networks tab
-    tab = MACHINE.TABS[1]
+    # 0.14.0: with liminal-libs 1.105.0 the World Wide Web tab is plugin-platform-worldwideweb's, not the base's
+    first = 0 if not world_in() else 1
+    assert MACHINE.TABS[:first + 1] == Firewall.TABS
+    assert [t.id for t in MACHINE.TABS] == ["world", "netstat", "container_networks"][1 - first:]  # 0.11.0: Networks
+    tab = MACHINE.TABS[first]
     assert (tab.title, tab.hook, tab.every) == ("Netstat", "netstat", netstat.EVERY) and netstat.EVERY == 3.0
-    assert set(netstat.HOOKS) <= set(MACHINE.HOOKS) and MACHINE.HOOKS[:len(Firewall.HOOKS)] == Firewall.HOOKS
+    mine = getattr(netstat, "FIREWALL_HOOKS", netstat.HOOKS) if not world_in() else netstat.HOOKS
+    assert set(mine) <= set(MACHINE.HOOKS) and MACHINE.HOOKS[:len(Firewall.HOOKS)] == Firewall.HOOKS
     hooks = MACHINE.interface()["hooks"]
     assert hooks["netstat"].startswith("()")  # asked with no arguments, as every tab's hook
     assert LinuxFirewallPlugin.netstat.__doc__.splitlines()[0] == (  # the line the Internal API tab draws
         "The Netstat tab's page: the listening ports and the open connections with the program behind each.")
+    if not world_in():  # 0.14.0: the data sets' and the GeoIP files' jobs left with the World Wide Web tab
+        assert MACHINE.JOB_HOOKS == ("install_nftables",) and not {h for h in hooks if h.startswith("world")}
+        assert "capture_unseen" in hooks and "capture_unseen" in MACHINE.READ_HOOKS
+        assert conformance(MACHINE) == [] and "Netstat tab" in MACHINE.about and "globe" not in MACHINE.about
+        return
     assert hooks["world_layer_get"].startswith("(dataset, accept_licence=False, log=None) ")
     # a data set's download runs as a job the page may cancel, beside the GeoIP file's and nftables' install
     assert MACHINE.JOB_HOOKS == (*Firewall.JOB_HOOKS, "install_nftables") and "world_layer_get" in MACHINE.JOB_HOOKS
@@ -325,6 +334,8 @@ def test_the_topology_zoos_maps_are_read_into_backbones_and_their_points_of_pres
     assert layers["pops"][1:3] == ("Backbones' points of presence, about 2010-2011", "points")
 
 
+@pytest.mark.skipif(not world_in(), reason="the World Wide Web tab is plugin-platform-worldwideweb's from "
+                                          "liminal-libs 1.105.0")
 def test_the_plugins_view_offers_each_data_set_as_a_job_its_licence_first(tmp_path):
     fw = plugin()
     view = fw.netstat_view()  # the base's own, over this plugin's data sets (none refused)
@@ -593,7 +604,8 @@ def test_on_windows_or_macos_the_netstat_tab_reads_nothing(note):
     fw = plugin(fake, native=note)
     assert fw.ask("netstat") == {"title": "Netstat", "note": f"Not for this machine: {note}. Nothing is read here."}
     with pytest.raises(ValueError, match="not for this machine"):
-        fw.ask("world_layer_get", "osm-datacentres", True)
+        # 0.14.0: with liminal-libs 1.105.0 the data sets are plugin-platform-worldwideweb's: a service of the base's
+        fw.ask("world_layer_get", "osm-datacentres", True) if world_in() else fw.ask("hosts_found", "describe")
     assert fw.netstat_view(make=False) is None and fw.netstat_listeners() == {} and not fw.present()
     assert fake.calls == [] and fw.api_facts() == {} and not infrastructure.folder().exists()
     fw.attach(object(), EnvironmentLogin(env={hostbook.VARIABLE: "always"}))
@@ -679,6 +691,8 @@ def test_the_netstat_facts_are_what_the_tab_read_and_asking_them_reads_nothing(m
     assert "_netstat" not in source.replace("netstat_facts", "") and "__dict__" not in source
 
 
+@pytest.mark.skipif(not world_in(), reason="the World Wide Web tab is plugin-platform-worldwideweb's from "
+                                          "liminal-libs 1.105.0")
 def test_with_a_library_from_before_the_netstat_tab_its_cards_and_its_words_are_left_out(monkeypatch):
     assert netstat_mod.cards(cards.APIS, cards.NETSTAT) == cards.APIS == MACHINE.apis  # this library has it
     assert "Netstat tab" in MACHINE.about  # (its words follow the library the plugin was loaded with)

@@ -32,6 +32,10 @@ NETWORK_CHANGES = ("move_rules", "new_label", "rename_label", "remove_label", "h
                    "world_geoip_get", "world_geoip_use", "world_geoip_remove",
                    # 0.13.0 (the review): the sgp4 package's download and removal, the page's alone
                    "world_sky_get", "world_sky_remove")
+# 0.14.0: with liminal-libs 1.105.0 the World Wide Web tab's hooks are plugin-platform-worldwideweb's, not this plugin's
+_HOOKS = set(__import__("plugin_platform_firewall_linux").MACHINE.HOOKS)
+NETWORK_CHANGES = tuple(h for h in NETWORK_CHANGES if h in _HOOKS)
+READS = tuple(h for h in READS if h in _HOOKS)
 
 
 class Neighbour(MachinePlugin):
@@ -79,7 +83,9 @@ def attached(monkeypatch):
 def test_its_changes_are_said_to_be_asked_only_from_its_page_and_its_reads_by_anyone():
     fw = LinuxFirewallPlugin(shell=Shell("local", runner=FakeLinux("ubuntu-24.04-ufw")), native="")
     assert set(internal.page_only(fw)) == set(CHANGES) | set(NETWORK_CHANGES)  # 0.11.0
-    assert set(internal.plugin_only(fw)) == {"network_plan", "apply_network", "network_work"}  # what the platform reads
+    # what the platform reads; 0.14.0, liminal-libs 1.105.0: the base's three changes only the World Wide Web plugin asks
+    kept = {"hosts_keep_route", "hosts_keep_places", "hosts_clear_places"} & _HOOKS
+    assert set(internal.plugin_only(fw)) == {"network_plan", "apply_network", "network_work", *kept}
     assert [p for p in internal.problems(fw) if "ONLY_HOOKS" in p] == []  # each a hook of its own, someone may ask it
     for hook in CHANGES:
         assert asking.refusal(fw, hook, asking.PAGE) == ""

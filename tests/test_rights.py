@@ -128,7 +128,8 @@ def test_off_the_rules_are_not_read_and_turn_on_is_offered_with_its_words(monkey
                                              "liminal, can then run that one read as root.")
     assert "takes effect once the platform is started again" in on["confirm"]["words"]
     hooks = fw.interface()["hooks"]
-    assert all(f["hook"] in hooks for f in st["forms"]) and "world" in hooks  # valid: its tabs are asked too
+    # valid: its tabs are asked too (0.14.0: the Netstat tab's, with liminal-libs 1.105.0's World Wide Web plugin)
+    assert all(f["hook"] in hooks for f in st["forms"]) and ("world" in hooks or "netstat" in hooks)
     fw.status(), fw.present()
     assert sudo.calls.count([*SUDO, "sh", "-c", SCRIPT]) == 1  # a refusal kept as long as a read
     fw.refresh  # noqa: B018 - Refresh reads again (and is refused again)

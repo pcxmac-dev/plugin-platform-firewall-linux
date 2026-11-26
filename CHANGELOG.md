@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.14.0 (provisional)
+
+The World Wide Web tab leaves this plugin for plugin-platform-worldwideweb 0.1.0 (Monday list item 33), on liminal-libs
+1.105.0, whose Firewall base no longer has it. This plugin keeps its rules, its Netstat tab, the hosts' recording and the
+Networks tab. Floor unchanged: on a library before 1.105.0 the tab is as in 0.13.0, for one release more.
+
+- **With liminal-libs 1.105.0** (`world_in`): its tabs are Netstat and Networks; no hook, key, form or card of the World
+  Wide Web tab is its own (libpcap, DB-IP, OpenDNS, Google and the data sets' sources are in plugin-platform-
+  worldwideweb's apis.py, moved word for word); its jobs are nftables' install alone; its page-only changes are those
+  its hooks have; its words no longer name a globe.
+- **`capture_unseen(address)`**, a read the World Wide Web plugin asks: what an XDP program at the adapter its capture
+  watches drops before libpcap sees it, in the words this plugin's tab said until now (xdp_words), from the read kept,
+  running no command. Beside it, the base's services: the socket table's reading, the hosts recorded, the routes kept,
+  the rules covering a port, and the changes only another plugin may ask.
+- **The Netstat tab's place column** comes from the World Wide Web plugin's `places`; with that plugin not attached the
+  note says why.
+- Tests: the 0.13.0 tab's tests run with an older library and are skipped with 1.105.0 (plugin-platform-worldwideweb
+  holds them); test_services.py covers `capture_unseen` and the services, skipped with an older library.
+
 ## 0.13.0 (2026-11-26)
 
 The globe's newer data sets (the Monday list's items 24, 27, 28, 29 and 32; the user, 2026-11-26: "Build first, ask per

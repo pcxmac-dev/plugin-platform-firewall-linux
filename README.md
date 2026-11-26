@@ -8,6 +8,13 @@ Netstat tab lists the listening ports and the open connections with the program 
 each program's remote hosts and how long they were connected, and the globe shows them, filtered, with the internet's
 exchange points, data centres and cables.
 
+**0.14.0:** with liminal-libs 1.105.0 the World Wide Web tab is a plugin of its own, plugin-platform-worldwideweb
+(Monday list item 33), which asks this plugin through the platform for what only a firewall knows: the socket table's
+reading, the hosts recorded, the routes kept, the rules covering a port, and what an XDP program at the adapter its
+capture watches drops before libpcap sees it (`capture_unseen`). This plugin keeps its rules, its Netstat tab and the
+hosts' recording; the Netstat tab's place column comes from that plugin's GeoIP file (`places`). On a library before
+1.105.0 the tab below is this plugin's as in 0.13.0, for one release more.
+
 The user's words. 2026-11-07: "the platform is the interface for the software/hardware which facilitates the liminal
 framework"; "i also need a windows and linux firewall plugin for the platform". 2026-11-08, on the Windows one: "i need
 it to be able to read the configuration, and make changes"; "basically the firewall plugin is an interface for windows
@@ -396,6 +403,9 @@ The World Wide Web tab's capture needs less: root, or CAP_NET_RAW alone, for the
 CAP_NET_ADMIN, which is the right to rewrite the firewall.
 
 ## The World Wide Web tab
+
+(With liminal-libs 1.105.0, plugin-platform-worldwideweb's: what follows is the tab as this plugin has it on an older
+library, and as that plugin has it now.)
 
 The user's words (2026-11-14): "so for the firewall's both are going to get a 'world wide web view' that shows the globe
 and the routes incoming all traffic, as well as monitoring port traffic stats". Since 0.8.0 the plugin's page has a

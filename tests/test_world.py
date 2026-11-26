@@ -55,6 +55,7 @@ from liminal_libs.traffic import TrafficBook
 from plugin_platform_firewall_linux import MACHINE, LinuxFirewallPlugin, xdp_words
 from plugin_platform_firewall_linux import apis as cards
 from plugin_platform_firewall_linux import netstat as netstat_mod
+from plugin_platform_firewall_linux import world_in
 from plugin_platform_firewall_linux.read import Config
 from plugin_platform_firewall_linux.system import Interface, System
 
@@ -69,6 +70,12 @@ except ImportError:  # a library from before it: the tab reads no socket table
 # CI installs maxminddb (the library's geo extra): there these run, and fail rather than skip without it
 needs_reader = pytest.mark.skipif(not geo.available()[0] and not os.environ.get("CI"),
                                   reason="maxminddb is not installed here")
+
+# 0.14.0: the whole of this file is the 0.13.0 tab's, run with a library whose Firewall base still has it (before
+# liminal-libs 1.105.0); from 1.105.0 the tab is plugin-platform-worldwideweb's, whose own tests hold these assertions,
+# and what this plugin still tells it (capture_unseen) is test_services.py's
+pytestmark = pytest.mark.skipif(not world_in(), reason="the World Wide Web tab is plugin-platform-worldwideweb's from "
+                                                       "liminal-libs 1.105.0")
 
 LAN, ROUTER = "192.168.1.20", "192.168.1.1"
 OWN = capture.own_addresses([LAN])

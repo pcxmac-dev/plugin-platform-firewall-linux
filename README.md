@@ -453,7 +453,15 @@ libpcap's own words. Without libpcap, the tab says which package to install.
 - They come from DB-IP's IP to City Lite file, looked up here with maxminddb (memory-mapped, never read whole into
   memory). The file is mapped only while the tab is watched: it is let go when watching stops, and mapped again at the
   next ask. No address is sent anywhere, and none is looked up by name.
-- The GeoIP file is downloaded on your word. While none is installed, the tab offers Install the GeoIP file….
+- The GeoIP file is downloaded on your word, from the tab's **GeoIP sources** table (0.12.0; Install the GeoIP file…
+  before): a row a source's file (Source, Gives, Licence, Key, Here), with Use…, Download… (Update… once one is due) and
+  Remove…, places and networks chosen apart. DB-IP's two files are the default for both, at the same addresses and in
+  the same folders. Download…, Use… and Remove… are asked only by you, signed in at the platform's page (each hook
+  refuses any other ask itself), and Remove… is asked twice. Your acceptance of a licence is kept in your own login
+  store (`licence-dbip-lite`, `licence-dbip-asn-lite`), never in a file. **IPinfo Lite** ([its
+  page](https://ipinfo.io/lite), CC BY-SA 4.0, credited "IP address data powered by IPinfo") is named for networks and
+  not offered yet: its row says "not offered: waiting for your word", with no button and no key asked, until you say
+  yes.
   - Its first confirmation says what is downloaded, from where (download.db-ip.com) and to where, and shows the
     licence.
   - The second asks you to accept the licence in so many words.
@@ -463,6 +471,7 @@ libpcap's own words. Without libpcap, the tab says which package to install.
     the data folder, readable by whichever account runs the platform later (0644 less the umask). The data folder is the
     checkout's, whichever account runs the platform, so an install the folder refuses says whose the folder is.
   - Update… is offered once the file is older than this month.
+  - The old installs (`world_geoip`, `world_asn`) stay for programs: DB-IP's files as before, nothing recorded.
 - The licence is CC BY 4.0. "IP Geolocation by DB-IP", linked to db-ip.com, is shown wherever places are, as DB-IP asks.
 
 **Home.**

@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.12.0 (2026-11-26)
+
+More GeoIP sources for the World Wide Web tab, phase 1 (Monday list item 20; the design of 2026-11-24 with your answers
+of 2026-11-25), on liminal-libs 1.101.0's machines/geosources.py. The user, 2026-11-19: "add a way to download different
+GEOIP sources"; 2026-11-25: all three sources in phases, each offered only after your yes. Floor: liminal-libs 1.101.0.
+- **GeoIP sources** (`apis.GEOIP_SOURCES`, the base's `GEOIP_SOURCES`): the tab's GeoIP sources table takes the place
+  of Install the GeoIP file… and Install the ASN file…, a row a source's file (Source, Gives, Licence, Key, Here) with
+  Use…, Download… (Update… once one is due) and Remove…. Places and networks are chosen apart; DB-IP's IP to City Lite
+  and IP to ASN Lite are the default for both, at the same addresses, in the same folders and in the same words, each
+  ending with the line that points to the full licence (CC BY 4.0), the same words as the Windows firewall plugin's.
+- **Only you, at the page:** Download…, Use… and Remove… are the base's three page-only hooks (`world_geoip_get`, a job
+  the page may cancel; `world_geoip_use`; `world_geoip_remove`, asked twice), and each refuses any ask but a person's
+  signed in at the platform's page itself. Your acceptance of a licence is kept in your own login store
+  (`licence-dbip-lite`, `licence-dbip-asn-lite`: the file and its month, the licence's version and page, your name),
+  never in the licences file; a store that refuses it ends the download with nothing fetched. The old installs
+  (`world_geoip`, `world_asn`) stay for programs: DB-IP's files as before, nothing recorded. On Linux, Use… of a source
+  other than the default is refused while the platform's login there keeps a setting only until the platform stops
+  (decision 7): DB-IP's stay in use.
+- **IPinfo Lite** for networks (CC BY-SA 4.0, "IP address data powered by IPinfo") is named and not offered: its row
+  says "not offered: waiting for your word", with no button, no form, no card and no key asked (`IPINFO_TOKEN` is not
+  declared), and its hooks refuse it before anything is read. It is offered once you say yes.
+- The DB-IP Lite card's words follow the new buttons and say where an acceptance is kept.
+- Tests: the sources' digest pinned (`GEOIP_SOURCES_SHA256`, the Windows plugin's too); the table's rows and forms, IPinfo
+  Lite's row without a button; a download for a person at the page, its record in a stand-in store and no licences
+  file; the other askers refused before anything is read; the pins of the page-only, job and Cancel hooks restated.
+
 ## 0.11.0 (2026-11-25)
 
 Services' networks through this firewall, on liminal-libs 1.96.0's NetworkHost (service-containers-networking-2026-11-23.md

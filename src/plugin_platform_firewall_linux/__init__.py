@@ -120,6 +120,15 @@ or removed, a default policy, on and off, saving, Root access, nftables' install
 so another plugin's ask is refused and the platform asks its login whether you are at the page; and the framework's
 allow reads its remote as the form's other side is read, so no word of it reaches nft unread.
 
+GeoIP sources (0.12.0; liminal-libs 1.101.0's machines/geosources.py, Monday list item 20; the user, 2026-11-19: "add a
+way to download different GEOIP sources"): the World Wide Web tab's GeoIP sources table, in place of its install
+buttons, places and networks chosen apart, DB-IP's two files the default for both (the same addresses and folders; the
+same words as the Windows firewall plugin's, each with the line pointing to the full licence). Their download, use and
+removal are the base's three page-only hooks, each refusing any ask but a person's signed in at the platform's page;
+each acceptance of a licence is kept in that person's own login store, never in a file. IPinfo Lite, for networks, is
+named and not offered (the user, 2026-11-25: each source offered only after their yes): its row waits for your word,
+with no button, no card and no key asked (apis.GEOIP_SOURCES).
+
     python -m plugin_platform_firewall_linux status | tables | rules [PRESET] [WORDS] | setup [STEP ...] | exposure
                                              | allow NAME PORT[,PORT ...] [tcp|udp] | remove NAME
                                              | run [--elevated] -- COMMAND
@@ -156,7 +165,7 @@ from .rights import PASSWORD_FIELD, Rights
 from .network import LinuxNetwork
 from liminal_libs.machines.segments import NetworkHost
 
-__version__ = "0.11.0"
+__version__ = "0.12.0"
 READ_S = 60.0  # the configuration read is kept this long; a change, a Refresh read it again
 READ_TIMEOUT_S = 90.0
 FRONTS = ("ufw", "firewalld")
@@ -243,6 +252,9 @@ class LinuxFirewallPlugin(Firewall, LinuxNetwork):
     GEOIP_ASN_URL, GEOIP_ASN_LICENCE = cards.GEOIP_ASN_URL, cards.GEOIP_ASN_LICENCE
     RDAP_BOOTSTRAP = cards.RDAP_BOOTSTRAP  # liminal-libs 1.72.1: the routers' networks are looked up from these
     ATTRIBUTION, PUBLIC_DNS = cards.ATTRIBUTION, cards.PUBLIC_DNS
+    # 0.12.0 (liminal-libs 1.101.0): the GeoIP sources (apis.py), places and networks chosen apart, DB-IP's the default
+    # for both; their download, use and removal the base's three page-only hooks. IPinfo Lite is named, not offered.
+    GEOIP_SOURCES = cards.GEOIP_SOURCES
     # The Netstat tab, the hosts database and the globe's filters and layers (0.9.0): the base's too (its TABS, HOOKS,
     # JOB_HOOKS, CANCEL_HOOKS and keys, from liminal-libs 1.65.0; an older base reads none of it). The data sets the
     # globe's layers are downloaded from are this plugin's to name (apis.py): OpenStreetMap's through the Overpass API,

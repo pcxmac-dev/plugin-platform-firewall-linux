@@ -15,7 +15,10 @@ Google's name servers, asked for this network's public address. Their addresses 
 library names no outside host: GEOIP_URL (this month's GeoIP file), GEOIP_LICENCE (its licence in words, shown before
 the download), ATTRIBUTION (DB-IP's credit, beside the places) and PUBLIC_DNS (the name servers). `facts` says what the
 tab watched and which GeoIP file it has open (or last had open, once it was let go), asking nothing either: it reads
-the tab through the base's world_view(make=False), which never makes one.
+the tab through the base's world_view(make=False), which never makes one. The GeoIP sources (0.12.0, liminal-libs
+1.101.0) are named here too (GEOIP_SOURCES): DB-IP's two files, at GEOIP_URL and GEOIP_ASN_URL, and IPinfo Lite for
+networks, named and not offered, so it has no card yet; the Windows firewall plugin names the same sources in the same
+words, and both plugins' tests pin their digest.
 
 And the Netstat tab's and the globe's internet infrastructure (0.9.0; the user, 2026-11-16: "the firewall app should
 have a 'netstat' like interface for looking at active ports and what apps they are attached to, and the hosts that
@@ -44,6 +47,7 @@ from __future__ import annotations
 import time
 
 from liminal_libs import geo
+from liminal_libs.machines import geosources
 from liminal_libs.sources.apis import Api, Area, Call, Link
 
 from .rights import Paths
@@ -88,6 +92,65 @@ GEOIP_ASN_LICENCE = (  # DB-IP's own terms for it (db-ip.com/db/download/ip-to-a
     "Geolocation by DB-IP\", linked, wherever its networks are. It is updated monthly. The download is about 5 MB "
     "(9.2 MB unpacked, 485,292 ranges), and one copy is kept on this machine, beside the GeoIP file.")
 ATTRIBUTION = {"text": "IP Geolocation by DB-IP", "url": "https://db-ip.com"}  # DB-IP's own link, as its terms give it
+# 0.12.0 (liminal-libs 1.101.0, Monday list item 20; the user, 2026-11-19: "add a way to download different GEOIP
+# sources"): the GeoIP sources the World Wide Web tab offers, places and networks chosen apart, the first the default
+# (machines/geosources.py reads each dict; every host, licence and credit is named here, never in the library). DB-IP's
+# two files are GEOIP_URL and GEOIP_ASN_URL above, in the same folders; each acceptance is kept in your own login store
+# (licence-dbip-lite and licence-dbip-asn-lite) when you ask from the platform's page. IPinfo Lite, for networks, is
+# named and not offered (the user, 2026-11-25: each source offered only after their yes): its row says it waits for your
+# word, no button, no key asked, nothing downloaded. The Windows firewall plugin names the same dicts in the same words
+# (its CITY_LITE_LICENCE and ASN_LITE_LICENCE, each with the line pointing to the full licence), and both plugins' tests
+# pin their digest.
+CC_BY_URL = "https://creativecommons.org/licenses/by/4.0/"
+CC_BY_SA_URL = "https://creativecommons.org/licenses/by-sa/4.0/"
+DBIP_CITY_WORDS = (
+    "DB-IP's IP to City Lite is free under the Creative Commons Attribution 4.0 International licence (CC BY 4.0, "
+    "creativecommons.org/licenses/by/4.0): it may be used, shared and changed for any purpose, as long as DB-IP is "
+    "credited. So wherever its places are shown, this page says \"IP Geolocation by DB-IP\" with a link to db-ip.com. "
+    "It comes as it is, with no warranty, and its places are approximate. The download is about 60 MB (about 121 MB "
+    "unpacked); DB-IP puts out a new one each month. "
+    + geosources.pointer(CC_BY_URL)
+)
+DBIP_ASN_WORDS = (
+    "DB-IP's IP to ASN Lite is free under the Creative Commons Attribution 4.0 International licence (CC BY 4.0, "
+    "creativecommons.org/licenses/by/4.0): it may be used, shared and changed for any purpose, as long as DB-IP is "
+    "credited. So wherever its networks are shown, this page says \"IP Geolocation by DB-IP\" with a link to "
+    "db-ip.com. It comes as it is, with no warranty. The download is about 5 MB (9.2 MB unpacked, 485,292 ranges); "
+    "DB-IP puts out a new one each month. "
+    + geosources.pointer(CC_BY_URL)
+)
+IPINFO_LITE = "https://ipinfo.io/data/ipinfo_lite.mmdb"  # the token goes in its query, the only way IPinfo's pages show
+IPINFO_LITE_LICENCE = (
+    "IPinfo Lite is free under the Creative Commons Attribution-ShareAlike 4.0 International licence (CC BY-SA 4.0), "
+    "for commercial use too: it may be used, shared and changed for any purpose, as long as IPinfo is credited and what "
+    "is shared of it, changed or not, is shared under the same licence. So wherever its networks are shown, this page "
+    "says \"IP address data powered by IPinfo\" with a link to ipinfo.io. It comes as it is, with no warranty. It needs "
+    "a free IPinfo account: its token is read from your own login store during the download and sent to ipinfo.io in "
+    "the download's address alone. The file is about 24 MB, not packed; IPinfo puts out a new one every day, ten "
+    "downloads a day per address, and an update is offered here a week after the file installed was built. "
+    + geosources.pointer(CC_BY_SA_URL)
+)
+GEOIP_SOURCES = (
+    {"id": "dbip", "title": "DB-IP Lite", "maker": "DB-IP", "hosts": ["download.db-ip.com"], "files": [
+        {"role": "places", "title": "DB-IP IP to City Lite", "url": GEOIP_URL, "packing": "mmdb.gz",
+         "size": "about 60 MB (about 121 MB unpacked)",
+         "licence": {"words": DBIP_CITY_WORDS, "name": "CC BY 4.0", "pair": "dbip-lite", "version": "CC BY 4.0",
+                     "url": CC_BY_URL},
+         "credit": ATTRIBUTION},
+        {"role": "networks", "title": "DB-IP IP to ASN Lite", "url": GEOIP_ASN_URL, "packing": "mmdb.gz",
+         "size": "about 5 MB (9.2 MB unpacked)",
+         "licence": {"words": DBIP_ASN_WORDS, "name": "CC BY 4.0", "pair": "dbip-asn-lite", "version": "CC BY 4.0",
+                     "url": CC_BY_URL},
+         "credit": ATTRIBUTION}]},
+    {"id": "ipinfo", "title": "IPinfo Lite", "maker": "IPinfo", "hosts": ["ipinfo.io"],
+     "keys": {"IPINFO_TOKEN": "token"}, "sends": "query", "query": "token", "offered": False, "files": [
+         {"role": "networks", "title": "IPinfo Lite", "url": IPINFO_LITE, "packing": "mmdb", "shape": "ipinfo-lite",
+          "stem": "ipinfo-lite", "size": "about 24 MB", "sent_on": ["dl.assets.ipinfo.io", "dl.ipinfo.io"],
+          "checksum": "ipinfo-checksums", "checksum_url": IPINFO_LITE + "/checksums", "every_days": 7,
+          "licence": {"words": IPINFO_LITE_LICENCE, "name": "CC BY-SA 4.0", "pair": "ipinfo-lite",
+                      "version": "CC BY-SA 4.0", "url": CC_BY_SA_URL},
+          "credit": {"text": "IP address data powered by IPinfo", "url": "https://ipinfo.io"}}]},
+)
 # the name servers asked for this network's public address, which the GeoIP file places as home when the user set no
 # place of their own: each answers with the asker's own address, and the question names no other machine. (the name, its
 # type, the server asked directly, whose), split by the server's IP version: an IPv6 address is asked over IPv6. The
@@ -987,7 +1050,9 @@ DBIP_LITE = Api(
                       "this month")),
         Area("The licence and attribution", "CC BY 4.0: free to use, crediting DB-IP with a link back wherever its results are shown",
              DBIP + "db/lite.php",
-             covered="shown before the download and accepted in so many words; \"IP Geolocation by DB-IP\" linked beside the places"),
+             covered=("shown before the download and accepted in so many words, the acceptance kept in your own login "
+                      "store when you ask from the platform's page (licence-dbip-lite, licence-dbip-asn-lite; 0.12.0); "
+                      "\"IP Geolocation by DB-IP\" linked beside the places")),
         Area("The MMDB file", ("a MaxMind DB 2.0 search tree of networks; each record's city.names, location, "
                                "country.iso_code, continent and subdivisions"), DBIP + "db/format/ip-to-city-lite/mmdb.html",
              covered=("read with maxminddb, memory-mapped, never read whole into memory, and mapped only while the tab is "
@@ -1004,15 +1069,15 @@ DBIP_LITE = Api(
     calls=(
         Call("GET https://download.db-ip.com/free/dbip-city-lite-<year>-<month>.mmdb.gz", "a month's City Lite file, gzipped",
              "The monthly download",
-             used=("Install the GeoIP file… and Update the GeoIP file…, on your word, as a job: this month's, then last "
-                   "month's on a 404; https on every hop, from download.db-ip.com alone"),
+             used=("Download… and Update… in the GeoIP sources table (0.12.0; Install the GeoIP file… before), on your "
+                   "word, as a job: this month's, then last month's on a 404; https on every hop, from download.db-ip.com alone"),
              docs=DBIP + "db/download/ip-to-city-lite"),
         Call("GET https://download.db-ip.com/free/dbip-city-lite-<year>-<month>.csv.gz", "the same as CSV", "The CSV files",
              docs=DBIP + "db/download/ip-to-city-lite"),
         Call("GET https://download.db-ip.com/free/dbip-country-lite-<year>-<month>.mmdb.gz", "a month's Country Lite file",
              "IP to Country Lite", docs=DBIP + "db/download/ip-to-country-lite"),
         Call("GET https://download.db-ip.com/free/dbip-asn-lite-<year>-<month>.mmdb.gz", "a month's ASN Lite file",
-             "IP to ASN Lite", used="Install the ASN file… and Update…, once the GeoIP file is in and you accept its licence, run by the platform as a job: this month's, else last month's; https on every hop, from download.db-ip.com alone", docs=DBIP + "db/download/ip-to-asn-lite"),
+             "IP to ASN Lite", used="Download… and Update… in the GeoIP sources table (0.12.0; Install the ASN file… before), once you accept its licence, run by the platform as a job: this month's, else last month's; https on every hop, from download.db-ip.com alone", docs=DBIP + "db/download/ip-to-asn-lite"),
         Call("maxminddb.open_database(<file>, MODE_MMAP_EXT)", "the file opened, memory-mapped by the C extension",
              "The MMDB file", used="the file opened for lookups (MODE_MMAP, pure Python, without the extension); a download checked",
              docs=READER_DOCS),

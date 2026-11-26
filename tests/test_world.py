@@ -11,13 +11,20 @@ never CAP_NET_ADMIN. What an XDP program at the adapter drops is said unseen, fr
 tab learned is on its cards, asking nothing, through the base's world_view(make=False). Inside a WSL distribution the
 page ends with what WSL changes for it (the library's world.under_wsl); on Windows and macOS nothing is made at all.
 
+Since 0.12.0, with liminal-libs 1.101.0, the install buttons are the GeoIP sources table: DB-IP's two files offered,
+downloaded only for a person signed in at the platform's page (a stand-in store, Store), their acceptance kept there and
+never in the licences file; IPinfo Lite named and not offered.
+
 Nothing is captured, downloaded or asked of a name server: the capture, the download and the lookup are stand-ins, the
 GeoIP files tiny ones written here (mmdb_file.py), and libpcap, the route, nslookup and urllib fail the test if reached.
 The machine's commands are a stand-in that keeps every one: the tab runs none."""
 from __future__ import annotations
 
+import contextlib
 import gzip
+import hashlib
 import inspect
+import json
 import io
 import os
 import re
@@ -33,10 +40,12 @@ from pathlib import Path
 import pytest
 
 from liminal_libs import capture, dns, geo, netpath
-from liminal_libs.apps.authorization import EnvironmentLogin
+from liminal_libs.apps import Login, Unauthorized, as_user
+from liminal_libs.apps.asking import PAGE, asking
+from liminal_libs.apps.authorization import LICENCE, EnvironmentLogin
 from liminal_libs.apps.tabs import Tab
 from liminal_libs.capture import ACK, PSH, SYN, CaptureError, Packet
-from liminal_libs.machines import world
+from liminal_libs.machines import geosources, world
 from liminal_libs.machines.firewall import Firewall
 from liminal_libs.machines.linux import Shell, why_not_native
 from liminal_libs.machines.world import LicenceRefused, WorldView, servers_of
@@ -73,6 +82,59 @@ PLACES = [("81.2.69.0/24", city("GB", "United Kingdom", "London", 51.5142, -0.09
           ("175.16.199.0/24", city("CN", "China", "Changchun", 43.88, 125.3228)),
           ("8.8.8.0/24", city("US", "United States", "Mountain View", 37.386, -122.0838))]
 WINDOWS = why_not_native("The Linux firewall", "win32", "10", {})
+# 0.12.0: the GeoIP sources' digest (sha256 of apis.GEOIP_SOURCES as canonical JSON: sorted keys, no spaces, UTF-8), the
+# same the Windows firewall plugin's tests pin: the two plugins name the same sources in the same words, and a source
+# changed changes both
+GEOIP_SOURCES_SHA256 = "d51938accb2b636d7f4f261f1c5aeb8307cdf547060090aacacfbd069fa2ba95"
+CC_BY = "https://creativecommons.org/licenses/by/4.0/"
+
+
+class Store(Login):
+    """A person's own login store, as the login app's session is (liminal-libs 1.101.0's tests have one): their pairs,
+    settings kept. No key in it is a real one."""
+
+    keeps_settings = True
+
+    def __init__(self, name="alice", pairs=None):
+        self.name, self.pairs, self.asked = name, dict(pairs or {}), []
+
+    def user(self):
+        return {"name": self.name}
+
+    def vector(self, name):
+        self.asked.append(name)
+        if name not in self.pairs:
+            raise Unauthorized("no such pair", 404)
+        return self.pairs[name][1]
+
+    def names(self):
+        return set(self.pairs)
+
+    def setting(self, name):
+        kept = self.pairs.get(name)
+        return json.loads(kept[1]) if kept else None
+
+    def keep_setting(self, name, value, kind="preference", label=""):
+        self.pairs[name] = (kind, json.dumps(value))
+        return {"name": name, "kind": kind}
+
+
+@pytest.fixture
+def licences(tmp_path, monkeypatch):
+    """The licences file the library keeps for programs (apps.accept_licence): never written by a GeoIP download."""
+    path = tmp_path / "licences.json"
+    monkeypatch.setenv("LIMINAL_LICENCES_FILE", str(path))
+    return path
+
+
+def cells(row) -> list:
+    """A table row's cells as words: a cell's text, a button's title, "" for none."""
+    return [c.get("text", c.get("title", "")) if isinstance(c, dict) else c for c in row]
+
+
+def titles(page: dict) -> dict:
+    """The page's tables by their titles."""
+    return {t["title"]: t for t in page.get("tables") or ()}
 MACOS = why_not_native("The Linux firewall", "darwin", "24.1.0", {})
 
 
@@ -145,7 +207,8 @@ class Watched(LinuxFirewallPlugin):
 
     def make_world_view(self) -> WorldView:
         self.views += 1
-        return WorldView(self.name, timeout=self.WORLD_TIMEOUT, **self.view_args)
+        # 0.12.0: the plugin's GeoIP sources, as the base's make_world_view gives them (liminal-libs 1.101.0)
+        return WorldView(self.name, timeout=self.WORLD_TIMEOUT, **{"sources": self.world_sources(), **self.view_args})
 
     def make_netstat_view(self):
         def reader() -> dict:
@@ -462,7 +525,11 @@ def test_what_an_xdp_program_at_the_adapter_watched_drops_is_said_unseen_from_th
 
 # -- the GeoIP file: DB-IP's, on the user's word --------------------------------------------------------------------------
 @needs_reader
-def test_db_ips_file_is_downloaded_from_its_own_address_only_once_its_licence_is_accepted(tmp_path):
+def test_db_ips_file_is_downloaded_from_its_own_address_only_once_its_licence_is_accepted(tmp_path, licences):
+    """0.12.0 (liminal-libs 1.101.0): the GeoIP sources table in place of the install buttons, DB-IP's two files
+    offered and IPinfo Lite named, not offered; a download asked by a person signed in at the platform's page, its
+    acceptance kept in their own login store (licence-dbip-lite), never in the licences file; any other ask refused
+    before anything is read."""
     folder = tmp_path / "geoip"
     downloads = Downloads({NOVEMBER_FILE: gzip.compress(mmdb(PLACES, built=NOVEMBER))})
     book = TrafficBook(clock=lambda: 50.0)
@@ -470,32 +537,63 @@ def test_db_ips_file_is_downloaded_from_its_own_address_only_once_its_licence_is
     traffic_of(book)
     page = fw.world()
     assert all(o["lat"] is None for o in page["globe"]["origins"]) and page["globe"]["attribution"] is None  # none placed yet
-    [form] = page["forms"]
-    assert (form["id"], form["hook"], form["title"]) == ("world-geoip", "world_geoip", "Install the GeoIP file")
-    assert form["job"] is True and form["hook"] in fw.JOB_HOOKS  # run as a job by the platform, its progress in the panel
-    assert form["fields"] == [{"name": "accept_licence", "type": "accept", "title": "Accept the GeoIP file's licence?",
-                               "words": MACHINE.GEOIP_LICENCE, "yes": "Accept it and download"}]
+    form, networks = page["forms"]
+    assert (form["id"], form["hook"], form["title"]) == (
+        "world-geoip-get-dbip-places", "world_geoip_get", "Download DB-IP IP to City Lite")
+    assert (networks["id"], networks["title"]) == ("world-geoip-get-dbip-networks", "Download DB-IP IP to ASN Lite")
+    # run as a job by the platform, its progress in the panel, its Cancel the page's
+    assert form["job"] is True and form["hook"] in fw.JOB_HOOKS and form["hook"] in fw.CANCEL_HOOKS
+    licence = cards.DBIP_CITY_WORDS
+    assert form["fields"] == [{"name": "source", "type": "fixed", "value": "dbip"},
+                              {"name": "role", "type": "fixed", "value": "places"},
+                              {"name": "accept_licence", "type": "accept", "title": "Accept its licence (CC BY 4.0)?",
+                               "words": licence, "yes": "Accept it and download"}]
+    assert licence.endswith(geosources.pointer(CC_BY))  # a summary: the full licence's page applies
     words = form["confirm"]["words"]
-    assert "downloaded from download.db-ip.com" in words and str(folder) in words
-    assert "its progress shows in the panel below, and it stops by itself after 30 minutes" in words
-    assert words.index(MACHINE.GEOIP_LICENCE) < words.index("You are asked to accept it next")  # the licence first
-    assert page["actions"] == [{"form": "world-geoip", "title": "Install the GeoIP file…",
-                                "note": "Downloads it once you accept its licence"}]
+    assert f"is downloaded from download.db-ip.com, and kept in {folder}," in words
+    assert "Its progress shows in the panel below; it stops by itself after 30 minutes" in words
+    assert words.index(licence) < words.index("You are asked to accept it next")  # the licence first
+    assert [cells(r) for r in titles(page)["GeoIP sources"]["rows"]] == [
+        ["DB-IP IP to City Lite", "places", "CC BY 4.0", "none needed", "not downloaded", "", "Download…", ""],
+        ["DB-IP IP to ASN Lite", "networks", "CC BY 4.0", "none needed", "not downloaded", "", "Download…", ""],
+        ["IPinfo Lite", "networks", "CC BY-SA 4.0", "not asked", "not offered: waiting for your word", "", "", ""]]
+    assert not page.get("actions")
     assert form["hook"] in fw.interface()["hooks"]  # a hook the platform may ask
-    # the platform asks it with the form's field false until its own, second confirmation: refused, nothing downloaded
-    with pytest.raises(LicenceRefused) as refused:
-        fw.ask(form["hook"], False)
-    assert refused.value.accept == "accept_licence" == form["fields"][0]["name"]
-    for almost in (None, 1, "true", "yes"):
-        with pytest.raises(LicenceRefused):
-            fw.world_geoip(almost)
-    assert downloads.asked == [] and not folder.exists()
-    out = fw.ask(form["hook"], True)  # accepted, in so many words
+    # the platform asks it with the form's fields, the accept field false until its own, second confirmation: refused,
+    # nothing downloaded
+    fixed = ["dbip", "places"]
+    alice = Store()
+    with asking(PAGE), as_user(alice):
+        with pytest.raises(LicenceRefused) as refused:
+            fw.ask(form["hook"], *fixed, False)
+        assert refused.value.accept == "accept_licence" == form["fields"][-1]["name"]
+        for almost in (None, 1, "true", "yes"):
+            with pytest.raises(LicenceRefused):
+                fw.world_geoip_get(*fixed, almost)
+    # anyone but a person signed in at the page is refused by the hook itself: no asker, another plugin, the platform's
+    # own login (it keeps no settings)
+    for who, login in ((None, None), ("another-plugin", Store("bob")), (PAGE, EnvironmentLogin(env={}))):
+        with contextlib.ExitStack() as stack:
+            if who:
+                stack.enter_context(asking(who))
+            if login is not None:
+                stack.enter_context(as_user(login))
+            with pytest.raises(geosources.NotAsked, match="sign in"):
+                fw.world_geoip_get(*fixed, True)
+    assert downloads.asked == [] and not folder.exists() and alice.pairs == {}
+    with asking(PAGE), as_user(alice):
+        out = fw.ask(form["hook"], *fixed, True)  # accepted, in so many words
     assert downloads.asked == [(NOVEMBER_FILE, world.READ_S)]  # DB-IP's own address, this month's file, nothing else
     assert out["ok"] is True and out["said"].startswith("installed dbip-city-lite-2026-11.mmdb (built 2026-11-01")
     assert out["lines"][0] == "downloaded from download.db-ip.com"
+    assert out["lines"][-1] == "your acceptance of its licence is kept in your own login store"
     assert [p.name for p in folder.iterdir()] == ["dbip-city-lite-2026-11.mmdb"]
-    # placed from now on, on this machine, DB-IP credited wherever places are; nothing more offered
+    kind, raw = alice.pairs["licence-dbip-lite"]  # her own store: the file and its month, the licence's version and page
+    record = json.loads(raw)
+    assert kind == LICENCE and record["title"] == "DB-IP IP to City Lite, 2026-11" and record["version"] == "CC BY 4.0"
+    assert record["url"] == CC_BY and record["acceptedBy"] == "alice"
+    assert set(alice.pairs) == {"licence-dbip-lite"} and not licences.exists()
+    # placed from now on, on this machine, DB-IP credited wherever places are; its Remove…, and the ASN file's Download…
     page = fw.world()
     by = {o["id"]: o for o in page["globe"]["origins"]}
     assert (by["81.2.69.0/24"]["city"], by["81.2.69.0/24"]["lat"], by["81.2.69.0/24"]["kind"]) == ("London", 51.5142, "allowed")
@@ -505,12 +603,14 @@ def test_db_ips_file_is_downloaded_from_its_own_address_only_once_its_licence_is
     assert page["globe"]["attribution"] == MARK
     places = next(t for t in page["tables"] if t["title"] == "Places")  # (0.9.0: the globe's choice is the first)
     assert "Places: IP Geolocation by DB-IP, https://db-ip.com." in places["note"]
-    asn = [world.ASN_FORM] if hasattr(world, "ASN_FORM") else []  # liminal-libs 1.75.0: the ASN file, once the GeoIP file is in
-    assert [f["id"] for f in page.get("forms", [])] == asn and [a["form"] for a in page.get("actions", [])] == asn
+    assert [f["id"] for f in page.get("forms", [])] == ["world-geoip-remove-dbip-places", "world-geoip-get-dbip-networks"]
+    assert not page.get("actions")
     facts = fw.api_facts()[cards.DBIP_LITE.name]
     assert facts["File"] == "dbip-city-lite-2026-11.mmdb, built 2026-11-01" and facts["Read"].startswith("memory-mapped")
+    # the old install (0.8.0's hook), asked by no person at the page: DB-IP's file as before, nothing recorded
     assert fw.world_geoip(True)["said"].startswith("dbip-city-lite-2026-11.mmdb is installed already")
-    assert len(downloads.asked) == 1  # this month's is there: not downloaded again
+    assert len(downloads.asked) == 1 and not licences.exists()  # this month's is there: not downloaded again
+    fw.world()  # opened again at the tab's ask
     fw.world_view().stop()  # nobody watches: the file is let go, and the cards say so, asking nothing
     assert fw.world_view(make=False).describe()["geoip"]["open"] is False
     facts = fw.api_facts()[cards.DBIP_LITE.name]
@@ -529,7 +629,10 @@ def test_last_months_file_while_this_months_is_not_out_and_nothing_written_when_
     assert out["said"].startswith("installed dbip-city-lite-2026-10.mmdb (built 2026-10-01")
     assert out["lines"][0] == "downloaded from download.db-ip.com: this month's file is not out yet, so last month's"
     page = fw.world()  # older than this month: its update offered
-    assert page["forms"][0]["title"] == "Update the GeoIP file" and page["actions"][0]["title"] == "Update the GeoIP file…"
+    forms = {f["id"]: f for f in page["forms"]}
+    assert forms["world-geoip-get-dbip-places"]["title"] == "Update DB-IP IP to City Lite"
+    assert cells(titles(page)["GeoIP sources"]["rows"][0])[4:] == [
+        "built 2026-10-01; used for places", "", "Update…", "Remove…"]
     fw.detach()
     empty = tmp_path / "empty"
     none = Watched(capture_factory=Feed, geo_folder=empty, wall=Clock(NOW), fetch=Downloads({}))
@@ -602,3 +705,51 @@ def test_its_asn_file_is_db_ips_ip_to_asn_lite_under_the_same_licence():
         assert said in MACHINE.GEOIP_ASN_LICENCE, said
     assert next(a for a in cards.DBIP_LITE.areas if a.name == "IP to ASN Lite").covered
     assert any(c.area == "IP to ASN Lite" and c.used and "dbip-asn-lite" in c.name for c in cards.DBIP_LITE.calls)
+
+
+# -- 0.12.0: the GeoIP sources (liminal-libs 1.101.0, Monday list item 20) ------------------------------------------------
+def test_the_sources_are_db_ips_two_files_first_and_ipinfo_lite_named_not_offered():
+    """The user, 2026-11-19: "add a way to download different GEOIP sources"; 2026-11-25: each source offered only after
+    their yes. DB-IP's two files the default for places and networks, at the addresses and in the words as before;
+    IPinfo Lite for networks named and not offered: no card, no key, nothing asked of anyone."""
+    said = json.dumps(cards.GEOIP_SOURCES, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    assert hashlib.sha256(said.encode("utf-8")).hexdigest() == GEOIP_SOURCES_SHA256  # the Windows plugin's pin too
+    assert MACHINE.GEOIP_SOURCES is cards.GEOIP_SOURCES
+    read, refused = geosources.read(MACHINE.GEOIP_SOURCES, [k.name for k in MACHINE.keys])
+    assert refused == [] and [s.id for s in read] == ["dbip", "ipinfo"]
+    dbip, ipinfo = read
+    assert dbip.offered and not dbip.keys and dbip.hosts == ("download.db-ip.com",) and dbip.roles == ("places", "networks")
+    assert (dbip.file("places").url, dbip.file("networks").url) == (MACHINE.GEOIP_URL, MACHINE.GEOIP_ASN_URL)
+    assert [f.licence.pair for f in dbip.files] == ["dbip-lite", "dbip-asn-lite"]
+    assert all(f.licence.url == CC_BY and f.licence.version == "CC BY 4.0" for f in dbip.files)
+    assert all(dict(f.credit) == MACHINE.ATTRIBUTION for f in dbip.files)  # "IP Geolocation by DB-IP", linked
+    assert not ipinfo.offered and ipinfo.roles == ("networks",) and ipinfo.hosts == ("ipinfo.io",)
+    lite = ipinfo.file("networks")
+    assert (lite.shape, lite.packing, lite.checksum, lite.every_days) == ("ipinfo-lite", "mmdb", "ipinfo-checksums", 7)
+    assert lite.sent_on == ("dl.assets.ipinfo.io", "dl.ipinfo.io") and lite.licence.name == "CC BY-SA 4.0"
+    assert dict(lite.credit) == {"text": "IP address data powered by IPinfo", "url": "https://ipinfo.io"}
+    assert dict(ipinfo.keys) == {"IPINFO_TOKEN": "token"} and ipinfo.sends == "query"
+    # not offered: no key declared or asked, no card, and its licence's pair not among what the plugin keeps
+    assert "IPINFO_TOKEN" not in {k.name for k in MACHINE.keys}
+    assert not any("IPinfo" in (a.name + a.maker) for a in MACHINE.apis)
+    kept = dict(MACHINE.KEEPS)
+    assert {geosources.VAR, "licence-dbip-lite", "licence-dbip-asn-lite"} <= set(kept)
+    assert "licence-ipinfo-lite" not in kept
+    # every word of a source is the plugin's: the library names no host of DB-IP's or IPinfo's
+    source = inspect.getsource(geosources) + inspect.getsource(world)
+    assert "db-ip.com" not in source and "ipinfo.io" not in source
+
+
+def test_ipinfo_lite_is_refused_before_any_key_is_read_or_anything_downloaded(tmp_path, licences):
+    downloads = Downloads({})
+    fw = Watched(capture_factory=Feed, geo_folder=tmp_path / "geoip", clock=Clock(), wall=Clock(NOW), fetch=downloads)
+    alice = Store(pairs={"ipinfo-token": ("key", "Canary_Token-0123456789abcdef")})  # a stand-in: never a real token
+    with asking(PAGE), as_user(alice):
+        with pytest.raises(ValueError, match="not offered: waiting for your word"):
+            fw.world_geoip_get("ipinfo", "networks", True)
+        with pytest.raises(ValueError, match="not offered"):
+            fw.world_geoip_use("ipinfo", "networks")
+        with pytest.raises(ValueError, match="names no"):
+            fw.world_geoip_get("ipinfo", "places", True)
+    assert alice.asked == [] and downloads.asked == [] and not licences.exists()
+    fw.detach()

@@ -27,7 +27,9 @@ READS = ("present", "status", "refresh", "show_rules", "find_rules", "wanted", "
 NETWORK_CHANGES = ("move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
                    "world_watching", "world_geoip", "world_asn", "world_layer_get", "world_layer_remove",
                    "approve_plan", "grant_network", "revoke_network", "set_domain", "withdraw", "repoint",
-                   "remove_leftover", "forget_records")
+                   "remove_leftover", "forget_records",
+                   # 0.12.0: the base's GeoIP sources, their file's download, use and removal (liminal-libs 1.101.0)
+                   "world_geoip_get", "world_geoip_use", "world_geoip_remove")
 
 
 class Neighbour(MachinePlugin):

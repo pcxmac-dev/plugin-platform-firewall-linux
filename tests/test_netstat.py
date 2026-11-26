@@ -201,7 +201,8 @@ def test_the_tab_its_hooks_its_job_and_its_setting_are_the_firewall_bases():
     assert hooks["world_layer_get"].startswith("(dataset, accept_licence=False, log=None) ")
     # a data set's download runs as a job the page may cancel, beside the GeoIP file's and nftables' install
     assert MACHINE.JOB_HOOKS == (*Firewall.JOB_HOOKS, "install_nftables") and "world_layer_get" in MACHINE.JOB_HOOKS
-    assert MACHINE.CANCEL_HOOKS == Firewall.CANCEL_HOOKS == ("world_layer_get",)
+    # liminal-libs 1.101.0 (0.12.0): a GeoIP source's file too, a job the page may cancel
+    assert MACHINE.CANCEL_HOOKS == Firewall.CANCEL_HOOKS == ("world_layer_get", "world_geoip_get")
     assert "world_layer" in MACHINE.READ_HOOKS  # a layer's geometry is a read, which writes no log line
     recording = next(k for k in MACHINE.keys if k.name == hostbook.VARIABLE)
     assert recording.name == "LIMINAL_HOSTS_RECORDING" and not recording.secret

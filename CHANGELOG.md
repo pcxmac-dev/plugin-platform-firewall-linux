@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.13.0 (2026-11-26, provisional)
+## 0.13.0 (2026-11-26)
 
 The globe's newer data sets (the Monday list's items 24, 27, 28, 29 and 32; the user, 2026-11-26: "Build first, ask per
 download", and their answers of the same day), on liminal-libs 1.104.0. Each is offered on the World Wide Web tab's

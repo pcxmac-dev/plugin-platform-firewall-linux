@@ -15,8 +15,6 @@ NETSTAT_LIBS: sockets.py, hostbook.py, machines/netstat.py, machines/infrastruct
   this account may read). None of it needs root, so it keeps the plugin valid where the firewall's own read is refused
   (B-revisions S2: "valid wherever it can read the socket table").
 - `needs_row()`: what the tab and the database need, as a row of the table of what the firewall needs here.
-- `cards(apis, netstat_cards)`: the plugin's cards with the library it runs with: the Netstat tab's left out with an
-  older library, where the plugin reaches none of them (as the Windows firewall plugin has it).
 - `WSL_ROWS` (`wsl_rows`, `with_wsl_rows`): what WSL changes for the tab beyond the library's own Under WSL table
   (sockets.under_wsl), only what was seen in the user's Ubuntu (WSL 2, 2026-11-18, read only): a TCP port listening at
   127.0.0.1 inside it is reached from Windows' own 127.0.0.1 too, and a UDP one is not. How such a connection looks
@@ -61,13 +59,6 @@ WSL_ROWS = (
 def library() -> bool:
     """Whether the library's Firewall base has the Netstat tab (liminal-libs NETSTAT_LIBS)."""
     return HOOK in tuple(getattr(Firewall, "HOOKS", ()) or ())
-
-
-def cards(apis: tuple, netstat_cards: tuple) -> tuple:
-    """The cards of what the plugin attaches to, with the library it runs with: every one of `apis` where the Firewall
-    base has the Netstat tab (library), else `netstat_cards` (the kernel's socket tables and the data sets' sources)
-    left out, since the plugin reaches none of them there (as the Windows firewall plugin has it)."""
-    return tuple(apis) if library() else tuple(a for a in apis if a not in netstat_cards)
 
 
 def tables_here() -> bool:

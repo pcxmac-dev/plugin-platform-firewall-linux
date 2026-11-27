@@ -1,34 +1,26 @@
-"""The Netstat tab, the hosts database and the globe's filters and layers as this plugin has them (0.9.0; the library's
-Firewall base, liminal-libs 1.65.0; the user, 2026-11-16: "the firewall app should have a 'netstat' like interface for
-looking at active ports and what apps they are attached to, and the hosts that they connect to across the lan or wan";
-"the globe-firewall should allow filtering, so i can view apps connected to hosts all across the globe, or ports
-talking to all hosts"; "have all the backbones,ibones, major internet infrastructure, (as many as possible) datacenter
-locations").
+"""The Netstat tab and the hosts database as this plugin has them (0.9.0; the library's Firewall base, liminal-libs
+1.65.0; the user, 2026-11-16: "the firewall app should have a 'netstat' like interface for looking at active ports and
+what apps they are attached to, and the hosts that they connect to across the lan or wan").
 
-The tab, its hooks, its job and its setting are the base's. This plugin names the data sets the globe's layers come
-from (OpenStreetMap's through the Overpass API, Wikidata's, EMODnet's, the Internet Topology Zoo's maps of backbone
-networks: the user, 2026-11-19, "major network 'bones' need to be displayed on the map"): each one the library reads,
-asked at its card's address in the one request its card names, with its licence, its credit and its wait, the same as
-the Windows firewall plugin's (their digest pinned in both). Its card of the kernel's socket
-tables names every file the library's reader reads. A listener another user holds is named from the firewall's read
-kept, running no command. The plugin is valid and present wherever the socket table can be read, its table of what
-the firewall needs saying what the tab needs; inside WSL 2 the tab's Under WSL table ends with what was seen in the
-user's Ubuntu; on Windows and macOS nothing is read; a firewall attached under a login that says always records
-nothing real; the cards' facts ask nothing.
+The tab, its hooks and its setting are the base's. Its card of the kernel's socket tables names every file the
+library's reader reads. A listener another user holds is named from the firewall's read kept, running no command. The
+plugin is valid and present wherever the socket table can be read, its table of what the firewall needs saying what
+the tab needs; inside WSL 2 the tab's Under WSL table ends with what was seen in the user's Ubuntu; on Windows and
+macOS nothing is read; a firewall attached under a login that says always records nothing real; the cards' facts ask
+nothing.
 
-Nothing real: the socket table is a stand-in reading (the suite's guard refuses the real one), the hosts database and
-the layers' folder are in tmp_path (the same guard), the GeoIP folder is tmp_path's, no download is made and no name
-server asked (refused here), and the machine's commands are a stand-in that keeps every one."""
+0.14.0 (the user, 2026-11-26, "Delete now"): the globe, its data sets and their tests are plugin-platform-worldwideweb's
+(its tests/test_globe_sets.py pins the data sets' digest these tests pinned); none of it is said or tested here.
+
+Nothing real: the socket table is a stand-in reading (the suite's guard refuses the real one), the hosts database is in
+tmp_path (the same guard), no name server is asked (refused here), and the machine's commands are a stand-in that keeps
+every one."""
 from __future__ import annotations
 
-import gzip
-import hashlib
 import inspect
-import io
 import json
 import os
 import re
-import tarfile
 import threading
 import time
 import types
@@ -44,22 +36,18 @@ from liminal_libs.apps.authorization import EnvironmentLogin  # noqa: E402
 from liminal_libs.machines import infrastructure, world  # noqa: E402
 from liminal_libs.machines import linux as linux_mod  # noqa: E402
 from liminal_libs.machines.firewall import Firewall  # noqa: E402
-from liminal_libs.machines.infrastructure import DataSet, Index, form  # noqa: E402
 from liminal_libs.machines.linux import Shell, why_not_native  # noqa: E402
 from liminal_libs.machines.netstat import NetstatView  # noqa: E402
-from liminal_libs.machines.world import size_words  # noqa: E402
 from liminal_libs.sources.apis import problems  # noqa: E402
 from liminal_libs.sources.conformance import problems as conformance  # noqa: E402
 
 from plugin_platform_firewall_linux import MACHINE, LinuxFirewallPlugin  # noqa: E402
 from plugin_platform_firewall_linux import apis as cards  # noqa: E402
 from plugin_platform_firewall_linux import netstat as netstat_mod  # noqa: E402
-from plugin_platform_firewall_linux import world_in  # noqa: E402
 from plugin_platform_firewall_linux.groups import UNKNOWN  # noqa: E402
 
 from conftest import Reached  # noqa: E402
 from machines import SUDO, FakeLinux  # noqa: E402
-from test_apis import pattern  # noqa: E402
 
 TABLES_HERE = netstat_mod.tables_here  # the real one, taken before any test (the suite's conftest stands it in)
 NOW = time.time()
@@ -71,28 +59,6 @@ NAMED_BY_READ = "named by the firewall's own root read; its pid is not read"
 UNDER = {"title": "Under WSL", "note": "What running inside a WSL distribution changes for this tab.",
          "columns": [{"title": "What"}, {"title": "Here"}, {"title": "What it means"}],
          "rows": [["This Linux", "WSL 2: Ubuntu", "a WSL distribution on Windows: the sockets listed are its own"]]}
-# the data sets' digest (sha256 of apis.INFRASTRUCTURE as canonical JSON: sorted keys, no spaces, UTF-8): the Windows
-# firewall plugin names the same data sets, and its tests pin the same digest: a data set changed changes both
-INFRASTRUCTURE_SHA256 = "15a12e765ec87d2314e9510c29d62e600901001d7600a122a9d0c09774f48e8a"  # 0.13.0: nineteen
-# a map of the Topology Zoo's as its toolset wrote them (a network's values, its points with their places, its links),
-# in its archive's shape (gml.tar.gz: gzipped tar of GML files); none of it recorded
-NORDU = ('graph [\n  Network "NORDUnet"\n  DateYear "2010"\n  node [\n    id 0\n    label "Stockholm"\n'
-         '    Longitude 18.0649\n    Internal 1\n    Latitude 59.33258\n  ]\n  node [\n    id 1\n    label "Oslo"\n'
-         '    Longitude 10.74609\n    Internal 1\n    Latitude 59.91273\n  ]\n  node [\n    id 2\n    label "GEANT"\n'
-         '    Internal 0\n    Longitude 4.9\n    Latitude 52.4\n  ]\n  edge [\n    source 0\n    target 1\n  ]\n'
-         '  edge [\n    source 0\n    target 2\n  ]\n]\n')
-
-
-def zoo_archive(maps: dict) -> bytes:
-    """Maps in a gzipped tar, as the Topology Zoo's gml.tar.gz holds them."""
-    out = io.BytesIO()
-    with tarfile.open(fileobj=out, mode="w") as tar:
-        for name, text in maps.items():
-            data = text.encode("utf-8")
-            info = tarfile.TarInfo(name)
-            info.size = len(data)
-            tar.addfile(info, io.BytesIO(data))
-    return gzip.compress(out.getvalue(), mtime=0)
 
 
 def sock(proto="tcp", local=LAN, local_port=41000, remote="", remote_port=0, *, state="established", pid=2000,
@@ -158,8 +124,7 @@ def plugin(fake=None, native: str = "") -> LinuxFirewallPlugin:
 
 
 class Tabbed(LinuxFirewallPlugin):
-    """The plugin with its Netstat view over a stand-in socket table (the rows given), counting its readings, and its
-    own data sets."""
+    """The plugin with its Netstat view over a stand-in socket table (the rows given), counting its readings."""
 
     def __init__(self, rows=None, fake=None):
         super().__init__(shell=Shell("local", runner=fake or FakeLinux("debian-13-nftables")), native="")
@@ -170,8 +135,7 @@ class Tabbed(LinuxFirewallPlugin):
             self.readings += 1
             return reading(self.rows, at=time.time())
         return NetstatView(self.name, reader=reader, names={}, login_of=lambda: getattr(self, "login", None),
-                           listeners=self.netstat_listeners,
-                           index=Index(datasets=[DataSet.of(d) for d in self.INFRASTRUCTURE]))
+                           listeners=self.netstat_listeners)
 
 
 class Bare(LinuxFirewallPlugin):
@@ -191,178 +155,32 @@ def texts(cells) -> list:
 
 # -- the tab, its hooks, its job and its setting: the base's -----------------------------------------------------------
 def test_the_tab_its_hooks_its_job_and_its_setting_are_the_firewall_bases():
-    # 0.14.0: with liminal-libs 1.105.0 the World Wide Web tab is plugin-platform-worldwideweb's, not the base's
-    first = 0 if not world_in() else 1
-    assert MACHINE.TABS[:first + 1] == Firewall.TABS
-    assert [t.id for t in MACHINE.TABS] == ["world", "netstat", "container_networks"][1 - first:]  # 0.11.0: Networks
-    tab = MACHINE.TABS[first]
+    # 0.14.0: the World Wide Web tab is plugin-platform-worldwideweb's (liminal-libs 1.105.0), none of it here
+    assert MACHINE.TABS[:1] == Firewall.TABS
+    assert [t.id for t in MACHINE.TABS] == ["netstat", "container_networks"]  # 0.11.0: Networks
+    tab = MACHINE.TABS[0]
     assert (tab.title, tab.hook, tab.every) == ("Netstat", "netstat", netstat.EVERY) and netstat.EVERY == 3.0
-    mine = getattr(netstat, "FIREWALL_HOOKS", netstat.HOOKS) if not world_in() else netstat.HOOKS
-    assert set(mine) <= set(MACHINE.HOOKS) and MACHINE.HOOKS[:len(Firewall.HOOKS)] == Firewall.HOOKS
+    assert set(netstat.FIREWALL_HOOKS) <= set(MACHINE.HOOKS) and MACHINE.HOOKS[:len(Firewall.HOOKS)] == Firewall.HOOKS
+    assert not set(netstat.GLOBE_HOOKS) & set(MACHINE.HOOKS)
     hooks = MACHINE.interface()["hooks"]
     assert hooks["netstat"].startswith("()")  # asked with no arguments, as every tab's hook
     assert LinuxFirewallPlugin.netstat.__doc__.splitlines()[0] == (  # the line the Internal API tab draws
         "The Netstat tab's page: the listening ports and the open connections with the program behind each.")
-    if not world_in():  # 0.14.0: the data sets' and the GeoIP files' jobs left with the World Wide Web tab
-        assert MACHINE.JOB_HOOKS == ("install_nftables",) and not {h for h in hooks if h.startswith("world")}
-        assert "capture_unseen" in hooks and "capture_unseen" in MACHINE.READ_HOOKS
-        assert conformance(MACHINE) == [] and "Netstat tab" in MACHINE.about and "globe" not in MACHINE.about
-        return
-    assert hooks["world_layer_get"].startswith("(dataset, accept_licence=False, log=None) ")
-    # a data set's download runs as a job the page may cancel, beside the GeoIP file's and nftables' install
-    assert MACHINE.JOB_HOOKS == (*Firewall.JOB_HOOKS, "install_nftables") and "world_layer_get" in MACHINE.JOB_HOOKS
-    # liminal-libs 1.101.0 (0.12.0): a GeoIP source's file too, a job the page may cancel
-    assert MACHINE.CANCEL_HOOKS == Firewall.CANCEL_HOOKS == ("world_layer_get", "world_geoip_get")
-    assert "world_layer" in MACHINE.READ_HOOKS  # a layer's geometry is a read, which writes no log line
+    # 0.14.0: the data sets' and the GeoIP files' jobs left with the World Wide Web tab
+    assert MACHINE.JOB_HOOKS == ("install_nftables",) and not {h for h in hooks if h.startswith("world")}
+    assert "capture_unseen" in hooks and "capture_unseen" in MACHINE.READ_HOOKS
+    assert MACHINE.INFRASTRUCTURE == () and not hasattr(MACHINE, "SKY_PACKAGE")  # the base's empty default
+    assert not hasattr(MACHINE, "GEOIP_SOURCES") and not hasattr(MACHINE, "PUBLIC_DNS")
+    assert "globe" not in MACHINE.about and "World Wide Web" not in MACHINE.about
     recording = next(k for k in MACHINE.keys if k.name == hostbook.VARIABLE)
     assert recording.name == "LIMINAL_HOSTS_RECORDING" and not recording.secret
     assert recording.hint.startswith("optional")
     assert conformance(MACHINE) == [] and "Netstat tab" in MACHINE.about and "hosts database" in MACHINE.about
 
 
-# -- the data sets: the library's, at their cards' addresses -----------------------------------------------------------
-def test_every_data_set_is_one_the_library_reads_asked_in_the_one_request_its_card_names():
-    assert MACHINE.INFRASTRUCTURE is cards.INFRASTRUCTURE
-    sets = [DataSet.of(d) for d in MACHINE.INFRASTRUCTURE]  # each reads, as the base's make_netstat_view reads it
-    assert [d.id for d in sets] == ["osm-datacentres", "osm-cables", "osm-lines", "wikidata", "emodnet-cables",
-                                    "topology-zoo", "ourairports", "geonames-cities",
-                                    # 0.13.0 (liminal-libs 1.104.0): test_the_newer_data_sets_... below
-                                    "afterfibre", "ne-roads", "ne-railways", "ne-roads-na", "topohub-world",
-                                    "atlas-probes", "atlas-traceroutes", "atlas-traceroutes6", "celestrak-starlink",
-                                    "celestrak-oneweb", "celestrak-hughesnet"]
-    sets = sets[:8]  # the eight of 0.9.0 to 0.12.0, each one request its card names
-    card_of = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET,
-               "gml": cards.TOPOLOGY_ZOO,
-                "ourairports": cards.OURAIRPORTS_API, "geonames": cards.GEONAMES_API}
-    assert [d.format for d in sets] == ["overpass", "overpass", "overpass", "sparql", "geojson", "gml",
-                                         "ourairports", "geonames"]
-    for d, said in zip(sets, MACHINE.INFRASTRUCTURE[:8]):
-        card = card_of[d.format]
-        address = d.address()
-        assert d.url == card.base and d.host == card.base.split("/")[2]
-        assert address.startswith(card.base + "?") if d.query else address == card.base  # a file: its address alone
-        [get] = [c for c in card.used if c.name.startswith("GET ")]  # the one request each download makes
-        assert pattern(get.name).search(address), (d.id, get.name)
-        assert d.wait <= infrastructure.INSTALL_S
-        assert d.about == said["about"] and d.title == said["title"]  # said whole: none cut to fit
-    assert {d.host for d in sets} == {"overpass-api.de", "query.wikidata.org", "ows.emodnet-humanactivities.eu",
-                                      "raw.githubusercontent.com",
-                                      "davidmegginson.github.io", "download.geonames.org"}
-    # (critique M7) Overpass prints tags and a point or a line alone, never every way's nodes; each data set waits on
-    # its socket as long as its query may run, and a margin
-    for d in sets[:3]:
-        assert re.findall(r"out ([a-z ]+?) qt;", d.query) and all(
-            o.startswith("tags ") for o in re.findall(r"out ([a-z ]+?) qt;", d.query)), d.query
-        limit = int(re.match(r"\[out:json\]\[timeout:(\d+)\];", d.query).group(1))
-        assert limit < d.wait <= infrastructure.INSTALL_S, d.id
-    assert 60 < sets[3].wait <= infrastructure.INSTALL_S  # the query service's own deadline is 60 s (its user manual)
-    # EMODnet's six telecom cable layers, as GeoJSON, longitude first (the library refuses a WFS asked otherwise)
-    emodnet = sets[4]
-    assert "srsName=EPSG:4326" in emodnet.query and "outputFormat=application/json" in emodnet.query
-    assert re.search(r"typeName=([^&]+)", emodnet.query).group(1).split(",") == list(cards.EMODNET_LAYERS)
-    assert "pcables" not in emodnet.query and len(cards.EMODNET_LAYERS) == 6  # the power cables are not asked for
-    # the licences, shown first and accepted in so many words, and the credits beside every feature drawn
-    for d in sets[:3]:
-        assert d.licence == cards.ODBL and d.credit == cards.OSM_CREDIT and d.licence_name == "ODbL 1.0"
-    assert "Open Database License 1.0" in cards.ODBL and "© OpenStreetMap contributors" in cards.ODBL
-    assert cards.OSM_CREDIT == {"text": "© OpenStreetMap contributors",
-                                "url": "https://www.openstreetmap.org/copyright"}
-    assert sets[3].licence == cards.CC0 and "Creative Commons Zero" in cards.CC0 and sets[3].licence_name == "CC0"
-    assert sets[4].licence == cards.EMODNET_LICENCE and sets[4].licence_name == "CC BY 4.0"
-    assert "This data was downloaded from the EMODnet Portal" in cards.EMODNET_LICENCE
-    assert cards.EMODNET_CREDIT["text"] == "EMODnet Human Activities; data originator Cogea Srl"
-    # the Topology Zoo's maps: its archive alone (348,613 bytes as GitHub gave it), CC BY 4.0, credited as asked, and
-    # said for what they are: logical links of about 2010 and 2011, not today's networks nor their fibre
-    zoo = sets[5]
-    assert (zoo.url, zoo.query, zoo.size, zoo.licence_name) == (cards.ZOO_GML, "", 348_613, "CC BY 4.0")
-    assert zoo.licence == cards.ZOO_LICENCE and zoo.credit == cards.ZOO_CREDIT and zoo.credit["text"] in zoo.licence
-    assert zoo.credit["text"].startswith("Internet Topology Zoo (Knight, Nguyen, Falkner, Bowden, Roughan, IEEE JSAC")
-    for words in ("Creative Commons Attribution 4.0", "logical links", "not the networks of today", "newest map"):
-        assert words in cards.ZOO_LICENCE, words
-    # the lines on land most like backbones: none on power poles; Wikidata's data centres of every kind
-    assert '["submarine"!="yes"][!"power"];' in sets[2].query and "none on power poles" in sets[2].about
-    assert "{ VALUES ?kind { wd:Q671224 } ?item wdt:P31/wdt:P279* ?kind . }" in sets[3].query
-    assert all(f"wd:{k}" in sets[3].query for k in infrastructure.KINDS)
-    licences = {x.url for c in cards.NETSTAT for x in c.links if x.kind == "terms"}
-    assert {"https://opendatacommons.org/licenses/odbl/1-0/", "https://www.openstreetmap.org/copyright",
-            "https://www.wikidata.org/wiki/Wikidata:Licensing", "https://creativecommons.org/licenses/by/4.0/",
-            cards.ZOO_RAW + "LICENSE"} <= licences
-    # nothing names PeeringDB, root-server sites or a cloud's regions: not free-licensed, or no licence stated
-    said = json.dumps(cards.INFRASTRUCTURE).lower()
-    assert "peeringdb" not in said and "root-servers" not in said
-
-
-def test_the_submarine_cables_are_asked_of_every_telecom_category_the_map_uses():
-    """The user, 2026-11-16: "have all the backbones,ibones, major internet infrastructure, (as many as possible)". A
-    submarine cable's use is its seamark:cable_submarine:category: the OSM wiki names a fibre optic cable "optical",
-    and the map spells it, and telephone's, other ways too (taginfo, 2026-11-18: telephone 749, fibre_optic 366,
-    fiber_optic 64, optical 5, telefon 2, telegraph, communication and telephone/fibre_optic 1 each). Every one of them
-    is asked for, as a whole value, and no power, mooring or ferry cable."""
-    cables = next(d for d in cards.INFRASTRUCTURE if d["id"] == "osm-cables")
-    [categories] = re.findall(r'\["seamark:cable_submarine:category"~"([^"]+)"\]', cables["query"])
-    for value in ("optical", "fibre_optic", "fiber_optic", "telephone", "telefon", "telegraph", "communication",
-                  "telephone/fibre_optic"):
-        assert re.search(categories, value), value
-    for value in ("power", "mooring", "ferry", "sensor", "disused", "optical_x", "non_optical"):  # whole values alone
-        assert not re.search(categories, value), value
-    assert cables["about"] == "about 1,200 cable ways and 60 landing stations"
-    queries = {a.name: a for a in cards.OVERPASS_API.areas}["Queries"].covered
-    assert "optical, fibre_optic and fiber_optic, telephone, telegraph" in queries  # the card says which
-
-
-def test_the_data_sets_are_pinned_as_the_windows_firewall_plugin_names_them():
-    """The Windows firewall plugin names the same data sets, in the same order (apis.INFRASTRUCTURE there, compared key
-    by key on 2026-11-19), and its tests pin the same digest. Kept alike by hand, the two drifted once unseen (the
-    review's finding 12: there osm-cables asked two of the eight telecom categories), so a change to them is a change
-    made on purpose, to both plugins and to both pins."""
-    said = json.dumps(cards.INFRASTRUCTURE, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
-    assert hashlib.sha256(said.encode("utf-8")).hexdigest() == INFRASTRUCTURE_SHA256
-
-
-def test_the_topology_zoos_maps_are_read_into_backbones_and_their_points_of_presence():
-    """A map in the shape the Topology Zoo's archive holds it, read by the library as the plugin names it: its own
-    points with a place, the link between two of them, the point of another network's and the link to it left out."""
-    zoo = next(d for d in cards.INFRASTRUCTURE if d["id"] == "topology-zoo")
-    found = infrastructure.parse(zoo, zoo_archive({"gml/Nordu2010.gml": NORDU}))
-    assert found["layers"]["pops"]["points"] == [(18.0649, 59.33258, "Stockholm (NORDUnet)", "NORDUnet, 2010"),
-                                                 (10.74609, 59.91273, "Oslo (NORDUnet)", "NORDUnet, 2010")]
-    assert found["layers"]["backbones"]["lines"] == [([(10.74609, 59.91273), (18.0649, 59.33258)],
-                                                      "NORDUnet, 2010: Oslo to Stockholm")]
-    assert found["dropped"] == {"outside its network": 1, "between points not drawn": 1}
-    layers = {x[0]: x for x in infrastructure.LAYERS}
-    assert layers["backbones"][1:] == ("Backbones, about 2010-2011", "lines", "line", 7, True, 4.0)
-    assert layers["pops"][1:3] == ("Backbones' points of presence, about 2010-2011", "points")
-
-
-@pytest.mark.skipif(not world_in(), reason="the World Wide Web tab is plugin-platform-worldwideweb's from "
-                                          "liminal-libs 1.105.0")
-def test_the_plugins_view_offers_each_data_set_as_a_job_its_licence_first(tmp_path):
-    fw = plugin()
-    view = fw.netstat_view()  # the base's own, over this plugin's data sets (none refused)
-    try:
-        assert view.refused == () and [d.id for d in view.index.datasets] == [d["id"] for d in cards.INFRASTRUCTURE]
-        # the plugin's name and its version, nothing of yours (no version where its distribution says none)
-        assert view.agent == netstat.agent_of(fw.name, fw.version) and view.agent.startswith("firewall-linux")
-        forms = {f["id"]: f for f in view.index.forms(can=True)}
-        # each, but one read with another (RIPE Atlas's traceroutes with its probes) until that one is in
-        offered = [d for d in cards.INFRASTRUCTURE if not d.get("needs")]
-        assert sorted(forms) == sorted(f"world-layer-{d['id']}" for d in offered)
-        assert len(offered) == len(cards.INFRASTRUCTURE) - 2 and "world-layer-atlas-traceroutes" not in forms
-        assert "world-layer-atlas-traceroutes6" not in forms
-        for d in offered:
-            f = forms[f"world-layer-{d['id']}"]
-            assert f["hook"] == "world_layer_get" and f["job"] is True and f["hook"] in fw.JOB_HOOKS
-            [accept] = [x for x in f["fields"] if x["type"] == "accept"]
-            assert accept["name"] == "accept_licence" and accept["words"] == d["licence"]
-            assert DataSet.of(d).host in f["confirm"]["words"]
-        assert not infrastructure.folder().exists()  # nothing downloaded, nothing made
-    finally:
-        fw.detach()
-
-
 # -- the cards ---------------------------------------------------------------------------------------------------------
 def test_the_socket_tables_card_names_every_file_the_librarys_reader_reads():
-    assert problems(cards.NETSTAT) == [] and cards.APIS[-13:] == cards.NETSTAT  # 0.13.0: six more
+    assert problems(cards.NETSTAT) == [] and cards.APIS[-1:] == cards.NETSTAT  # 0.14.0: the socket tables' alone
     files = {re.search(r"/proc/(\S+)", c.name).group(1) for c in cards.PROCFS.used}
     assert {f.replace("/<fd>", "") for f in files} == set(sockets.LINUX_FILES)  # those, and no other
     assert all(c.name.split()[0] in ("read", "readlink") for c in cards.PROCFS.used)  # files alone: no command
@@ -604,8 +422,7 @@ def test_on_windows_or_macos_the_netstat_tab_reads_nothing(note):
     fw = plugin(fake, native=note)
     assert fw.ask("netstat") == {"title": "Netstat", "note": f"Not for this machine: {note}. Nothing is read here."}
     with pytest.raises(ValueError, match="not for this machine"):
-        # 0.14.0: with liminal-libs 1.105.0 the data sets are plugin-platform-worldwideweb's: a service of the base's
-        fw.ask("world_layer_get", "osm-datacentres", True) if world_in() else fw.ask("hosts_found", "describe")
+        fw.ask("hosts_found", "describe")  # a service of the base's, which the World Wide Web plugin asks
     assert fw.netstat_view(make=False) is None and fw.netstat_listeners() == {} and not fw.present()
     assert fake.calls == [] and fw.api_facts() == {} and not infrastructure.folder().exists()
     fw.attach(object(), EnvironmentLogin(env={hostbook.VARIABLE: "always"}))
@@ -651,53 +468,29 @@ def test_the_netstat_facts_are_what_the_tab_read_and_asking_them_reads_nothing(m
     assert facts["Recording"] == "only while this plugin's Netstat or World Wide Web tab is shown"
     assert re.fullmatch(r"\d+ rows? \(\d+ hosts?, \d+ programs?\), .+, in .+hosts\.db(, recorded since .+)?",
                         facts["Hosts database"]), facts
-    for d in cards.INFRASTRUCTURE:  # each data set under its source's card, none downloaded
-        card = {"overpass": cards.OVERPASS_API, "sparql": cards.WIKIDATA, "geojson": cards.EMODNET,
-                "gml": cards.TOPOLOGY_ZOO,
-                "ourairports": cards.OURAIRPORTS_API, "geonames": cards.GEONAMES_API,
-                "shapefile": cards.NATURAL_EARTH_API, "mvt": cards.AFTERFIBRE_API,
-                "topohub": cards.TOPOHUB_API, "atlas-probes": cards.RIPE_ATLAS, "atlas-latest": cards.RIPE_ATLAS,
-                "omm-csv": cards.CELESTRAK_API}[d["format"]]
-        assert fw.api_facts()[card.name][d["title"]].startswith("not downloaded: the World Wide Web tab's")
+    assert set(fw.api_facts()) <= {c.name for c in cards.APIS}  # 0.14.0: no data set's card, nor its words
     fw.detach()
     assert cards.PROCFS.name not in fw.api_facts()  # detached: the view let go, nothing said
-    # each data set under its source's card: one installed, one being downloaded, one not downloaded
+    # a view that still describes data sets (an older library's): 0.14.0, their words are the World Wide Web plugin's
     view = types.SimpleNamespace(describe=lambda: {
         "reading": None, "book": None, "mode": "always", "recording": False, "error": "",
         "sets": [{"id": "osm-datacentres", "title": "Data centres", "format": "overpass", "installed": True,
                   "features": 5073, "fetched": "2026-11-18T20:00:00+00:00", "bytes": 1_234_567,
-                  "downloading": False},
-                 {"id": "wikidata", "title": "Exchange points, ground stations and teleports", "format": "sparql",
-                  "installed": False, "features": 0, "fetched": None, "downloading": True},
-                 {"id": "emodnet-cables", "title": "Telecom cable routes in European waters", "format": "geojson",
-                  "installed": False, "features": 0, "fetched": None, "downloading": False}]})
+                  "downloading": False}]})
     made: list = []
     said = cards.netstat_facts(types.SimpleNamespace(netstat_view=lambda make=True: made.append(make) or view))
-    assert made == [False] and said[cards.PROCFS.name] == {
-        "Last reading": "none yet: the socket tables are read while the Netstat or World Wide Web tab is shown",
+    assert made == [False] and said == {cards.PROCFS.name: {
+        "Last reading": ("none yet: the socket tables are read while the Netstat tab or the World Wide Web plugin's "
+                         "tab is shown"),
         "Recording": "all the time the platform runs, but not recording now",
-        "Hosts database": ("not opened yet: it is read and written while one of the two tabs is shown, or as "
-                           "recording says")}
-    size = world.size_words(1_234_567)
-    assert said[cards.OVERPASS_API.name] == {"Data centres": f"5,073 features, fetched 2026-11-18 ({size})"}
-    assert said[cards.WIKIDATA.name] == {"Exchange points, ground stations and teleports":
-                                         "being downloaded now (its progress is in the plugin's panel)"}
-    assert said[cards.EMODNET.name]["Telecom cable routes in European waters"].startswith("not downloaded")
-    assert cards.netstat_facts(object()) == {}  # a library from before the Netstat tab: nothing
+        "Hosts database": ("not opened yet: it is read and written while the Netstat tab or the World Wide Web "
+                           "plugin's tab is shown, or as recording says")}}
+    assert cards.netstat_facts(object()) == {}  # no view to ask: nothing
     broken = types.SimpleNamespace(netstat_view=lambda make=True: types.SimpleNamespace(describe=lambda: 1 / 0))
     assert cards.netstat_facts(broken) == {}  # what the tab read is extra: the cards are drawn without it
     # the base's view is reached through its accessor alone (netstat_view, liminal-libs 1.65.0)
     source = inspect.getsource(cards.netstat_facts)
     assert "_netstat" not in source.replace("netstat_facts", "") and "__dict__" not in source
-
-
-@pytest.mark.skipif(not world_in(), reason="the World Wide Web tab is plugin-platform-worldwideweb's from "
-                                          "liminal-libs 1.105.0")
-def test_with_a_library_from_before_the_netstat_tab_its_cards_and_its_words_are_left_out(monkeypatch):
-    assert netstat_mod.cards(cards.APIS, cards.NETSTAT) == cards.APIS == MACHINE.apis  # this library has it
-    assert "Netstat tab" in MACHINE.about  # (its words follow the library the plugin was loaded with)
-    monkeypatch.setattr(netstat_mod, "library", lambda: False)
-    assert netstat_mod.cards(cards.APIS, cards.NETSTAT) == cards.FIREWALL + cards.WORLD  # it reaches none of them there
 
 
 # -- the plugin's own lines --------------------------------------------------------------------------------------------
@@ -708,151 +501,3 @@ def test_the_lines_written_for_the_netstat_tab_are_120_characters_at_most():
         assert long == [], (path.name, long)
 
 
-# -- liminal-libs 1.104.0: the fibre, its stand-ins, backbones, RIPE Atlas and the satellites (the Monday list's items
-# 24, 28, 29 and 32), the same in both firewall plugins -------------------------------------------------------------
-def _newer_sets() -> dict:
-    return {d["id"]: DataSet.of(d) for d in cards.INFRASTRUCTURE[8:]}
-
-
-def test_the_newer_data_sets_are_read_by_the_library_each_with_its_licence_and_credit_said_first(tmp_path):
-    """Item 24: AfTerFibre's fibre as its map's 56 tiles at zoom 5 (its site offers no file now), Natural Earth's roads
-    and railways as stand-ins for fibre, their one redirect to its CDN alone; items 28 and 29: TopoHub's model and RIPE
-    Atlas's probes and traceroutes, the traceroutes read with the probes; item 32: CelesTrak's three constellations,
-    asked compressed, never twice on a busy answer, Update… held back 2 hours, HughesNet's three satellites by their
-    numbers. Each said whole and offered as the eight before them (form)."""
-    sets = _newer_sets()
-    fibre = sets["afterfibre"]
-    assert (fibre.format, fibre.layer, fibre.member, len(fibre.tiles)) == ("mvt", "fibre", "fiber", 56)
-    assert {z for z, _, _ in fibre.tiles} == {5} and fibre.host == "d316kar6yg8hyq.cloudfront.net"
-    assert "never kept" in fibre.about and "contributors' names and e-mail addresses are never kept" in fibre.licence
-    for ident, layer, member in (("ne-roads", "roads", "ne_10m_roads"),
-                                 ("ne-railways", "railways", "ne_10m_railroads")):
-        d = sets[ident]
-        assert (d.format, d.layer, d.member, d.stand_in, d.step) == ("shapefile", layer, member, True, 0.05)
-        assert d.hosts == ("naciscdn.org",) and d.url.endswith(f"/download/10m/cultural/{member}.zip")
-        assert "a stand-in for fibre" in d.title and d.licence_name == "Public domain"
-    assert dict(sets["ne-roads"].drop) == {"featurecla": ("Ferry",)}
-    assert dict(sets["ne-railways"].drop) == {"featurecla": ("Railroad ferry",)}
-    assert sets["topohub-world"].format == "topohub" and "No licence is stated" in sets["topohub-world"].licence
-    probes, traces = sets["atlas-probes"], sets["atlas-traceroutes"]
-    assert (probes.format, traces.format, traces.needs) == ("atlas-probes", "atlas-latest", "atlas-probes")
-    assert traces.addresses(range(1, 601)) == [f"{cards.ATLAS_LATEST}?format=json&probe_ids="
-                                               + ",".join(str(i) for i in range(at, at + 300)) for at in (1, 301)]
-    for d in (probes, traces):
-        assert "article 4.5" in d.licence and "non-commercial" in d.licence_name
-    sky = [sets[f"celestrak-{c}"] for c in ("starlink", "oneweb", "hughesnet")]
-    assert [d.constellation for d in sky] == ["starlink", "oneweb", "hughesnet"]  # their colours' order
-    assert all((d.format, d.retry, d.every, d.gzip, d.host) == ("omm-csv", False, 7200.0, True, "celestrak.org")
-               for d in sky)
-    assert sky[2].addresses() == [f"{cards.CELESTRAK_GP}?CATNR={n}&FORMAT=csv" for n in ("38551", "41893", "57479")]
-    for d in sets.values():
-        assert d.credit["text"] in d.licence and d.about and d.title  # the credit the licence asks for, in its words
-        f = form(d, tmp_path)
-        words = f["confirm"]["words"]
-        assert f["job"] is True and f["hook"] == "world_layer_get" and size_words(d.size) in words
-        assert words.index(d.licence) < words.index("You are asked to accept it next")  # the licence first
-
-
-def test_hughesnets_satellites_are_drawn_with_their_full_cap(tmp_path):
-    """The user, 2026-11-26 ("Full 25° cap"): no beams' countries are named (those written from memory are gone), so
-    the sky gives each HughesNet satellite its full 25-degree cap: no beams in the globe's spec."""
-    from liminal_libs.machines import satellites
-    assert _newer_sets()["celestrak-hughesnet"].beams == ()
-    assert not hasattr(cards, "HUGHESNET_BEAMS") and not hasattr(cards, "AMERICAS")
-    view = satellites.SkyView(Index(tmp_path / "infrastructure", cards.INFRASTRUCTURE), cards.SGP4_PACKAGE,
-                              data_dir=tmp_path)
-    assert [c["beams"] for c in view.spec()["constellations"]] == [{}, {}, {}]
-
-
-def test_the_users_answers_of_2026_11_26_are_in_the_data_sets_and_their_words(tmp_path):
-    """The user, 2026-11-26: RIPE Atlas's every connected probe, and IPv6 (6152) beside IPv4 (5151), their limits
-    raised for them alone and said in their confirmations; CelesTrak's orbits refreshed by themselves while the tab is
-    open, nothing asked for 15 minutes after a 500 or 503; North America's roads offered on their own, their limit
-    raised; AfTerFibre's licence said unconfirmed; TopoHub's data said to state no licence."""
-    from liminal_libs.machines import infrastructure
-    sets = _newer_sets()
-    v4, v6 = sets["atlas-traceroutes"], sets["atlas-traceroutes6"]
-    assert (v4.ask, v4.family, v4.needs, v4.url) == ("probes", 4, "atlas-probes", cards.ATLAS_LATEST)
-    assert (v6.ask, v6.family, v6.needs, v6.url) == ("probes", 6, "atlas-probes", cards.ATLAS_LATEST6)
-    assert "/measurements/6152/" in v6.url and (v4.most, v6.most) == (100 << 20, 64 << 20)
-    assert v4.limit > infrastructure.MAX_ANSWER and sets["atlas-probes"].most == 0
-    words = form(v4, tmp_path)["confirm"]["words"]
-    assert size_words(v4.size) in words and "a limit raised for this data set alone" in words
-    for d in (v4, v6, sets["atlas-probes"]):
-        assert "non-commercial" in d.licence_name and "article 4.5" in d.licence
-        assert d.credit["text"] == "RIPE Atlas (RIPE NCC)" and d.credit["text"] in d.licence
-    sky = [sets[f"celestrak-{c}"] for c in ("starlink", "oneweb", "hughesnet")]
-    assert all((d.refresh, d.pause, d.every, d.retry, d.gzip) == (True, 900.0, 7200.0, False, True) for d in sky)
-    assert ("fetched again by themselves every 2 hours at the soonest, and only while the World Wide Web tab is open"
-            in sky[0].licence) and "never again by themselves" not in sky[0].licence
-    assert "again by itself every 2 hours at the soonest" in form(sky[0], tmp_path)["confirm"]["words"]
-    na = sets["ne-roads-na"]
-    assert (na.layer, na.stand_in, na.most, na.size, na.hosts) == ("roads", True, 96 << 20, 45_570_000,
-                                                                   ("naciscdn.org",))
-    assert na.url == cards.NATURAL_EARTH_DOWNLOAD + "ne_10m_roads_north_america.zip" and na.member == ""
-    words = form(na, tmp_path)["confirm"]["words"]
-    assert size_words(na.size) in words and "a limit raised for this data set alone" in words
-    assert "(whose link sends it on to naciscdn.org, the only host it may go to)" in words
-    assert "sends it on once to naciscdn.org" in na.licence
-    fibre = sets["afterfibre"]
-    assert fibre.licence_name.startswith("unconfirmed") and fibre.licence.startswith(
-        "AfTerFibre's licence is unconfirmed.")
-    assert "No licence is stated for its data" in sets["topohub-world"].licence
-    assert "no licence stated for its data" in sets["topohub-world"].about
-
-
-def test_the_sgp4_package_is_pinned_offered_with_its_sum_and_licence_and_nothing_is_placed_without_it(tmp_path):
-    """Item 32: the orbit math is the sgp4 package's, pinned here (its wheel's address, size and sha256 as PyPI's own
-    file list gave them), offered on the tab beside the data sets, and until it is downloaded the sky says it needs it
-    and places nothing. Each constellation its own colour, in the data sets' order."""
-    from liminal_libs.machines import satellites
-    package = satellites.Package.of(cards.SGP4_PACKAGE)
-    assert package.version == "2.27" and package.licence_name == "MIT" and "MIT licence" in package.licence
-    assert package.source.url.startswith("https://files.pythonhosted.org/packages/")
-    assert package.source.url.endswith("/" + package.source.name) and len(package.source.sha256) == 64
-    assert MACHINE.SKY_PACKAGE is cards.SGP4_PACKAGE and "satellites" in cards.SGP4_API.about
-    view = satellites.SkyView(Index(tmp_path / "infrastructure", cards.INFRASTRUCTURE), cards.SGP4_PACKAGE,
-                              data_dir=tmp_path)
-    spec = view.spec()
-    assert [(c["id"], c["slot"], c["count"]) for c in spec["constellations"]] == [
-        ("starlink", 1, 0), ("oneweb", 2, 0), ("hughesnet", 3, 0)]
-    assert spec["needs"] and "sgp4" in view.read(0)["needs"]  # nothing placed without the package
-    [offer] = view.forms()
-    words = offer["confirm"]["words"]
-    assert offer["job"] is True and package.source.sha256 in words and "files.pythonhosted.org" in words
-    assert size_words(package.source.size) in words and offer["fields"][0]["words"] == package.licence
-    assert not (tmp_path / "packages").exists()  # nothing downloaded, nothing made
-
-
-def test_the_newer_sources_cards_name_their_pages_and_the_requests_made_of_them():
-    named = {a.name: a for a in cards.APIS}
-    for card in cards.GLOBE2:
-        assert named[card.name] is card and card in cards.NETSTAT and card.verified == cards.VERIFIED_GLOBE2
-        assert card.used and all("on the World Wide Web tab" in c.used for c in card.used)
-    for card in (cards.NATURAL_EARTH_API, cards.AFTERFIBRE_API, cards.TOPOHUB_API, cards.RIPE_ATLAS):
-        assert card.link("terms")
-    assert "never decoded or kept" in cards.AFTERFIBRE_API.about and "art. 4.5" in cards.RIPE_ATLAS.limits
-    assert "every 2 hours" in cards.CELESTRAK_API.limits and cards.SGP4_PACKAGE["url"] in cards.SGP4_API.used[0].name
-    assert problems(cards.APIS) == []
-
-
-def test_the_sgp4_wheel_pinned_is_this_machines():
-    """The user, 2026-11-26: on Linux the faster manylinux abi3 wheel, as PyPI's own file list of 2.27 gave it (218,130
-    bytes, sha256 4d377531...), on x86-64 with glibc and Python 3.11 or later; on arm64, on musl (Alpine) or an older
-    Python, the pure Python wheel, the same math, slower."""
-    from liminal_libs.machines import satellites
-    assert cards.sgp4_wheel("x86_64", "glibc", (3, 12)) == "manylinux_x86_64"
-    assert cards.sgp4_wheel("aarch64", "glibc", (3, 12)) == "any"  # arm64: the pure wheel
-    assert cards.sgp4_wheel("x86_64", "", (3, 12)) == "any"  # musl's libc: no manylinux wheel loads
-    assert cards.sgp4_wheel("x86_64", "glibc", (3, 10)) == "any"  # abi3 for 3.11 on
-    fast, pure = cards.sgp4_package("manylinux_x86_64"), cards.sgp4_package("any")
-    assert (fast["size"], fast["sha256"]) == (218_130,
-                                              "4d3775313120dcb6239535fa0c94cb6d5b089fd84bbfb15220923ae38dec7296")
-    assert fast["url"] == ("https://files.pythonhosted.org/packages/d6/75/"
-                           "633ad7874db149df164168090951e676cdc3541a12d43b2cbb9d20ecb721/"
-                           "sgp4-2.27-cp311-abi3-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl")
-    assert (pure["name"], pure["size"], pure["sha256"]) == (
-        "sgp4-2.27-py3-none-any.whl", 123_299, "5f3f5716649988b638fbe7fcda592830e0956f548ca273b93cfa5f75917b9087")
-    for pinned in (fast, pure):
-        assert satellites.Package.of(pinned).source.url.endswith("/" + pinned["name"])
-    assert cards.SGP4_PACKAGE == cards.sgp4_package(cards.sgp4_wheel())

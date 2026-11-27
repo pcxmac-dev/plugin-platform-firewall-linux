@@ -8,10 +8,10 @@ version = "0.14.0"  # the plugin's own release (CHANGELOG.md); the app shows it 
 description = """\
   Linux firewall for Liminal: the native Linux machine's whole firewall read and changed from the platform's page \
   (nftables, iptables nf_tables and legacy, ebtables, arptables, ipset, firewalld, ufw, conntrack, eBPF and XDP read \
-  only), under systemd, OpenRC or SysV scripts, on the major distributions and Gentoo; its World Wide Web tab, the \
-  places its traffic comes from and goes to on a globe and its ports' traffic, watched while the tab is shown; and \
-  its Netstat tab: the listening ports and the connections with their programs, the hosts each program talks with \
-  recorded on this machine, and the globe filtered by them over the internet's infrastructure."""
+  only), under systemd, OpenRC or SysV scripts, on the major distributions and Gentoo; its Netstat tab: the \
+  listening ports and the connections with their programs, the hosts each program talks with recorded on this \
+  machine (the globe that draws them is plugin-platform-worldwideweb's); and its Networks tab, the container \
+  plugins' segments routed and named."""
 readme = "README.md"
 requires-python = ">=3.10"
 # the library it plugs into (the machine kind: liminal_libs.machines, plugin API 2.2: what it attaches to, 1.49.0; the
@@ -23,10 +23,13 @@ requires-python = ">=3.10"
 # netstat.library, rights.library); on 1.65.0 the Topology Zoo's data set alone is left out, in words. 1.96.0:
 # NetworkHost (0.11.0); 1.101.0: the GeoIP sources (machines/geosources.py) and their three page-only hooks (0.12.0)
 # 1.104.0: the globe's newer data sets, the plugin's own infrastructure database and the sky (0.13.0)
-dependencies = ["liminal-libs[geo]>=1.104.0"]
+# 1.105.0 (0.14.0): the World Wide Web tab is plugin-platform-worldwideweb's, and the Firewall base offers the services
+# it asks; with it the GeoIP reader, the tab's cards and the code for an older library went (the user, 2026-11-26:
+# "Delete now"), so the geo extra too
+dependencies = ["liminal-libs>=1.105.0"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "maxminddb>=3.2"]  # maxminddb: the World Wide Web tab's tests read a GeoIP file they write
+dev = ["pytest>=8"]
 
 [project.entry-points."liminal.providers"]
 firewall-linux = "plugin_platform_firewall_linux"

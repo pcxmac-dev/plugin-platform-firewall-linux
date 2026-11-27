@@ -2,8 +2,8 @@
 the Firewall base for that plugin, which asks a firewall through the platform what only a firewall knows. Beside the
 base's services (the socket table's reading, the hosts recorded, the routes kept, the rules covering a port), this
 plugin tells it what an XDP program at the adapter its capture watches drops before libpcap sees it (capture_unseen),
-in the words its own tab said until then, from the read kept and running no command. On Windows and macOS each
-refuses in words. A library before 1.105.0 has none of them: the tests are skipped there."""
+in the words its own tab said until 0.13.0, from the read kept and running no command. On Windows and macOS each
+refuses in words. 0.14.0: the plugin needs liminal-libs 1.105.0, so they are always there."""
 from __future__ import annotations
 
 import pytest
@@ -11,12 +11,10 @@ import pytest
 from liminal_libs import internal
 from liminal_libs.machines.linux import Shell
 
-from plugin_platform_firewall_linux import LinuxFirewallPlugin, world_in
+from plugin_platform_firewall_linux import LinuxFirewallPlugin
 
 from machines import FakeLinux
 
-pytestmark = pytest.mark.skipif(world_in(), reason="a library before 1.105.0: the World Wide Web tab is still this "
-                                                   "plugin's, and no other plugin asks these")
 SERVICES = ("netstat_seen", "hosts_found", "hosts_routes", "rules_covering", "hosts_keep_route", "hosts_keep_places",
             "hosts_clear_places", "capture_unseen")
 WINDOWS = "The Linux firewall is for Linux: this machine runs Windows"

@@ -1,23 +1,28 @@
 # Changelog
 
-## 0.14.0 (provisional)
+## 0.14.0 (2026-11-26)
 
 The World Wide Web tab leaves this plugin for plugin-platform-worldwideweb 0.1.0 (Monday list item 33), on liminal-libs
-1.105.0, whose Firewall base no longer has it. This plugin keeps its rules, its Netstat tab, the hosts' recording and the
-Networks tab. Floor unchanged: on a library before 1.105.0 the tab is as in 0.13.0, for one release more.
+1.105.0, whose Firewall base no longer has it; and what this plugin kept of it for an older library is deleted (the
+user, 2026-11-26: "Delete now"). This plugin keeps its rules, Root access, its Netstat tab, the hosts' recording and
+the Networks tab. Floor: liminal-libs 1.105.0, without the geo extra.
 
-- **With liminal-libs 1.105.0** (`world_in`): its tabs are Netstat and Networks; no hook, key, form or card of the World
-  Wide Web tab is its own (libpcap, DB-IP, OpenDNS, Google and the data sets' sources are in plugin-platform-
-  worldwideweb's apis.py, moved word for word); its jobs are nftables' install alone; its page-only changes are those
-  its hooks have; its words no longer name a globe.
+- **Its tabs are Netstat and Networks**; no hook, key, form or card of the World Wide Web tab is its own; its jobs are
+  nftables' install alone; its words no longer name a globe. Its cards are fourteen: the firewall's thirteen and the
+  socket tables'. libpcap and the right to capture, DB-IP, OpenDNS, Google and the globe's data sets' sources (0.13.0's
+  six newer ones among them), with the data sets themselves (`INFRASTRUCTURE`, its digest), the GeoIP sources and the
+  sgp4 package's pins, are plugin-platform-worldwideweb's, moved there word for word, and deleted here.
 - **`capture_unseen(address)`**, a read the World Wide Web plugin asks: what an XDP program at the adapter its capture
-  watches drops before libpcap sees it, in the words this plugin's tab said until now (xdp_words), from the read kept,
-  running no command. Beside it, the base's services: the socket table's reading, the hosts recorded, the routes kept,
-  the rules covering a port, and the changes only another plugin may ask.
+  watches drops before libpcap sees it, in the words this plugin's tab said until 0.13.0 (xdp_words), from the read
+  kept, running no command. Beside it, the base's services: the socket table's reading, the hosts recorded, the routes
+  kept, the rules covering a port, and the changes only another plugin may ask.
 - **The Netstat tab's place column** comes from the World Wide Web plugin's `places`; with that plugin not attached the
   note says why.
-- Tests: the 0.13.0 tab's tests run with an older library and are skipped with 1.105.0 (plugin-platform-worldwideweb
-  holds them); test_services.py covers `capture_unseen` and the services, skipped with an older library.
+- **Deleted:** `world_in`, the tab's `world` and `xdp_unseen`, the GeoIP, name server, data set and sky attributes,
+  `netstat.cards`, the tab's facts (`world_facts`) and the data sets' words in the Netstat facts.
+- Tests: the World Wide Web tab's (test_world.py and its GeoIP file, mmdb_file.py, and the globe's and data sets' in
+  test_netstat.py and test_apis.py) are deleted: plugin-platform-worldwideweb's tests hold them (its
+  tests/test_globe_sets.py pins the data sets' digest). test_services.py covers `capture_unseen` and the services.
 
 ## 0.13.0 (2026-11-26)
 

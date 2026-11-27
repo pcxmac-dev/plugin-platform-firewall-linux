@@ -41,7 +41,8 @@ def test_an_elevated_command_comes_after_sudos_own_double_dash_from_the_library_
     package says so (its floor), and the library the tests run on must hold it, or SUDO below would pass on its
     `sudo -n` alone."""
     assert SUDO[:1] == ["sudo"] and SUDO[-1:] == ["--"]
-    floor = re.search(r'"liminal-libs\[geo\]>=(\d+)\.(\d+)\.(\d+)"', PYPROJECT.read_text(encoding="utf-8"))
+    # 0.14.0: without the geo extra (the GeoIP reader left with the World Wide Web tab)
+    floor = re.search(r'"liminal-libs(?:\[geo\])?>=(\d+)\.(\d+)\.(\d+)"', PYPROJECT.read_text(encoding="utf-8"))
     assert floor and tuple(int(n) for n in floor.groups()) >= (1, 80, 0)
 
 

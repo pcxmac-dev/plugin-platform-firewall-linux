@@ -3,8 +3,10 @@ from its page (PAGE_ONLY_HOOKS, as liminal-libs 1.66.0's apps/asking.py and limi
 made or removed, a default policy, on and off, saving, Root access, nftables' install, and the base's allow and remove.
 Another plugin's ask is refused, and so is an ask that names no one; over HTTP the platform also asks its login whether
 you are at the page. Before, any program on this machine asked them with two headers, a second confirmation being only
-an argument. Its reads are asked by anyone, as before. Asked through the library's own App (its ask, which names who
-asks as the platform's does), over a recorded machine and a stand-in shell: nothing runs, no server is started."""
+an argument. The rules read again and the Rules table's two choices (refresh, show_rules, find_rules) are the page's
+alone too (0.14.1; the user, 2026-11-26: "Yes, closed by default"); its other reads are asked by anyone, as before.
+Asked through the library's own App (its ask, which names who asks as the platform's does), over a recorded machine
+and a stand-in shell: nothing runs, no server is started."""
 from __future__ import annotations
 
 import pytest
@@ -22,7 +24,9 @@ from machines import FakeLinux
 
 CHANGES = ("allow", "remove", "make_rule", "remove_rule", "set_policy", "switch", "save_rules", "root_access",
            "install_nftables")
-READS = ("present", "status", "refresh", "show_rules", "find_rules", "wanted", "netstat", "capture_unseen")
+PAGE_READS = ("refresh", "show_rules", "find_rules")  # read again as root, the Rules table's choices: 0.14.1
+PAGE_ASKS = {"refresh": (), "show_rules": ("all",), "find_rules": ("ssh",)}
+READS = ("present", "status", "wanted", "netstat", "capture_unseen")
 # 0.11.0: the base's other changes, and NetworkHost's (liminal-libs 1.96.0)
 NETWORK_CHANGES = ("move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
                    "approve_plan", "grant_network", "revoke_network", "set_domain", "withdraw", "repoint",
@@ -73,14 +77,15 @@ def attached(monkeypatch):
     app.detach(fw.name)
 
 
-def test_its_changes_are_said_to_be_asked_only_from_its_page_and_its_reads_by_anyone():
+def test_its_changes_and_the_rules_tables_choices_are_said_to_be_asked_only_from_its_page():
     fw = LinuxFirewallPlugin(shell=Shell("local", runner=FakeLinux("ubuntu-24.04-ufw")), native="")
-    assert set(internal.page_only(fw)) == set(CHANGES) | set(NETWORK_CHANGES)  # 0.11.0
+    assert set(internal.page_only(fw)) == set(CHANGES) | set(NETWORK_CHANGES) | set(PAGE_READS)  # 0.11.0, 0.14.1
+    assert set(PAGE_ASKS) == set(PAGE_READS)
     # what the platform reads; 0.14.0, liminal-libs 1.105.0: the base's three changes only the World Wide Web plugin asks
     kept = {"hosts_keep_route", "hosts_keep_places", "hosts_clear_places"}
     assert set(internal.plugin_only(fw)) == {"network_plan", "apply_network", "network_work", *kept}
     assert [p for p in internal.problems(fw) if "ONLY_HOOKS" in p] == []  # each a hook of its own, someone may ask it
-    for hook in CHANGES:
+    for hook in (*CHANGES, *PAGE_READS):
         assert asking.refusal(fw, hook, asking.PAGE) == ""
         assert asking.refusal(fw, hook, "neighbour") == (f"firewall-linux's {hook} is asked only from its page, "
                                                          "never by another plugin: neighbour asked it.")
@@ -98,7 +103,33 @@ def test_another_plugin_or_no_one_asking_a_change_runs_nothing_and_its_page_does
                 lambda: neighbour.wants("root_access", "off")):
         with pytest.raises(asking.AskRefused, match="is asked only from its page"):
             ask()
+    for hook, args in PAGE_ASKS.items():  # Read again and the Rules table's choices: the page's alone
+        for ask in (lambda: neighbour.wants(hook, *args), lambda: app.on_its_own(hook, *args)):
+            with pytest.raises(asking.AskRefused, match=f"firewall-linux's {hook} is asked only from its page") as no:
+                ask()
+            assert no.value.status == 403 and no.value.hook == hook
     assert fake.calls == []  # not even read
     assert neighbour.wants("present") is True  # a read: answered as before
+    assert app.from_page("show_rules", "all")["said"] == "showing all"
+    assert app.from_page("find_rules", "ssh")["said"] == "finding 'ssh'"
+    assert app.from_page("refresh")["said"].startswith("read again: ") and fake.calls and fake.changes == []
     assert app.from_page("switch", "ufw", "off", True)["said"] == "ufw turned off"
     assert fake.changes == [["ufw", "disable"]]
+
+
+def test_no_hook_is_left_undeclared():
+    """0.14.1, closed by default (liminal-libs 1.107.0): every hook it answers says who may ask it, so none is left to
+    the default and the library's conformance has no warning. Its own are read from its words, so that part holds on
+    an older library, whose bases may say less."""
+    from liminal_libs.machines.firewall import Firewall
+    from liminal_libs.machines.segments import NetworkHost
+    from liminal_libs.sources import conformance
+
+    fw = LinuxFirewallPlugin(shell=Shell("local", runner=FakeLinux("ubuntu-24.04-ufw")), native="")
+    said = {h for word in ("READ_HOOKS", "SERVICE_HOOKS", "PLUGIN_ONLY_HOOKS", "PAGE_ONLY_HOOKS")
+            for h in internal.declared(fw, word)} | {t.as_dict()["hook"] for t in fw.TABS}
+    own = [h for h in fw.HOOKS if h not in (*Firewall.HOOKS, *NetworkHost.HOOKS)]
+    assert set(own) >= {*PAGE_READS, "make_rule", "switch"} and [h for h in own if h not in said] == []
+    assert not set(PAGE_READS) & set(internal.declared(fw, "READ_HOOKS"))  # none is opened again as a read
+    warnings = getattr(conformance, "warnings", None)  # liminal-libs 1.107.0
+    assert warnings is None or warnings(fw) == []

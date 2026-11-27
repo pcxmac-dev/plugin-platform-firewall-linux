@@ -183,7 +183,7 @@ from .rights import PASSWORD_FIELD, Rights
 from .network import LinuxNetwork
 from liminal_libs.machines.segments import NetworkHost
 
-__version__ = "0.14.0"
+__version__ = "0.14.1"
 
 
 # 0.14.0: what plugin-platform-worldwideweb asks of this plugin beside the base's services (liminal-libs 1.105.0): the
@@ -263,7 +263,12 @@ class LinuxFirewallPlugin(Firewall, LinuxNetwork):
                        "allow", "remove", "make_rule", "remove_rule", "set_policy", "switch", "save_rules", ROOT_HOOK,
                        INSTALL_HOOK,
                        # 0.11.0 (service-containers-networking §8.1): the base's other changes too
-                       "move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget")
+                       "move_rules", "new_label", "rename_label", "remove_label", "hosts_recording", "hosts_forget",
+                       # 0.14.1 (the user, 2026-11-26: "Yes, closed by default", and of the reads made with a key or
+                       # with rights: "Page-only"): the rules read again, as root, and the Rules table's two choices.
+                       # With them every hook says who may ask it (liminal-libs 1.107.0's conformance.warnings is
+                       # empty)
+                       "refresh", "show_rules", "find_rules")
     # 0.14.0: the World Wide Web tab's (the watching, the GeoIP files, the data sets, the sgp4 package) are
     # plugin-platform-worldwideweb's
 

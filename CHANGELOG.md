@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.14.1 (2026-11-26)
+
+Read again and the Rules table's two choices are asked only from the page. The user, 2026-11-26: "Yes, closed by
+default" (liminal-libs 1.107.0: a hook a plugin declares for no one is its page's alone), and of the reads made with a
+key or with rights: "Page-only".
+
+- **`refresh`, `show_rules` and `find_rules` are page-only** (`PAGE_ONLY_HOOKS`, beside its changes). Read again
+  reads the machine's whole firewall at once, as root; the other two choose what the page's Rules table shows. Until
+  now any plugin, and any program on this machine through the platform, could ask them. Another plugin's ask and an
+  ask that names no one are refused (403) in words, and liminal-platform asks its login whether you are at the page
+  (401 otherwise).
+- `present`, `status`, the tabs, `wanted` and the services the World Wide Web plugin and the container plugins ask
+  stay as they were.
+- Every hook now says who may ask it, so the library's `conformance.warnings` is empty.
+
+Tests: the three refused to another plugin and to no one with nothing run, and answered for the page; a test that no
+hook is left undeclared. They fail when one is taken out of `PAGE_ONLY_HOOKS`, on liminal-libs 1.106.0 and on 1.107.0
+alike. No new requirement: the word is liminal-libs 1.66.0's.
+
 ## 0.14.0 (2026-11-26)
 
 The World Wide Web tab leaves this plugin for plugin-platform-worldwideweb 0.1.0 (Monday list item 33), on liminal-libs

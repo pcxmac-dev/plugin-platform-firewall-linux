@@ -206,7 +206,9 @@ login whether you are at the page before it asks one over HTTP (401 if not; a pl
 before). The second confirmation is the page's: to the hook it is an argument, so until 0.10.0 any program on this
 machine that sent the platform's two headers could make any of these changes (the review of PLT-H1's fix,
 2026-11-24). The framework's setup and the command line call the plugin's code in their own process, not through an
-ask, and the reads are asked by anyone, as before.
+ask. Since 0.14.1 the rules read again, as root, and the Rules table's two choices (`refresh`, `show_rules`,
+`find_rules`) are the page's as well (the user, 2026-11-26: "Yes, closed by default"); the other reads are asked by
+anyone, as before.
 
 **The framework's own rules** (its setup's, the base's `allow`) are made with no second confirmation. Their remote is
 read as the form's other side is (0.10.0): "any" for anywhere, else an address or a network, written canonically, and
